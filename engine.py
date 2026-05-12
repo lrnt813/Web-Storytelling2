@@ -159,6 +159,12 @@ class Cfg:
     elbow_n_init: int = 5
     elbow_max_iter: int = 100
 
+    # ── Titik Aman Semu (Academic Version) ───────────────────────────────────
+    psi_threshold_fragile: float = 0.25
+    psi_threshold_robust: float = 0.1
+    alr_threshold_severe: float = 0.75
+    alr_threshold_minor: float = 0.25
+
     def __post_init__(self):
         b = self.base_dir
         self.input_file  = f"{b}/Kulonprogo_Ready4.gpkg"
@@ -1255,41 +1261,81 @@ def detect_titik_aman_semu(
     skenario: str,
     sk: str,
     cfg: Cfg,
+    baseline_times: Optional[np.ndarray] = None,
+    psi_array: Optional[np.ndarray] = None,
+    t_pen: float = 9999.0,
+    is_isolated_override: Optional[np.ndarray] = None,
 ) -> gpd.GeoDataFrame:
     """
-    Identifikasi grid yang termasuk 'Titik Aman Semu':
-    grid dengan hazard tinggi TAPI terisolasi (tidak bisa mencapai TES dalam threshold).
-    Returns: GeoDataFrame subset grid titik aman semu (kosong jika tidak ada).
+    Identifikasi grid yang termasuk 'Titik Aman Semu' (Hybrid Academic Logic):
+    pseudo_safe = (PSI >= threshold) AND (ALR >= threshold)
     """
-    tc = f"waktu_tes_min_{sk}"
+    # Kolom waktu tempuh saat ini (tanpa prefix intensitas agar konsisten)
+    tc = f"waktu_tes_min_{skenario}" 
     if tc not in gdf_sim.columns:
         logger.warning(f"[detect_titik_aman_semu] kolom {tc} tidak ada")
         return gpd.GeoDataFrame()
 
-    pc = f"sim_prob_{skenario}"
-    hc = cfg.indeks_bahaya.get(skenario)
-    if pc in gdf_sim.columns:
-        m_haz = gdf_sim[pc].fillna(0).values >= 0.5
-    elif hc and hc in gdf_sim.columns:
-        m_haz = gdf_sim[hc].fillna(0).values >= 2
+    # T_current
+    tm_curr = gdf_sim[tc].fillna(cfg.unreachable_time).values
+    
+    # 1. Identifikasi Isolasi (Connectivity Failure)
+    # Jalur komputasi penuh memakai ambang penalty; jalur cache boleh memberi
+    # mask eksplisit agar grid reachable yang waktunya mendekati penalty tidak
+    # salah diberi status isolated.
+    if is_isolated_override is not None:
+        is_isolated = np.asarray(is_isolated_override, dtype=bool)
     else:
-        m_haz = np.ones(len(gdf_sim), bool)
+        is_isolated = (tm_curr >= t_pen * 0.98)
+    
+    # 2. Ambil PSI (Intrinsic Instability)
+    if psi_array is None:
+        psi_col = f"PSI_{skenario}"
+        if psi_col in gdf_sim.columns:
+            psi_array = gdf_sim[psi_col].values
+        else:
+            # Tetap buat kolom agar tidak error di frontend
+            gdf_sim["psi_val"] = 0.0
+            gdf_sim["alr_val"] = np.where(is_isolated, np.nan, 0.0)
+            gdf_sim["is_isolated"] = is_isolated.astype(bool)
+            gdf_sim["is_semu"] = 0
+            return gpd.GeoDataFrame()
+    
+    # 3. Ambil Baseline Times & Hitung ALR (Accessibility Loss Ratio)
+    if baseline_times is None:
+        gdf_sim["psi_val"] = psi_array
+        gdf_sim["alr_val"] = np.where(is_isolated, np.nan, 0.0)
+        gdf_sim["is_isolated"] = is_isolated.astype(bool)
+        gdf_sim["is_semu"] = 0
+        return gpd.GeoDataFrame()
+    
+    # ALR = (T_current - T_baseline) / T_baseline (Murni Matematis)
+    t_base = np.where(baseline_times <= 0, 1e-6, baseline_times)
+    alr_raw = (tm_curr - baseline_times) / t_base
+    
+    # Jika terisolasi, ALR tidak terdefinisi secara rasio (set ke NaN untuk statistik)
+    alr_final = np.where(is_isolated, np.nan, alr_raw)
+    
+    # Simpan metrik ke GDF (SELALU simpan agar muncul di popup)
+    gdf_sim["psi_val"] = psi_array
+    gdf_sim["alr_val"] = alr_final
+    gdf_sim["is_isolated"] = is_isolated.astype(bool)
+    
+    # 3. Filter Final (Logika Akademik)
+    # Area Aman Semu = Fragile (PSI tinggi) DAN (Isolated ATAU ALR Severe)
+    mask_semu = (psi_array >= cfg.psi_threshold_fragile) & (is_isolated | (alr_raw >= cfg.alr_threshold_severe))
+    gdf_sim["is_semu"] = mask_semu.astype(int)
 
-    tm    = gdf_sim[tc].fillna(cfg.unreachable_time).values
-    m_iso = tm >= cfg.isolation_time_threshold
-    oc    = f"jumlah_opsi_rute_{sk}"
-    if oc in gdf_sim.columns:
-        m_iso = m_iso | (gdf_sim[oc].fillna(0).values == 0)
-
-    mask_semu = m_haz & m_iso
-    n_semu    = int(mask_semu.sum())
+    n_semu = int(mask_semu.sum())
+    n_iso  = int(is_isolated.sum())
     logger.info(
-        f"[detect_titik_aman_semu] [{sk}] "
-        f"bahaya={m_haz.sum()} isolasi={m_iso.sum()} semu={n_semu}"
+        f"[detect_titik_aman_semu] PSI >= {cfg.psi_threshold_fragile} & "
+        f"(Iso={n_iso} | ALR >= {cfg.alr_threshold_severe}) -> semu={n_semu}"
     )
 
     if n_semu == 0:
         return gpd.GeoDataFrame()
+        
     gdf_s               = gdf_sim[mask_semu].copy()
     gdf_s["_kategori"]  = "titik_aman_semu"
     gdf_s["_cluster"]   = labels[mask_semu]
@@ -1463,13 +1509,16 @@ def run_pipeline(
     skenario: str,
     intensity: float,
     cfg: Cfg,
-    k_opt_override: Optional[int] = None,      # Tambahkan ini
-    t_pen_override: Optional[float] = None,    # Tambahkan ini
+    k_opt_override: Optional[int] = None,
+    t_pen_override: Optional[float] = None,
     cut_roads: Optional[List[dict]] = None,
     G_override: Optional[nx.Graph] = None,
     nl_override=None,
     tn_override=None,
     w_override=None,
+    baseline_times_override: Optional[np.ndarray] = None,
+    psi_array_override: Optional[np.ndarray] = None,
+    bypass_cache: bool = False,
 ) -> Tuple[gpd.GeoDataFrame, dict, pd.DataFrame, dict]:
     """
     Pipeline lengkap: simulate → filter_tes → build_network → distances →
@@ -1479,7 +1528,69 @@ def run_pipeline(
     sk = cfg.sk_key(skenario, intensity)
     logger.info(f"[run_pipeline] START | skenario={skenario} intensity={intensity} sk={sk}")
 
-    # ── 1. Simulasi ───────────────────────────────────────────────────────────
+    # ── 0. Cek Cache (Hanya jika tidak ada blokade jalan dan tidak bypass) ─────
+    pct = int(intensity * 100)
+    sk_tag = f"{pct}pct"
+    col_cl = f"cl_sdwfcm_{skenario}_{pct}pct"
+    col_mem = f"mem_sdwfcm_{skenario}_{pct}pct"
+    col_tm = f"waktu_min_{skenario}_{pct}pct"
+    col_iso = f"iso_{skenario}_{pct}pct"
+    
+    can_use_cache = (
+        not bypass_cache and
+        not cut_roads and 
+        col_cl in gdf_base.columns and 
+        col_mem in gdf_base.columns and 
+        col_tm in gdf_base.columns
+    )
+    
+    if can_use_cache:
+        logger.info(f"[run_pipeline] CACHE HIT: Mengambil hasil precomputed untuk {skenario} {pct}%")
+        gdf_sim = gdf_base.copy()
+        
+        # Ambil hasil dari cache
+        tm = gdf_sim[col_tm].values
+        labs = gdf_sim[col_cl].values
+        mem = gdf_sim[col_mem].values
+        
+        # Pasang ke kolom standar
+        gdf_sim[f"waktu_tes_min_{skenario}"] = tm
+        gdf_sim[f"waktu_tes_min_{sk}"]       = tm
+        gdf_sim["cluster_sdwfcm"]           = labs
+        gdf_sim["membership_max"]           = mem
+        
+        # Hitung aksesibilitas standar
+        aks = np.where(tm <= cfg.golden_time_min, 1,
+                       np.where(tm <= cfg.isolation_time_threshold, 2, 3))
+        gdf_sim[f"aksesibilitas_{sk}"]       = aks
+        gdf_sim[f"aksesibilitas_{skenario}"] = aks
+
+        finite_tm = tm[np.isfinite(tm) & (tm > 0)]
+        # Offline cache stores only the minimum travel time, not the original
+        # per-category t_pen metadata. Isolated grids are encoded at the
+        # scenario/intensity penalty, so infer that penalty from the cached
+        # travel-time column instead of using a stale baseline override.
+        t_pen_cache = float(np.max(finite_tm)) if finite_tm.size else 200.0
+        if col_iso in gdf_base.columns:
+            is_isolated_cache = gdf_base[col_iso].fillna(0).astype(bool).values
+        else:
+            is_isolated_cache = np.isclose(tm, t_pen_cache, rtol=0.0, atol=1e-6)
+
+        # Deteksi Titik Aman Semu
+        gdf_sim["titik_aman_semu"] = 0
+        semu_gdf = detect_titik_aman_semu(
+            gdf_sim, labs, skenario, sk, cfg,
+            baseline_times=baseline_times_override,
+            psi_array=psi_array_override,
+            t_pen=t_pen_cache,
+            is_isolated_override=is_isolated_cache,
+        )
+        if len(semu_gdf) > 0:
+            gdf_sim.loc[semu_gdf.index, "titik_aman_semu"] = 1
+
+        return gdf_sim, {}, pd.DataFrame(), {"k": int(len(np.unique(labs))), "t_pen": float(t_pen_cache)}
+
+    # ── 1. Simulasi Bencana (Hazard Map) ──────────────────────────────────────
     gdf_sim, roads_sim, tes_sim, mask_dampak = simulate_hazard(
         gdf_base.copy(),
         roads_raw.copy() if roads_raw is not None else None,
@@ -1574,9 +1685,14 @@ def run_pipeline(
             gdf_sim["cluster_sfcm"]        = (cl_results.get("SFCM") or {}).get("labels")
             gdf_sim["cluster_redcap"]      = (cl_results.get("REDCAP") or {}).get("labels")
             gdf_sim["cluster_skater"]      = (cl_results.get("SKATER") or {}).get("labels")
-            # Deteksi titik aman semu
+            # Deteksi titik aman semu (Hybrid Logic)
             gdf_sim["titik_aman_semu"]     = 0
-            semu_gdf = detect_titik_aman_semu(gdf_sim, labs, skenario, sk, cfg)
+            semu_gdf = detect_titik_aman_semu(
+                gdf_sim, labs, skenario, sk, cfg, 
+                baseline_times=baseline_times_override,
+                psi_array=psi_array_override,
+                t_pen=t_pen
+            )
             if len(semu_gdf) > 0:
                 gdf_sim.loc[semu_gdf.index, "titik_aman_semu"] = 1
 

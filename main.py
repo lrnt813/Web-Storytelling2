@@ -79,14 +79,44 @@ class AppState:
     is_ready:      bool = False
     startup_error: Optional[str] = None
     
+    # Caching Graph untuk responsivitas routing
+    # {(skenario, intensity, frozenset(cut_roads)): (G, tn, nl)}
+    graph_cache: Dict[tuple, tuple] = {}
+    
+    # Ranks cluster berdasarkan kualitas (0=terburuk, 1=terbaik)
+    # {skenario: {cluster_id: score}}
+    cluster_ranks: Dict[str, Dict[int, float]] = {}
+    
     # Caching untuk akselerasi
     baseline_params: Dict[str, dict] = {}
     baseline_cache:  Dict[str, dict] = {} # Menyimpan {skenario: {data_klaster, k, t_pen, eval}}
     
+    # NEW: Baseline Accessibility Cache (Waktu tempuh 0% intensitas)
+    # {skenario: array_of_times_min_per_grid}
+    baseline_times:  Dict[str, np.ndarray] = {}
+
     # Kunci antrian komputasi
     compute_lock: Optional[asyncio.Lock] = None
 
 state = AppState()
+
+
+def _has_offline_cluster_cache(gdf: gpd.GeoDataFrame) -> bool:
+    """True jika GPKG sudah berisi cache SDWFCM untuk semua skenario/intensitas UI."""
+    required = []
+    for skenario in cfg.skenario_list:
+        required.append(f"PSI_{skenario}")
+        for pct in range(0, 101, 10):
+            required.extend([
+                f"cl_sdwfcm_{skenario}_{pct}pct",
+                f"mem_sdwfcm_{skenario}_{pct}pct",
+                f"waktu_min_{skenario}_{pct}pct",
+            ])
+    missing = [c for c in required if c not in gdf.columns]
+    if missing:
+        logger.info(f"[startup] Offline cache belum lengkap. Contoh kolom hilang: {missing[:6]}")
+        return False
+    return True
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 5. FASTAPI APP
@@ -148,6 +178,9 @@ async def startup_event():
         logger.info("[startup] Step 1/4: Load grid Kulon Progo...")
         state.gdf_base = load_data(cfg)
         logger.info(f"[startup] OK Grid: {len(state.gdf_base)} baris | id_grid: 0..{len(state.gdf_base)-1}")
+        offline_cache_ready = _has_offline_cluster_cache(state.gdf_base)
+        if offline_cache_ready:
+            logger.info("[startup] Offline SDWFCM cache lengkap -> mode startup cepat aktif.")
 
         # Step 2: Load jalan & TES
         logger.info("[startup] Step 2/4: Load jalan & TES...")
@@ -157,14 +190,19 @@ async def startup_event():
             f"TES: {sum(len(v) for v in state.tes_raw.values())} titik"
         )
 
-        # Step 3: Spatial weights
-        logger.info("[startup] Step 3/4: Bangun Spatial Weight Matrix baseline...")
-        state.w_baseline = build_weights(state.gdf_base)
-        logger.info(f"[startup] OK Spatial weight: N={state.w_baseline.n} | avg_nb={state.w_baseline.mean_neighbors:.2f}")
+        if offline_cache_ready:
+            logger.info("[startup] Step 3/4: Lewati Spatial Weight Matrix (pakai offline cache).")
+        else:
+            # Step 3: Spatial weights
+            logger.info("[startup] Step 3/4: Bangun Spatial Weight Matrix baseline...")
+            state.w_baseline = build_weights(state.gdf_base)
+            logger.info(f"[startup] OK Spatial weight: N={state.w_baseline.n} | avg_nb={state.w_baseline.mean_neighbors:.2f}")
 
         # Step 4: Routing network
-        logger.info("[startup] Step 4/4: Bangun Routing Network (Optimized NetworkX)...")
-        if state.roads_raw is not None:
+        if offline_cache_ready:
+            logger.info("[startup] Step 4/4: Lewati Routing Network awal (lazy-build saat routing).")
+        elif state.roads_raw is not None:
+            logger.info("[startup] Step 4/4: Bangun Routing Network (Optimized NetworkX)...")
             (state.nx_graph_base,
              state.nx_node_list,
              state.nx_kdtree) = build_road_graph(state.roads_raw, "banjir", 0.0, cfg)
@@ -180,6 +218,14 @@ async def startup_event():
         logger.info("[startup] Step 5/5: Warm-up Baseline (Parallelized)...")
         
         async def _warmup(sk):
+            # OPTIMASI: Cek apakah baseline (0%) sudah ada di cache GPKG
+            col_cache = f"waktu_min_{sk}_0pct"
+            if col_cache in state.gdf_base.columns:
+                logger.info(f"[startup] Baseline {sk} ditemukan di GPKG Cache. Memuat...")
+                state.baseline_times[sk] = state.gdf_base[col_cache].values
+                # Kita tetap jalankan run_pipeline sekali untuk populate baseline_cache (t_pen, k, dll)
+                # Tapi ini akan cepat karena CACHE HIT di engine.run_pipeline
+            
             logger.info(f"[startup] Warm-up Baseline {sk}...")
             res = await asyncio.get_event_loop().run_in_executor(
                 None,
@@ -197,10 +243,19 @@ async def startup_event():
                     nl_override=state.nx_node_list,
                     tn_override=state.nx_kdtree,
                     w_override=state.w_baseline,
+                    baseline_times_override=None, # Baseline tidak butuh baseline_override
+                    psi_array_override=state.gdf_base[f"PSI_{sk}"].values if f"PSI_{sk}" in state.gdf_base.columns else None
                 )
             )
             gdf_res, cl_res, eval_res, metadata = res
-            data_klaster = _gdf_to_data_klaster(gdf_res, sk, "banjir") # "banjir" as fallback skenario string for col mapping
+            
+            # Simpan baseline times jika belum ada (jika tadi tidak hit GPKG cache secara eksplisit di sini)
+            if sk not in state.baseline_times:
+                col_time = f"waktu_tes_min_{sk}"
+                if col_time in gdf_res.columns:
+                    state.baseline_times[sk] = gdf_res[col_time].values
+
+            data_klaster = _gdf_to_data_klaster(gdf_res, sk, "banjir")
             
             state.baseline_params[sk] = metadata
             state.baseline_cache[sk] = {
@@ -213,10 +268,23 @@ async def startup_event():
                 "n_grid": len(gdf_res),
                 "n_titik_semu": int(gdf_res["titik_aman_semu"].sum()) if "titik_aman_semu" in gdf_res.columns else 0,
                 "data_klaster": data_klaster,
-                "k_optimal": _sanitize(metadata["k"]),
-                "t_pen": _sanitize(metadata["t_pen"]),
+                "k_optimal": _sanitize(metadata.get("k", 3)),
+                "t_pen": _sanitize(metadata.get("t_pen", 200.0)),
             }
-            logger.info(f"[startup] Baseline {sk} tersimpan: k={metadata['k']}")
+            # Hitung rank cluster untuk rekomendasi
+            # Cluster dengan rata-rata waktu_tes_min rendah = rank tinggi
+            df_klaster = pd.DataFrame(data_klaster)
+            t_col = f"waktu_tes_min_{sk}" # sk di sini adalah sk_key dari loop gather
+            if "cluster_sdwfcm" in df_klaster.columns and t_col in df_klaster.columns:
+                avg_t = df_klaster.groupby("cluster_sdwfcm")[t_col].mean()
+                # Score 0..1 (1 = paling cepat/aman)
+                if not avg_t.empty:
+                    t_min, t_max = avg_t.min(), avg_t.max()
+                    denom = (t_max - t_min) if t_max > t_min else 1.0
+                    ranks = {int(c): float(1.0 - (v - t_min) / denom) for c, v in avg_t.items()}
+                    state.cluster_ranks[sk.split("_")[0]] = ranks
+            
+            logger.info(f"[startup] Baseline {sk} tersimpan: k={metadata.get('k', '?')}")
 
         await asyncio.gather(*[_warmup(sk) for sk in ["banjir", "banjir_bandang", "tanah_longsor"]])
 
@@ -371,6 +439,8 @@ def _gdf_to_data_klaster(
         waktu_tes_min_{sk}   : waktu ke TES terdekat (menit)
         aksesibilitas_{sk}   : 1=Tinggi / 2=Sedang / 3=Rendah
         titik_aman_semu      : 1 jika terdeteksi Titik Aman Semu
+        alr_val              : Accessibility Loss Ratio; null jika isolated
+        is_isolated          : true jika grid kehilangan seluruh akses TES
         sim_dampak_{skenario}: dampak simulasi bencana
         waktu_tes_{kat}_{sk} : waktu ke TES per kategori fasilitas
 
@@ -387,6 +457,9 @@ def _gdf_to_data_klaster(
         f"waktu_tes_min_{sk}",
         f"aksesibilitas_{sk}",
         "titik_aman_semu",
+        "psi_val",
+        "alr_val",
+        "is_isolated",
         f"sim_dampak_{skenario}",
         cfg.indeks_bahaya.get(skenario, skenario), # Indeks bahaya mentah (0,1,2,3)
     ]
@@ -447,6 +520,54 @@ def _prepare_cut_roads(cut_roads: List[RoadCutItem]) -> List[dict]:
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── 9.0 Health Check ─────────────────────────────────────────────────────────
+def _tes_to_geojson(tes_by_category: Dict[str, gpd.GeoDataFrame], skenario: str) -> Dict[str, Any]:
+    name_cols = ["Nama_Objek", "nama", "Nama", "NAMA", "Name", "NAME", "REMARK", "Fasilitas", "KETERANGAN", "NAMA_UNSUR"]
+    hazard_col = cfg.hazard_col_map.get(skenario, skenario)
+    features = []
+
+    for kategori in cfg.kategori_fac:
+        tes_gdf = tes_by_category.get(kategori)
+        if tes_gdf is None or tes_gdf.empty:
+            continue
+
+        tes_wgs = tes_gdf.to_crs("EPSG:4326")
+
+        for idx, row in tes_wgs.iterrows():
+            name = "Fasilitas TES"
+            for col in name_cols:
+                if col in tes_wgs.columns and pd.notna(row.get(col)):
+                    value = str(row.get(col)).strip()
+                    if value:
+                        name = value
+                        break
+
+            hazard_value = None
+            if hazard_col in tes_wgs.columns and pd.notna(row.get(hazard_col)):
+                hazard_value = _sanitize(row.get(hazard_col))
+            is_valid = (
+                int(row.get(hazard_col, 0)) < cfg.tes_hazard_threshold
+                if hazard_col in tes_wgs.columns and pd.notna(row.get(hazard_col))
+                else True
+            )
+
+            features.append({
+                "type": "Feature",
+                "geometry": row.geometry.__geo_interface__,
+                "properties": {
+                    "id_tes": f"{kategori}-{idx}",
+                    "kategori": kategori,
+                    "name": name,
+                    "hazard": hazard_value,
+                    "is_valid": bool(is_valid),
+                },
+            })
+
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+    }
+
+
 @app.get("/api/health", tags=["System"])
 async def health_check():
     return {
@@ -471,6 +592,41 @@ async def health_check():
 
 
 # ── 9.1 GET /api/baseline ────────────────────────────────────────────────────
+@app.get("/api/tes-layers", tags=["System"], summary="Ambil titik TES per kategori untuk layer peta")
+async def get_tes_layers(
+    skenario: str = Query("banjir", description="banjir | banjir_bandang | tanah_longsor"),
+    intensity: float = Query(0.0, ge=0.0, le=1.0),
+):
+    _check_ready()
+    _validate_skenario(skenario)
+
+    tes_source = state.tes_raw
+    if intensity > 0:
+        _, _, tes_source, _ = simulate_hazard(
+            state.gdf_base.copy(),
+            state.roads_raw.copy() if state.roads_raw is not None else None,
+            state.tes_raw,
+            skenario,
+            intensity,
+            cfg,
+        )
+
+    tes_geojson = _tes_to_geojson(tes_source, skenario)
+    counts = {
+        kategori: len(tes_source.get(kategori, []))
+        for kategori in cfg.kategori_fac
+    }
+
+    return JSONResponse(content=_sanitize({
+        "status": "ok",
+        "skenario": skenario,
+        "intensity": intensity,
+        "categories": cfg.kategori_fac,
+        "counts": counts,
+        "geojson": tes_geojson,
+    }))
+
+
 @app.get(
     "/api/baseline",
     tags=["Clustering"],
@@ -535,6 +691,8 @@ async def get_baseline(
                     cut_roads    = None,
                     G_override   = None,
                     w_override   = state.w_baseline,
+                    baseline_times_override=state.baseline_times.get(skenario),
+                    psi_array_override=state.gdf_base[f"PSI_{skenario}"].values if f"PSI_{skenario}" in state.gdf_base.columns else None
                 )
             )
         except Exception as e:
@@ -603,10 +761,11 @@ async def post_simulate(body: SimulateRequest):
                 )
                 nl_sim = state.nx_node_list
                 tn_sim = state.nx_kdtree
-            elif state.nx_graph_base is not None:
-                G_sim  = state.nx_graph_base
-                nl_sim = state.nx_node_list
-                tn_sim = state.nx_kdtree
+            elif cut_roads_converted and state.roads_raw is not None:
+                G_sim, nl_sim, tn_sim = build_road_graph(
+                    state.roads_raw, body.skenario, body.intensity, cfg
+                )
+                G_sim = apply_road_cuts_to_graph(G_sim, nl_sim, tn_sim, cut_roads_converted, cfg)
 
             params = state.baseline_params.get(body.skenario, {})
             k_opt_ov = params.get("k")
@@ -628,6 +787,8 @@ async def post_simulate(body: SimulateRequest):
                     nl_override  = nl_sim,
                     tn_override  = tn_sim,
                     w_override   = state.w_baseline,
+                    baseline_times_override=state.baseline_times.get(body.skenario),
+                    psi_array_override=state.gdf_base[f"PSI_{body.skenario}"].values if f"PSI_{body.skenario}" in state.gdf_base.columns else None
                 )
             )
         except Exception as e:
@@ -777,21 +938,41 @@ async def post_route_all_tes(body: RouteAllTesRequest):
     origin_x, origin_y = _latlon_to_projected(body.lat, body.lng)
     cut_roads_converted = _prepare_cut_roads(body.cut_roads)
 
-    # ── Bangun graph sesuai skenario & intensitas saat ini ─────────────────────
-    G_use = nl_use = tn_use = None
-    
-    # Optimasi: Gunakan graph baseline jika intensity=0 dan tidak ada cut_roads
-    if body.intensity == 0.0 and not cut_roads_converted and body.skenario == "banjir" and state.nx_graph_base is not None:
-        G_use, nl_use, tn_use = state.nx_graph_base, state.nx_node_list, state.nx_kdtree
-    elif state.roads_raw is not None:
-        # Bangun graph sesuai kondisi (intensity/skenario mempengaruhi jalan yang putus)
-        G_use, nl_use, tn_use = build_road_graph(state.roads_raw, body.skenario, body.intensity, cfg)
-        # Terapkan pemutusan jalan user jika ada
-        if cut_roads_converted:
-            G_use = apply_road_cuts_to_graph(G_use, nl_use, tn_use, cut_roads_converted, cfg)
-    
-    if G_use is None:
-        G_use, nl_use, tn_use = state.nx_graph_base, state.nx_node_list, state.nx_kdtree
+    # ── Gunakan Cache Graph jika memungkinkan ──────────────────────────────
+    # Konversi cut_roads ke format yang bisa di-hash (tuple of sorted items)
+    # Gunakan frozenset agar urutan pemutusan jalan tidak mempengaruhi cache
+    cut_roads_tuple = []
+    for c in body.cut_roads:
+        d = c.dict(exclude_none=True)
+        # Konversi nested list (seperti edge_from) ke tuple agar hashable
+        hashable_item = tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in d.items()))
+        cut_roads_tuple.append(hashable_item)
+
+    cache_key = (body.skenario, body.intensity, frozenset(cut_roads_tuple))
+    if cache_key in state.graph_cache:
+        G_use, tn_use, nl_use = state.graph_cache[cache_key]
+        logger.info("[route-all-tes] Menggunakan Graph dari cache")
+    else:
+        # ── Bangun graph sesuai skenario & intensitas saat ini ─────────────────────
+        G_use = nl_use = tn_use = None
+        
+        # Optimasi: Gunakan graph baseline jika intensity=0 dan tidak ada cut_roads
+        if body.intensity == 0.0 and not cut_roads_converted and body.skenario == "banjir" and state.nx_graph_base is not None:
+            G_use, nl_use, tn_use = state.nx_graph_base, state.nx_node_list, state.nx_kdtree
+        elif state.roads_raw is not None:
+            # Bangun graph sesuai kondisi (intensity/skenario mempengaruhi jalan yang putus)
+            G_use, nl_use, tn_use = build_road_graph(state.roads_raw, body.skenario, body.intensity, cfg)
+            # Terapkan pemutusan jalan user jika ada
+            if cut_roads_converted:
+                G_use = apply_road_cuts_to_graph(G_use, nl_use, tn_use, cut_roads_converted, cfg)
+        
+        if G_use is None:
+            G_use, nl_use, tn_use = state.nx_graph_base, state.nx_node_list, state.nx_kdtree
+
+        # Simpan ke cache (batasi ukuran cache)
+        if len(state.graph_cache) > 10: state.graph_cache.clear()
+        state.graph_cache[cache_key] = (G_use, tn_use, nl_use)
+        logger.info("[route-all-tes] Graph baru dibuat dan disimpan ke cache")
     _, _, tes_sim, _ = simulate_hazard(
         state.gdf_base.copy(),
         state.roads_raw.copy() if state.roads_raw is not None else None,
@@ -900,15 +1081,110 @@ async def post_route_all_tes(body: RouteAllTesRequest):
     elapsed = round(time.time() - t_req, 2)
     logger.info(f"[POST /api/route-all-tes] selesai {elapsed}s | n_cut={len(body.cut_roads)}")
 
+    # ── Deteksi Isolasi & Rekomendasi ──────────────────────────────────────────
+    recommendations = []
+    found_count = sum(1 for r in routes.values() if r["found"])
+    
+    if found_count == 0:
+        logger.info("[route-all-tes] Deteksi isolasi total. Mencari rekomendasi...")
+        # 1. Temukan semua node yang bisa mencapai TES manapun di G_use
+        all_tes_nodes = []
+        for kat in cfg.kategori_fac:
+            tes_v_kat = tes_v_all[tes_v_all["kategori"] == kat]
+            for _, row in tes_v_kat.iterrows():
+                nd = _snap(G_use, tn_use, nl_use, [row.geometry.x, row.geometry.y], max_snap=1000)
+                if nd: all_tes_nodes.append(nd)
+        
+        if all_tes_nodes:
+            # Dijkstra terbalik: Dari semua TES ke seluruh node
+            try:
+                # lengths[node] = jarak ke TES terdekat
+                import networkx as nx
+                reachable_lengths = nx.multi_source_dijkstra_path_length(G_use, all_tes_nodes, weight="weight")
+                
+                # 2. Cari kandidat node terdekat dari origin_x, origin_y (Euclidean)
+                # Kita ambil subset node yang reachable dan hitung jarak Euclidean-nya
+                candidates = []
+                r_nodes = list(reachable_lengths.keys())
+                r_coords = np.array(r_nodes) # [[x, y], ...]
+                
+                # Jarak Euclidean ke origin
+                euc_dists = np.hypot(r_coords[:, 0] - origin_x, r_coords[:, 1] - origin_y)
+                
+                # Ambil misal 100 node terdekat secara Euclidean untuk dievaluasi kualitasnya
+                top_idx = np.argsort(euc_dists)[:100]
+                
+                for idx in top_idx:
+                    node = r_nodes[idx]
+                    dist_euc = euc_dists[idx]
+                    dist_to_tes = reachable_lengths[node]
+                    
+                    # 3. Hitung skor kualitas (0-100)
+                    # Faktor A: Kedekatan ke TES (waktu tempuh)
+                    time_to_tes = dist_to_tes / cfg.walking_speed_m_per_min
+                    score_time = max(0, 100 * (1 - time_to_tes / 60)) # 60 menit sebagai penalti max
+                    
+                    # Faktor B: Cluster Rank (jika ada)
+                    score_cluster = 50 # default
+                    # Cari id_grid dari node ini (pencarian terdekat di state.gdf_base)
+                    if state.nx_kdtree is not None:
+                        # Ini node graph, kita cari grid terdekatnya
+                        # Tapi lebih akurat kalau kita simpan mapping node -> grid di startup
+                        # Untuk sekarang, kita gunakan Euclidean ke centroid grid
+                        pass
+
+                    total_score = round(score_time, 1)
+                    
+                    candidates.append({
+                        "node": node,
+                        "dist_euc": dist_euc,
+                        "score": total_score,
+                        "time_to_tes": round(time_to_tes, 1)
+                    })
+                
+                # 4. Pilih level rekomendasi: Terdekat dan Terbaik
+                candidates.sort(key=lambda x: x["dist_euc"])
+                
+                if candidates:
+                    # Level 1: Terdekat - "Pekat"
+                    c1 = candidates[0]
+                    lon1, lat1 = _utm_to_wgs84.transform(c1["node"][0], c1["node"][1])
+                    recommendations.append({
+                        "level": "Sub-Optimal",
+                        "lat": lat1, "lng": lon1,
+                        "dist_m": round(c1["dist_euc"], 1),
+                        "score": c1["score"],
+                        "desc": "Akses Terdekat",
+                        "color_type": "pekat"
+                    })
+                    
+                    # Level 2: Cari yang skornya tertinggi (Akses Terbaik)
+                    c_best = max(candidates, key=lambda x: x["score"])
+                    
+                    # Jika c_best jauh lebih baik atau lokasinya cukup berbeda dari c1
+                    if c_best["score"] > c1["score"] + 2 or c_best["dist_euc"] > c1["dist_euc"] + 20:
+                        lon2, lat2 = _utm_to_wgs84.transform(c_best["node"][0], c_best["node"][1])
+                        recommendations.append({
+                            "level": "Optimal",
+                            "lat": lat2, "lng": lon2,
+                            "dist_m": round(c_best["dist_euc"], 1),
+                            "score": c_best["score"],
+                            "desc": "Area Terhubung",
+                            "color_type": "gradient" # Label khusus untuk frontend
+                        })
+            except Exception as e:
+                logger.error(f"[recommendation] Gagal: {e}")
+
     return JSONResponse(content=_sanitize({
         "status": "ok",
         "origin_lat": body.lat, "origin_lng": body.lng,
         "skenario": body.skenario, "intensity": body.intensity,
         "n_cut_roads": len(body.cut_roads),
         "tes_stats": tes_stats,
-        "found_count": sum(1 for r in routes.values() if r["found"]),
+        "found_count": found_count,
         "elapsed_sec": elapsed,
         "routes": routes,
+        "recommendations": recommendations # ← BARU
     }))
 
 
@@ -916,6 +1192,7 @@ class RoadRequest(BaseModel):
     skenario: str = "banjir"
     intensity: float = 0.0
     cut_roads: List[dict] = []
+    full: bool = False # Jika true, kembalikan GeoJSON lengkap. Jika false, hanya ID yang putus.
 
 
 # ── 9.5 POST /api/roads ──────────────────────────────────────────────────────
@@ -963,11 +1240,24 @@ async def post_roads(body: RoadRequest):
             if not res.empty:
                 roads_sim.loc[res.index, "is_broken"] = True
 
-    # 3. Sederhanakan & Export
-    roads_sim["geometry"] = roads_sim.geometry.simplify(5.0, preserve_topology=True)
+    # 3. Kembalikan hasil (Optimized)
+    if not body.full:
+        # Hanya kembalikan list index yang is_broken
+        broken_indices = roads_sim.index[roads_sim["is_broken"]].tolist()
+        return JSONResponse(content={
+            "status": "ok",
+            "broken_ids": broken_indices,
+            "n_total": len(roads_sim)
+        })
+
+    # Jika full=true, export GeoJSON lengkap (hanya untuk loading awal)
+    roads_sim["geometry"] = roads_sim.geometry.simplify(0.0001, preserve_topology=True)
     roads_wgs = roads_sim.to_crs("EPSG:4326")
     
-    cols = ["geometry", "is_broken"]
+    # Tambahkan index sebagai id_jalan agar sinkron dengan broken_ids
+    roads_wgs["id_jalan"] = roads_wgs.index
+    
+    cols = ["geometry", "is_broken", "id_jalan"]
     if "name" in roads_wgs.columns: cols.append("name")
     
     return JSONResponse(content=json.loads(roads_wgs[cols].to_json()))
@@ -988,6 +1278,91 @@ async def get_skenario_info():
             "intensity_levels": cfg.intensity_levels,
         }
     return {"status": "ok", "skenario_info": info}
+
+@app.get("/api/boundary", tags=["Search"])
+async def get_boundary(name: str, type: str):
+    """
+    Ambil boundary GeoJSON dari file GPKG lokal berdasarkan nama dan tipe (kapanewon/kalurahan).
+    """
+    try:
+        file_path = Path(DATA_DIR) / ("KulonProgo_Kec.gpkg" if type == "kapanewon" else "KulonProgo_Desa.gpkg")
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail=f"File GPKG tidak ditemukan: {file_path}")
+            
+        gdf = gpd.read_file(file_path)
+        
+        # Cari kolom nama yang sesuai (prioritaskan WADMKC/WADMKD sesuai permintaan user)
+        if type == "kapanewon":
+            target_col = "WADMKC" if "WADMKC" in gdf.columns else next((c for c in ["NAMOBJ", "KECAMATAN", "NAMA"] if c in gdf.columns), None)
+        else:
+            target_col = "WADMKD" if "WADMKD" in gdf.columns else next((c for c in ["NAMOBJ", "WADMKE", "DESA", "NAMA"] if c in gdf.columns), None)
+        
+        if not target_col:
+            raise HTTPException(status_code=500, detail=f"Kolom nama tidak ditemukan di {file_path.name}. Columns: {list(gdf.columns)}")
+            
+        # Filter (exact match prioritized to avoid ambiguity between village/district with same name)
+        search_name = name.replace("Kelurahan ", "").replace("Desa ", "").replace("Kecamatan ", "").strip()
+        
+        # Try exact match first to avoid pulling partial matches that might hide the intended result
+        match = gdf[gdf[target_col].str.lower() == search_name.lower()]
+        
+        # If no exact match, try contains (fallback)
+        if match.empty:
+            match = gdf[gdf[target_col].str.contains(search_name, case=False, na=False)]
+            
+        if match.empty:
+            raise HTTPException(status_code=404, detail=f"Wilayah '{search_name}' ({type}) tidak ditemukan di {file_path.name}")
+            
+        # Convert to GeoJSON (first match)
+        res_gdf = match.iloc[[0]].to_crs("EPSG:4326")
+        return JSONResponse(content=json.loads(res_gdf.to_json()))
+        
+    except Exception as e:
+        logger.error(f"Error fetching boundary for {name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/search-list", tags=["Search"])
+async def get_search_list():
+    """
+    Kembalikan daftar lengkap wilayah dari GPKG untuk sinkronisasi KULON_PROGO_LIST.
+    """
+    try:
+        kec_path = Path(DATA_DIR) / "KulonProgo_Kec.gpkg"
+        desa_path = Path(DATA_DIR) / "KulonProgo_Desa.gpkg"
+        
+        results = []
+        
+        if kec_path.exists():
+            gdf = gpd.read_file(kec_path)
+            # Prioritaskan WADMKC
+            col = "WADMKC" if "WADMKC" in gdf.columns else next((c for c in ["NAMOBJ", "KECAMATAN", "NAMA"] if c in gdf.columns), None)
+            if col:
+                names = sorted([str(n) for n in gdf[col].unique() if pd.notna(n)])
+                for n in names:
+                    results.append({"name": n, "type": "kapanewon", "desc": "Kecamatan di Kulon Progo"})
+                    
+        if desa_path.exists():
+            gdf = gpd.read_file(desa_path)
+            # Prioritaskan WADMKD
+            col = "WADMKD" if "WADMKD" in gdf.columns else next((c for c in ["NAMOBJ", "WADMKE", "DESA", "NAMA"] if c in gdf.columns), None)
+            # Kolom kecamatan (parent) untuk deskripsi
+            kec_col = "WADMKC" if "WADMKC" in gdf.columns else next((c for c in ["KECAMATAN"] if c in gdf.columns), None)
+            
+            if col:
+                # Gunakan data lengkap agar deskripsi kecamatan akurat
+                for _, row in gdf.iterrows():
+                    parent = row[kec_col] if kec_col in row and pd.notna(row[kec_col]) else "Kulon Progo"
+                    results.append({
+                        "name": str(row[col]),
+                        "type": "kalurahan",
+                        "desc": f"Kalurahan di {parent}"
+                    })
+                    
+        return {"status": "ok", "results": results}
+    except Exception as e:
+        logger.error(f"Error building search list: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
