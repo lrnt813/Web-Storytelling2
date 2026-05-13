@@ -1,7 +1,7 @@
 
 import geopandas as gpd
 import networkx as nx
-from engine import Cfg, load_data, load_road_network, build_road_graph, filter_tes, simulate_hazard
+from backend.engine import Cfg, load_data, load_road_network, build_road_graph, filter_tes, simulate_hazard
 import os
 
 def diagnose():
@@ -32,7 +32,7 @@ def diagnose():
 
     print("5. Testing Snapping for a random grid centroid...")
     sample_point = gdf_base.geometry.centroid.iloc[len(gdf_base)//2]
-    from main import _snap
+    from backend.main import _snap
     snapped = _snap(G, kdtree, nodes_list, [sample_point.x, sample_point.y], max_snap=1000)
     print(f"   Sample Snapped: {snapped}")
 

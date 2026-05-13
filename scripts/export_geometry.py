@@ -4,6 +4,7 @@
 # ║  "Aturan Emas Web GIS": Pisahkan Geometri dari Atribut                      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 import os, sys, logging, time, argparse
+from pathlib import Path
 import geopandas as gpd
 
 logging.basicConfig(level=logging.INFO,
@@ -11,8 +12,9 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger(__name__)
 
 # ── Konfigurasi path ──────────────────────────────────────────────────────────
-INPUT_GPKG     = os.environ.get("SDWFCM_INPUT_GPKG",    "./data/Kulonprogo_Ready4.gpkg")
-OUTPUT_GEOJSON = os.environ.get("SDWFCM_OUTPUT_GEOJSON","./static/static_grid_kulonprogo.geojson")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+INPUT_GPKG     = os.environ.get("SDWFCM_INPUT_GPKG", str(PROJECT_ROOT / "data" / "Kulonprogo_Ready4.gpkg"))
+OUTPUT_GEOJSON = os.environ.get("SDWFCM_OUTPUT_GEOJSON", str(PROJECT_ROOT / "static" / "static_grid_kulonprogo.geojson"))
 
 # HARUS sama dengan cfg.target_crs di engine.py — untuk urutan baris yang identik
 ENGINE_CRS = "EPSG:32749"

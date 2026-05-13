@@ -1,8 +1,15 @@
 import geopandas as gpd
 import os
-from engine import Cfg
+import sys
+from pathlib import Path
 
-cfg = Cfg(base_dir="./data")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from backend.engine import Cfg
+
+cfg = Cfg(base_dir=str(PROJECT_ROOT / "data"))
 if os.path.exists(cfg.input_file):
     gdf = gpd.read_file(cfg.input_file)
     print(f"File: {cfg.input_file}")

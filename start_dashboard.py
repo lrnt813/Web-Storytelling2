@@ -17,8 +17,8 @@ def start_dashboard():
     try:
         import geopandas as gpd
 
-        from engine import Cfg
-        from offline_analysis import run_offline_analysis
+        from backend.engine import Cfg
+        from scripts.offline_analysis import run_offline_analysis
 
         base_path = os.path.dirname(os.path.abspath(__file__))
         data_path = os.path.join(base_path, "data")
@@ -43,7 +43,7 @@ def start_dashboard():
     # 1. Jalankan Backend (Uvicorn).
     print("\n[1/3] Menjalankan server backend (FastAPI)...")
     backend_process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8000"],
+        [sys.executable, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000"],
         creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == "nt" else 0,
     )
 

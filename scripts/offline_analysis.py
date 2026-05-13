@@ -4,7 +4,13 @@ import numpy as np
 import geopandas as gpd
 import pandas as pd
 from pathlib import Path
-from engine import (
+import sys
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from backend.engine import (
     Cfg, load_data, load_road_network, build_weights, 
     run_pipeline
 )
@@ -20,8 +26,7 @@ def run_offline_analysis(data_dir=None):
     logger.info("Memulai Offline Multi-Scenario Transition Analysis...")
     
     # 1. Inisialisasi Config & Data
-    BASE_DIR = Path(__file__).parent.resolve()
-    DATA_DIR = data_dir or os.environ.get("SDWFCM_DATA_DIR", str(BASE_DIR / "data"))
+    DATA_DIR = data_dir or os.environ.get("SDWFCM_DATA_DIR", str(PROJECT_ROOT / "data"))
     cfg = Cfg(base_dir=DATA_DIR)
     
     logger.info(f"Memuat data dari: {cfg.input_file}")

@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+
+scratch/*.log
+scratch/*.out
+scratch/*.err
+scratch/logs/

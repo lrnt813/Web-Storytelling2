@@ -4,10 +4,10 @@ import os
 from pathlib import Path
 
 # Setup configuration similar to main.py
-BASE_DIR = Path(__file__).parent.resolve()
-DATA_DIR = BASE_DIR / "data"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = PROJECT_ROOT / "data"
 ROADS_FILE = DATA_DIR / "Kulonprogo_Jalan.gpkg"
-OUTPUT_FILE = BASE_DIR / "frontend" / "static_roads_kulonprogo.geojson"
+OUTPUT_FILE = PROJECT_ROOT / "frontend" / "static_roads_kulonprogo.geojson"
 
 def export_roads():
     print(f"Loading roads from {ROADS_FILE}...")
