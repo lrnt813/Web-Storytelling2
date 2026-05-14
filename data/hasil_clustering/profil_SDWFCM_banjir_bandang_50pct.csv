@@ -1,0 +1,5 @@
+_cl,Road_Density_mean,banjir_bandang,waktu_tes_pendidikan_banjir_bandang_50pct,waktu_tes_kesehatan_banjir_bandang_50pct,waktu_tes_pemerintahan_banjir_bandang_50pct,waktu_tes_ibadah_banjir_bandang_50pct,waktu_tes_gor_banjir_bandang_50pct,jumlah_opsi_rute_banjir_bandang_50pct,is_isolated_pendidikan_banjir_bandang_50pct,is_isolated_kesehatan_banjir_bandang_50pct,is_isolated_pemerintahan_banjir_bandang_50pct,is_isolated_ibadah_banjir_bandang_50pct,is_isolated_gor_banjir_bandang_50pct,Jumlah_Grid
+0,0.658,0.052,13.304,49.43,28.626,10.394,55.121,4.994,0.001,0.001,0.001,0.001,0.001,10790
+1,0.589,0.165,285.046,398.153,321.244,238.929,322.166,1.143,0.703,0.988,0.788,0.587,0.792,825
+2,0.773,0.026,6.305,22.861,13.18,4.643,55.48,5.0,0.0,0.0,0.0,0.0,0.0,5874
+3,1.074,0.014,5.584,27.202,9.035,5.242,15.477,4.995,0.0,0.005,0.0,0.0,0.0,5184

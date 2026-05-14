@@ -46,6 +46,11 @@ from sklearn.preprocessing import PowerTransformer, RobustScaler
 
 from libpysal.weights import KNN, Queen, Rook
 from esda.moran import Moran
+from .pseudo_safety import (
+    classify_metric_values,
+    estimate_metric_thresholds,
+    relabel_clustering_result,
+)
 
 warnings.filterwarnings("ignore")
 _SDWFCM_W_CACHE: Dict[tuple, csr_matrix] = {}
@@ -167,6 +172,7 @@ class Cfg:
     psi_threshold_robust: float = 0.1
     alr_threshold_severe: float = 0.75
     alr_threshold_minor: float = 0.25
+    threshold_n_classes: int = 3
 
     def __post_init__(self):
         b = self.base_dir
@@ -1313,6 +1319,7 @@ def detect_titik_aman_semu(
     tc = f"waktu_tes_min_{skenario}" 
     if tc not in gdf_sim.columns:
         logger.warning(f"[detect_titik_aman_semu] kolom {tc} tidak ada")
+        gdf_sim.attrs["pseudo_safety_thresholds"] = {}
         return gpd.GeoDataFrame()
 
     # T_current
@@ -1337,15 +1344,37 @@ def detect_titik_aman_semu(
             gdf_sim["psi_val"] = 0.0
             gdf_sim["alr_val"] = np.where(is_isolated, np.nan, 0.0)
             gdf_sim["is_isolated"] = is_isolated.astype(bool)
+            gdf_sim["psi_class"] = "unknown"
+            gdf_sim["alr_class"] = np.where(is_isolated, "isolated", "unknown")
             gdf_sim["is_semu"] = 0
+            gdf_sim.attrs["pseudo_safety_thresholds"] = {}
             return gpd.GeoDataFrame()
     
     # 3. Ambil Baseline Times & Hitung ALR (Accessibility Loss Ratio)
     if baseline_times is None:
+        psi_meta = estimate_metric_thresholds(
+            psi_array,
+            "PSI",
+            fallback_lower=cfg.psi_threshold_robust,
+            fallback_upper=cfg.psi_threshold_fragile,
+            n_classes=cfg.threshold_n_classes,
+        )
+        alr_meta = estimate_metric_thresholds(
+            np.zeros(len(gdf_sim), dtype=float),
+            "ALR",
+            fallback_lower=cfg.alr_threshold_minor,
+            fallback_upper=cfg.alr_threshold_severe,
+            n_classes=cfg.threshold_n_classes,
+        )
         gdf_sim["psi_val"] = psi_array
         gdf_sim["alr_val"] = np.where(is_isolated, np.nan, 0.0)
         gdf_sim["is_isolated"] = is_isolated.astype(bool)
+        gdf_sim["psi_class"] = classify_metric_values(
+            psi_array, psi_meta, "stable", "fragile", "critical"
+        )
+        gdf_sim["alr_class"] = np.where(is_isolated, "isolated", "minor")
         gdf_sim["is_semu"] = 0
+        gdf_sim.attrs["pseudo_safety_thresholds"] = {"psi": psi_meta, "alr": alr_meta}
         return gpd.GeoDataFrame()
     
     # ALR = (T_current - T_baseline) / T_baseline (Murni Matematis)
@@ -1355,21 +1384,47 @@ def detect_titik_aman_semu(
     # Jika terisolasi, ALR tidak terdefinisi secara rasio (set ke NaN untuk statistik)
     alr_final = np.where(is_isolated, np.nan, alr_raw)
     
+    psi_meta = estimate_metric_thresholds(
+        psi_array,
+        "PSI",
+        fallback_lower=cfg.psi_threshold_robust,
+        fallback_upper=cfg.psi_threshold_fragile,
+        n_classes=cfg.threshold_n_classes,
+    )
+    alr_meta = estimate_metric_thresholds(
+        alr_raw[~is_isolated],
+        "ALR",
+        fallback_lower=cfg.alr_threshold_minor,
+        fallback_upper=cfg.alr_threshold_severe,
+        n_classes=cfg.threshold_n_classes,
+    )
+
     # Simpan metrik ke GDF (SELALU simpan agar muncul di popup)
     gdf_sim["psi_val"] = psi_array
     gdf_sim["alr_val"] = alr_final
     gdf_sim["is_isolated"] = is_isolated.astype(bool)
+    gdf_sim["psi_class"] = classify_metric_values(
+        psi_array, psi_meta, "stable", "fragile", "critical"
+    )
+    gdf_sim["alr_class"] = classify_metric_values(
+        alr_raw, alr_meta, "minor", "moderate", "severe"
+    )
+    gdf_sim.loc[is_isolated, "alr_class"] = "isolated"
+    gdf_sim.attrs["pseudo_safety_thresholds"] = {"psi": psi_meta, "alr": alr_meta}
     
     # 3. Filter Final (Logika Akademik)
     # Area Aman Semu = Fragile (PSI tinggi) DAN (Isolated ATAU ALR Severe)
-    mask_semu = (psi_array >= cfg.psi_threshold_fragile) & (is_isolated | (alr_raw >= cfg.alr_threshold_severe))
+    mask_semu = (
+        (psi_array >= float(psi_meta["upper"]))
+        & (is_isolated | (alr_raw >= float(alr_meta["upper"])))
+    )
     gdf_sim["is_semu"] = mask_semu.astype(int)
 
     n_semu = int(mask_semu.sum())
     n_iso  = int(is_isolated.sum())
     logger.info(
-        f"[detect_titik_aman_semu] PSI >= {cfg.psi_threshold_fragile} & "
-        f"(Iso={n_iso} | ALR >= {cfg.alr_threshold_severe}) -> semu={n_semu}"
+        f"[detect_titik_aman_semu] PSI>={psi_meta['upper']:.4f} ({psi_meta['method']}) & "
+        f"(Iso={n_iso} | ALR>={alr_meta['upper']:.4f} ({alr_meta['method']})) -> semu={n_semu}"
     )
 
     if n_semu == 0:
@@ -1629,7 +1684,11 @@ def run_pipeline(
         if len(semu_gdf) > 0:
             gdf_sim.loc[semu_gdf.index, "titik_aman_semu"] = 1
 
-        return gdf_sim, {}, pd.DataFrame(), {"k": int(len(np.unique(labs))), "t_pen": float(t_pen_cache)}
+        return gdf_sim, {}, pd.DataFrame(), {
+            "k": int(len(np.unique(labs))),
+            "t_pen": float(t_pen_cache),
+            "pseudo_safety_thresholds": gdf_sim.attrs.get("pseudo_safety_thresholds", {}),
+        }
 
     # ── 1. Simulasi Bencana (Hazard Map) ──────────────────────────────────────
     gdf_sim, roads_sim, tes_sim, mask_dampak = simulate_hazard(
@@ -1723,6 +1782,12 @@ def run_pipeline(
     if sdwfcm_res is not None:
         labs = sdwfcm_res.get("labels")
         if labs is not None:
+            metric_for_order = gdf_sim[f"waktu_tes_min_{skenario}"].values
+            for algo_name, algo_result in cl_results.items():
+                if isinstance(algo_result, dict) and algo_result.get("labels") is not None:
+                    cl_results[algo_name] = relabel_clustering_result(algo_result, metric_for_order)
+            sdwfcm_res = cl_results.get("SDWFCM")
+            labs = sdwfcm_res.get("labels")
             gdf_sim["cluster_sdwfcm"]      = labs
             gdf_sim["membership_max"]      = sdwfcm_res.get("max_membership")
             gdf_sim["cluster_sfcm"]        = (cl_results.get("SFCM") or {}).get("labels")
@@ -1750,4 +1815,8 @@ def run_pipeline(
             eval_df = pd.DataFrame()
 
     logger.info(f"[run_pipeline] SELESAI | sk={sk}")
-    return gdf_sim, cl_results, eval_df, {"k": k_opt, "t_pen": t_pen}
+    return gdf_sim, cl_results, eval_df, {
+        "k": k_opt,
+        "t_pen": t_pen,
+        "pseudo_safety_thresholds": gdf_sim.attrs.get("pseudo_safety_thresholds", {}),
+    }

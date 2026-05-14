@@ -36,11 +36,21 @@ let activeAdminLayers = new Set(['kecamatan', 'desa']);
 let landCoverOpacity = Number(localStorage.getItem('evac_land_cover_opacity') || '0.72');
 let mapRuntimeState = { basemap: 'ready', overlay: 'idle', message: '' };
 let landCoverRuntimeState = { tileErrors: 0, hasSuccessfulTile: false };
-let roadCuts = [], cutMarkers = [], routeLayers, originMarker = null, gridPopup = null;
+let roadCuts = [], cutMarkers = [], routeLayers, contextRouteLayers, originMarker = null, gridPopup = null;
 let routingAbortController = null, isCalculating = false, markerPopupOpen = false;
 let searchMarker = null, activeCluster = null, clustersHidden = false, searchBoundaryLayer = null;
 let isolatedOrigin = null; // Store { latlng, routes, gridAttr, recommendations }
 let lastK = 5; // Global store for cluster count
+let pseudoSafetyThresholds = { psi: null, alr: null };
+let activePopupSnapshot = null;
+let suppressRecommendationRestore = false;
+
+function ensureGridPopup() {
+    if (!gridPopup) {
+        gridPopup = L.popup({ maxWidth: 320, autoClose: false, closeOnClick: false, autoPan: false });
+    }
+    return gridPopup;
+}
 
 function toggleClusters(hide) {
     clustersHidden = hide;
@@ -56,11 +66,136 @@ function getGridAttrAt(latlng) {
             foundId = layer.feature.properties.id_grid;
         }
     });
-    return foundId ? gridLayer.lookup[foundId] : null;
+    return foundId !== null && foundId !== undefined ? gridLayer.lookup[foundId] : null;
+}
+
+function getGridCenterById(idGrid) {
+    if (!gridLayer || idGrid === null || idGrid === undefined) return null;
+    let center = null;
+    gridLayer.eachLayer(layer => {
+        if (layer.feature?.properties?.id_grid === idGrid) {
+            center = layer.getBounds().getCenter();
+        }
+    });
+    return center;
+}
+
+function clonePopupLatLng(latlng) {
+    if (!latlng) return null;
+    const cloned = L.latLng(latlng.lat, latlng.lng);
+    if (latlng.gridAttr) cloned.gridAttr = latlng.gridAttr;
+    if (latlng.id_grid !== undefined) cloned.id_grid = latlng.id_grid;
+    if (latlng.isRecommendation) cloned.isRecommendation = true;
+    return cloned;
+}
+
+function captureActivePopupState() {
+    if (!map) return null;
+    if (gridPopup && map.hasLayer(gridPopup) && gridPopup._gridRouteState) {
+        const state = gridPopup._gridRouteState;
+        activePopupSnapshot = {
+            kind: 'grid',
+            latlng: clonePopupLatLng(state.latlng),
+            isGridClick: true
+        };
+        return activePopupSnapshot;
+    }
+
+    const popup = map._popup;
+    if (popup && map.hasLayer(popup)) {
+        const content = popup.getContent();
+        activePopupSnapshot = {
+            kind: 'generic',
+            latlng: clonePopupLatLng(popup.getLatLng()),
+            content: typeof content === 'string' ? content : popup._contentNode?.innerHTML || ''
+        };
+        return activePopupSnapshot;
+    }
+    activePopupSnapshot = null;
+    return null;
+}
+
+function restoreActivePopupState(snapshot) {
+    if (!snapshot || !map) return;
+    if (snapshot.kind === 'grid' && snapshot.latlng) {
+        const latlng = clonePopupLatLng(snapshot.latlng);
+        latlng.gridAttr = getGridAttrAt(latlng) || latlng.gridAttr || null;
+        calculateRoutes(latlng, true);
+        return;
+    }
+    if (snapshot.kind === 'generic' && snapshot.latlng && snapshot.content) {
+        L.popup({ maxWidth: 320, autoClose: false, closeOnClick: false })
+            .setLatLng(snapshot.latlng)
+            .setContent(snapshot.content)
+            .openOn(map);
+    }
+}
+
+function updateRouteResultsLayout() {
+    const panel = document.getElementById('route-results');
+    if (!panel) return;
+
+    const layerControl = document.querySelector('.tes-layer-control');
+    const attribution = document.querySelector('.leaflet-control-attribution');
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+
+    const defaultTop = 100;
+    const defaultBottom = 18;
+    const gap = 12;
+
+    const controlBottom = layerControl
+        ? Math.min(viewportHeight - 120, Math.max(defaultTop, layerControl.getBoundingClientRect().bottom + gap))
+        : defaultTop;
+
+    const attributionTop = attribution
+        ? Math.max(controlBottom + 180, attribution.getBoundingClientRect().top - gap)
+        : (viewportHeight - 48);
+
+    const availableHeight = Math.max(180, attributionTop - controlBottom);
+    panel.style.top = `${Math.round(controlBottom)}px`;
+    panel.style.maxHeight = `${Math.round(availableHeight)}px`;
+    panel.style.bottom = 'auto';
+
+    panel.classList.toggle('compact', availableHeight < 360);
+    panel.classList.toggle('ultra-compact', availableHeight < 280);
+
+    if (window.getComputedStyle(panel).display === 'none') {
+        panel.style.height = 'auto';
+        return;
+    }
+
+    panel.style.height = 'auto';
+    const naturalHeight = panel.scrollHeight;
+    panel.style.height = `${Math.min(Math.round(availableHeight), naturalHeight)}px`;
 }
 
 function isGridIsolated(gridAttr) {
     return gridAttr?.is_isolated === true || gridAttr?.is_isolated === 1;
+}
+
+function setPseudoSafetyThresholds(thresholds) {
+    pseudoSafetyThresholds = thresholds || { psi: null, alr: null };
+}
+
+function classifyByThreshold(metricKey, value) {
+    const metric = pseudoSafetyThresholds?.[metricKey];
+    const numericValue = Number(value);
+    if (!metric || value === null || !Number.isFinite(numericValue)) return null;
+    if (numericValue >= Number(metric.upper)) return 'high';
+    if (numericValue >= Number(metric.lower)) return 'mid';
+    return 'low';
+}
+
+function renderPsiValue(gridAttr) {
+    if (!gridAttr || gridAttr.psi_val === undefined || gridAttr.psi_val === null) return '';
+    const psi = Number(gridAttr.psi_val);
+    if (!Number.isFinite(psi)) return '';
+    const level = gridAttr.psi_class || classifyByThreshold('psi', psi);
+    const color = level === 'critical' || level === 'high'
+        ? 'var(--danger)'
+        : (level === 'fragile' || level === 'mid' ? 'var(--warning)' : 'var(--accent-primary)');
+    const label = gridAttr.psi_class ? `${psi.toFixed(2)} • ${String(gridAttr.psi_class).toUpperCase()}` : psi.toFixed(2);
+    return `<div style="display:flex; justify-content:space-between; margin-top:4px;"><span style="color:var(--text-dim); font-size:10px;">PSI (Instability)</span><span style="font-weight:700; color:${color}">${label}</span></div>`;
 }
 
 function renderAlrValue(gridAttr, hasRouteAccess = false) {
@@ -68,8 +203,13 @@ function renderAlrValue(gridAttr, hasRouteAccess = false) {
     const isolated = isGridIsolated(gridAttr) && !hasRouteAccess;
     const alr = Number(gridAttr.alr_val);
     const hasValidAlr = gridAttr.alr_val !== null && Number.isFinite(alr);
-    const color = isolated || (hasValidAlr && alr >= 0.75) ? 'var(--danger)' : 'var(--accent-primary)';
-    const label = isolated ? 'ISOLATED' : (hasValidAlr ? `${(alr * 100).toFixed(0)}%` : 'N/A');
+    const level = isolated ? 'isolated' : (gridAttr.alr_class || classifyByThreshold('alr', alr));
+    const color = (level === 'isolated' || level === 'severe' || level === 'high')
+        ? 'var(--danger)'
+        : ((level === 'moderate' || level === 'mid') ? 'var(--warning)' : 'var(--accent-primary)');
+    const label = isolated
+        ? 'ISOLATED'
+        : (hasValidAlr ? `${(alr * 100).toFixed(0)}%${gridAttr.alr_class ? ` • ${String(gridAttr.alr_class).toUpperCase()}` : ''}` : 'N/A');
     return `<div style="display:flex; justify-content:space-between; margin-top:4px;"><span style="color:var(--text-dim); font-size:10px;">ALR (Loss Ratio)</span><span style="font-weight:700; color:${color}">${label}</span></div>`;
 }
 

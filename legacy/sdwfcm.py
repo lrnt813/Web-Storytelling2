@@ -7,12 +7,6 @@ Original file is located at
     https://colab.research.google.com/drive/13Fk1QnZp5Dax5Oy14XvG0uNDN7yGQf5H
 """
 
-# ══════════════════════════════════════════════════════════════════════
-# 0. INSTALL
-# ══════════════════════════════════════════════════════════════════════
-
-!pip install geopandas libpysal esda scikit-learn networkx matplotlib seaborn tqdm pyproj scipy kneed pandana numba folium mapclassify spopt -q
-
 # ╔══════════════════════════════════════════════════════════════════════╗
 # ║  TIPOLOGI KERAWANAN EVAKUASI & DETEKSI TITIK AMAN SEMU               ║
 # ║  Kabupaten Kulon Progo | v24-Refactored | Google Colab               ║
@@ -41,8 +35,7 @@ import scipy.sparse as sp
 
 from sklearn.preprocessing import RobustScaler, PowerTransformer
 from sklearn.decomposition import PCA
-from sklearn.metrics import (silhouette_score, calinski_harabasz_score,
-                             davies_bouldin_score)
+from sklearn.metrics import (silhouette_score, calinski_harabasz_score, davies_bouldin_score)
 from sklearn.neighbors import NearestNeighbors
 from sklearn.pipeline import Pipeline
 
@@ -54,6 +47,11 @@ from shapely.ops import unary_union
 from tqdm.auto import tqdm
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
+from backend.pseudo_safety import (
+    classify_metric_values,
+    estimate_metric_thresholds,
+    relabel_clustering_result,
+)
 
 try:
     import folium; from folium import GeoJson, GeoJsonTooltip
@@ -101,7 +99,7 @@ except Exception:
 # ══════════════════════════════════════════════════════════════════════
 @dataclass
 class Cfg:
-    base_dir: str = "/content/drive/MyDrive/Bahan Pengolahan"
+    base_dir: str = "data"
     target_crs: str = "EPSG:32749"
 
     hazard_col_map: Dict[str, str] = field(default_factory=lambda: {
@@ -160,6 +158,13 @@ class Cfg:
     k_min_parsimony: int = 2
     elbow_n_init: int = 5
     elbow_max_iter: int = 100
+
+    # Titik Aman Semu (Hybrid Academic Logic)
+    psi_threshold_fragile: float = 0.25
+    psi_threshold_robust: float = 0.1
+    alr_threshold_severe: float = 0.75
+    alr_threshold_minor: float = 0.25
+    threshold_n_classes: int = 3
 
     tipologi_colors: Dict[str, str] = field(default_factory=lambda: {
         "aman_tinggi": "#2ECC71",
@@ -696,29 +701,36 @@ def simulate_hazard(gdf, roads, tes_raw, hazard_type, intensity, cfg: Cfg, rs=42
         p = np.full(n, 0.5)
         log(f"  '{hc}' tidak ada → p=0.5", "WARN")
 
-    mask = (np.zeros(n, dtype=bool) if intensity == 0.0
-            else (p >= (1.0 - intensity)) & (p > 0.0))
+    mask = (
+        np.zeros(n, dtype=bool) if intensity == 0.0
+        else (p >= (1.0 - intensity)) & (p > 0.0)
+    )
     log(f"  Grid terdampak: {mask.sum()}/{n} ({mask.sum() / n * 100:.1f}%)", "DATA")
 
-    gdf_s  = gdf.copy()
-    gdf_s[f"sim_prob_{hazard_type}"]   = p
+    gdf_s = gdf.copy(deep=False)
+    gdf_s[f"sim_prob_{hazard_type}"] = p
     gdf_s[f"sim_dampak_{hazard_type}"] = mask.astype(int)
-    tes_s    = {k: v.copy() for k, v in tes_raw.items()}
-    roads_s  = roads.copy() if roads is not None else None
+    tes_s = {k: v.copy() for k, v in tes_raw.items()}
+    roads_s = roads.copy(deep=False) if roads is not None else None
 
-    if intensity > 0.0:
-        du  = (unary_union(gdf_s[mask].geometry.buffer(10))
-               if mask.any() else None)
+    if intensity > 0.0 and mask.any():
         hcr = cfg.hazard_col_map.get(hazard_type, hazard_type)
-        if du is not None:
-            for kat, gt in tes_s.items():
-                if hcr not in gt.columns: gt[hcr] = 0
-                for idx in gt.index:
-                    pt = gt.at[idx, "geometry"]
-                    if (pt and not pt.is_empty and
-                            (pt.within(du) or pt.buffer(50).intersects(du))):
-                        if int(gt.at[idx, hcr]) < cfg.tes_hazard_threshold:
-                            gt.at[idx, hcr] = cfg.road_break_threshold
+        impacted_geom = gdf_s[mask].geometry
+        sindex = impacted_geom.sindex
+        for kat, gt in tes_s.items():
+            if hcr not in gt.columns:
+                gt[hcr] = 0
+            for idx in gt.index:
+                pt = gt.at[idx, "geometry"]
+                if pt and not pt.is_empty:
+                    pt_buf = pt.buffer(50)
+                    possible_matches_idx = list(sindex.intersection(pt_buf.bounds))
+                    if possible_matches_idx:
+                        possible_matches = impacted_geom.iloc[possible_matches_idx]
+                        precise_matches = possible_matches[possible_matches.intersects(pt_buf)]
+                        if not precise_matches.empty:
+                            if int(gt.at[idx, hcr]) < cfg.tes_hazard_threshold:
+                                gt.at[idx, hcr] = cfg.road_break_threshold
 
     _plot_sim_overview(gdf_s, roads_s, tes_s, hazard_type, intensity, mask, cfg)
     return gdf_s, roads_s, tes_s, mask
@@ -920,71 +932,65 @@ def compute_distances(gdf, skenario, tes_v, cfg: Cfg, intensity=0.0,
                       t_pen=None, net=None, edge_df=None,
                       G=None, nl=None, tn=None):
     n  = len(gdf)
-    cx = gdf.geometry.centroid.x.values
-    cy = gdf.geometry.centroid.y.values
+    if "cx" in gdf.columns and "cy" in gdf.columns:
+        cx = gdf["cx"].values
+        cy = gdf["cy"].values
+    else:
+        cx = gdf.geometry.centroid.x.values
+        cy = gdf.geometry.centroid.y.values
     tp = t_pen if (t_pen and t_pen > 0) else cfg.unreachable_time
 
-    if PANDANA_OK and net is not None:
-        apply_pandana_weights(net, edge_df, skenario, intensity, cfg)
-        tpk = {}
-        for kat in cfg.kategori_fac:
-            sub = tes_v[tes_v["kategori"] == kat] if tes_v is not None else None
-            if sub is None or len(sub) == 0:
-                tpk[kat] = np.full(n, tp); continue
-            ta = query_pandana(net, cx, cy,
-                               sub.geometry.x.values, sub.geometry.y.values, tp, cfg)
-            tpk[kat] = ta if ta is not None else np.full(n, tp)
-        tm   = np.column_stack(list(tpk.values())).min(axis=1)
-        iso  = {k: (tpk[k] >= tp).astype(int) for k in cfg.kategori_fac}
-        opsi = np.column_stack([(tpk[k] < tp).astype(int)
-                                 for k in cfg.kategori_fac]).sum(axis=1)
-        return tpk, tm, None, iso, opsi
+    log(f"  NetworkX Multi-Source Dijkstra [{skenario.upper()}|{intensity:.2f}]...", "DATA")
+    gnodes = np.array([None] * n, dtype=object)
+    if tn is not None and len(nl) > 0:
+        dists, idxs = tn.query(np.column_stack((cx, cy)), k=1)
+        valid_mask = dists <= 300
+        for i in range(n):
+            if valid_mask[i]:
+                idx = idxs[i] if np.isscalar(idxs[i]) else idxs[i][0]
+                nd = tuple(nl[idx])
+                if G.has_node(nd):
+                    gnodes[i] = nd
+    gnodes_list = gnodes.tolist()
 
-    log(f"  NetworkX Dijkstra [{skenario.upper()}|{intensity:.2f}]...", "DATA")
-    gnodes = [_snap(G, tn, nl, [cx[i], cy[i]]) for i in range(n)]
-    if tes_v is None:
+    if tes_v is None or len(tes_v) == 0:
         tpk = {k: np.full(n, tp) for k in cfg.kategori_fac}
-        return tpk, np.full(n, tp), gnodes, \
+        return tpk, np.full(n, tp), gnodes_list, \
                {k: np.ones(n, int) for k in cfg.kategori_fac}, np.zeros(n, int)
 
     tnpk = {}
     for kat, sub in tes_v.groupby("kategori"):
-        snapped = [_snap(G, tn, nl, [r.geometry.x, r.geometry.y])
-                   for _, r in sub.iterrows()]
-        tnpk[kat] = list(set(x for x in snapped if x is not None))
-
-    all_tes = list({nd for nds in tnpk.values() for nd in nds})
-    if not all_tes:
-        tpk = {k: np.full(n, tp) for k in tnpk}
-        return tpk, np.full(n, tp), gnodes, \
-               {k: np.ones(n, int) for k in tnpk}, np.zeros(n, int)
-
-    dpk = {k: np.full(n, np.inf) for k in tnpk}
-    n2k = {}
-    for k, nodes in tnpk.items():
-        for nd in nodes: n2k.setdefault(nd, []).append(k)
-
-    for tnd in tqdm(all_tes, desc=f"  Dijkstra [{skenario}]", leave=False):
-        try: lengths = nx.single_source_dijkstra_path_length(G, tnd, weight="weight")
-        except: continue
-        for gi, gnd in enumerate(gnodes):
-            if gnd is None: continue
-            d = lengths.get(gnd, np.inf)
-            for k in n2k.get(tnd, []):
-                if d < dpk[k][gi]: dpk[k][gi] = d
+        snapped_nodes = []
+        for _, r in sub.iterrows():
+            d, i = tn.query([r.geometry.x, r.geometry.y], k=1)
+            d_val = d if np.isscalar(d) else d[0]
+            if d_val <= 300:
+                idx = i if np.isscalar(i) else i[0]
+                nd = tuple(nl[idx])
+                if G.has_node(nd):
+                    snapped_nodes.append(nd)
+        tnpk[kat] = list(set(snapped_nodes))
 
     tpk = {}
-    for k, arr in dpk.items():
+    for kat in cfg.kategori_fac:
+        sources = tnpk.get(kat, [])
+        arr = np.full(n, np.inf)
+        if sources:
+            try:
+                lengths = nx.multi_source_dijkstra_path_length(G, sources, weight="weight")
+                for gi, gnd in enumerate(gnodes):
+                    if gnd is not None:
+                        arr[gi] = lengths.get(gnd, np.inf)
+            except Exception:
+                pass
         t = arr / cfg.walking_speed_m_per_min
-        tpk[k] = np.where(np.isinf(t), tp, t)
-    for k in cfg.kategori_fac:
-        if k not in tpk: tpk[k] = np.full(n, tp)
+        tpk[kat] = np.where(np.isinf(t), tp, t)
 
     tm   = np.column_stack(list(tpk.values())).min(axis=1)
     iso  = {k: (tpk[k] >= tp).astype(int) for k in cfg.kategori_fac}
     opsi = np.column_stack([(tpk[k] < tp).astype(int)
                              for k in cfg.kategori_fac]).sum(axis=1)
-    return tpk, tm, gnodes, iso, opsi
+    return tpk, tm, gnodes_list, iso, opsi
 
 def calc_t_max(tpk, cfg: Cfg):
     all_t = []
@@ -1236,7 +1242,10 @@ class SpatialDistanceWeightedFCM:
         self.labels_ = self.U_ = self.max_membership_ = self.centers_ = None
 
     def _build_W(self, gdf_or_coords):
-        if hasattr(gdf_or_coords, "geometry"):
+        if hasattr(gdf_or_coords, "columns") and "cx" in gdf_or_coords.columns and "cy" in gdf_or_coords.columns:
+            coords = np.column_stack([gdf_or_coords["cx"].values,
+                                      gdf_or_coords["cy"].values])
+        elif hasattr(gdf_or_coords, "geometry"):
             coords = np.column_stack([gdf_or_coords.geometry.centroid.x.values,
                                       gdf_or_coords.geometry.centroid.y.values])
         else:
@@ -1588,26 +1597,32 @@ def determine_k(X_pca, skenario, cfg: Cfg, suffix=""):
 
     ia      = np.array(inertias)
     valid_k = [ks[i] for i in range(len(ks)) if not np.isnan(ia[i])]
-    valid_i = ia[~np.isnan(ia)].tolist()
-    k_opt   = None
-    if KNEED_OK and len(valid_k) >= 3:
+    valid_i = ia[~np.isnan(ia)]
+    if len(valid_k) < 2:
+        k_opt = 4
+    else:
+        k_opt = None
+    if k_opt is None and KNEED_OK:
         try:
             kl    = KneeLocator(valid_k, valid_i, curve="convex",
                                 direction="decreasing", interp_method="interp1d")
             k_opt = kl.knee
         except: pass
     if k_opt is None and len(valid_i) >= 2:
-        rel   = np.abs(np.diff(valid_i)) / (np.array(valid_i[:-1]) + 1e-10)
+        rel   = np.abs(np.diff(valid_i)) / (valid_i[:-1] + 1e-10)
         k_opt = valid_k[int(np.argmax(rel)) + 1]
     if k_opt is None: k_opt = 4
     if k_opt <= cfg.k_min_parsimony:
-        ge3 = [k for k in valid_k if k >= 3]
-        ie3 = [valid_i[valid_k.index(k)] for k in ge3]
-        if len(ge3) >= 2:
-            rel   = np.abs(np.diff(ie3)) / (np.array(ie3[:-1]) + 1e-10)
-            k_opt = ge3[int(np.argmax(rel)) + 1]
-        elif ge3: k_opt = ge3[0]
-        else:     k_opt = 3
+        ge3_mask = np.array(valid_k) >= 3
+        ge3_k = np.array(valid_k)[ge3_mask]
+        ge3_i = np.array(valid_i)[ge3_mask]
+        if len(ge3_k) >= 2:
+            rel   = np.abs(np.diff(ge3_i)) / (ge3_i[:-1] + 1e-10)
+            k_opt = int(ge3_k[int(np.argmax(rel)) + 1])
+        elif len(ge3_k) == 1:
+            k_opt = int(ge3_k[0])
+        else:
+            k_opt = 3
 
     fig, ax = plt.subplots(figsize=(9, 5))
     ax.plot(ks, inertias, "o-", color="#3498DB", lw=2.5, ms=9)
@@ -1686,6 +1701,13 @@ def run_all_clustering(gdf, w, X_pca, k, skenario, cfg: Cfg, mask_dampak=None):
                      ("SKATER",  _skater)]:
         r = _run(name, fn)
         if r: results[name] = r
+
+    metric_col = f"waktu_tes_min_{skenario}"
+    if metric_col in gdf.columns:
+        metric_values = gdf[metric_col].values
+        for algo_name, algo_result in list(results.items()):
+            if isinstance(algo_result, dict) and algo_result.get("labels") is not None:
+                results[algo_name] = relabel_clustering_result(algo_result, metric_values)
 
     log(f"{len(results)}/4 algoritma berhasil", "OK"); return results
 
@@ -2001,44 +2023,157 @@ def run_bab45(df_eval, gdf_sim, results, skenario, sk, cfg: Cfg) -> dict:
 # ══════════════════════════════════════════════════════════════════════
 # BAB 4.6 — TITIK AMAN SEMU
 # ══════════════════════════════════════════════════════════════════════
-def run_bab46(gdf_sim, labels, skenario, sk, cfg: Cfg) -> gpd.GeoDataFrame:
+def detect_titik_aman_semu(
+    gdf_sim: gpd.GeoDataFrame,
+    labels: np.ndarray,
+    skenario: str,
+    sk: str,
+    cfg: Cfg,
+    baseline_times: Optional[np.ndarray] = None,
+    psi_array: Optional[np.ndarray] = None,
+    t_pen: float = 9999.0,
+    is_isolated_override: Optional[np.ndarray] = None,
+) -> gpd.GeoDataFrame:
+    tc = f"waktu_tes_min_{skenario}"
+    if tc not in gdf_sim.columns:
+        log(f"[detect_titik_aman_semu] kolom {tc} tidak ada", "WARN")
+        gdf_sim["is_semu"] = 0
+        gdf_sim.attrs["pseudo_safety_thresholds"] = {}
+        return gpd.GeoDataFrame()
+
+    tm_curr = gdf_sim[tc].fillna(cfg.unreachable_time).values
+
+    if is_isolated_override is not None:
+        is_isolated = np.asarray(is_isolated_override, dtype=bool)
+    else:
+        is_isolated = (tm_curr >= t_pen * 0.98)
+
+    if psi_array is None:
+        psi_col = f"PSI_{skenario}"
+        if psi_col in gdf_sim.columns:
+            psi_array = gdf_sim[psi_col].values
+        else:
+            gdf_sim["psi_val"] = 0.0
+            gdf_sim["alr_val"] = np.where(is_isolated, np.nan, 0.0)
+            gdf_sim["is_isolated"] = is_isolated.astype(bool)
+            gdf_sim["psi_class"] = "unknown"
+            gdf_sim["alr_class"] = np.where(is_isolated, "isolated", "unknown")
+            gdf_sim["is_semu"] = 0
+            gdf_sim.attrs["pseudo_safety_thresholds"] = {}
+            return gpd.GeoDataFrame()
+
+    if baseline_times is None:
+        psi_meta = estimate_metric_thresholds(
+            psi_array, "PSI",
+            fallback_lower=cfg.psi_threshold_robust,
+            fallback_upper=cfg.psi_threshold_fragile,
+            n_classes=cfg.threshold_n_classes,
+        )
+        alr_meta = estimate_metric_thresholds(
+            np.zeros(len(gdf_sim), dtype=float), "ALR",
+            fallback_lower=cfg.alr_threshold_minor,
+            fallback_upper=cfg.alr_threshold_severe,
+            n_classes=cfg.threshold_n_classes,
+        )
+        gdf_sim["psi_val"] = psi_array
+        gdf_sim["alr_val"] = np.where(is_isolated, np.nan, 0.0)
+        gdf_sim["is_isolated"] = is_isolated.astype(bool)
+        gdf_sim["psi_class"] = classify_metric_values(
+            psi_array, psi_meta, "stable", "fragile", "critical"
+        )
+        gdf_sim["alr_class"] = np.where(is_isolated, "isolated", "minor")
+        gdf_sim["is_semu"] = 0
+        gdf_sim.attrs["pseudo_safety_thresholds"] = {"psi": psi_meta, "alr": alr_meta}
+        return gpd.GeoDataFrame()
+
+    t_base = np.where(baseline_times <= 0, 1e-6, baseline_times)
+    alr_raw = (tm_curr - baseline_times) / t_base
+    alr_final = np.where(is_isolated, np.nan, alr_raw)
+
+    psi_meta = estimate_metric_thresholds(
+        psi_array, "PSI",
+        fallback_lower=cfg.psi_threshold_robust,
+        fallback_upper=cfg.psi_threshold_fragile,
+        n_classes=cfg.threshold_n_classes,
+    )
+    alr_meta = estimate_metric_thresholds(
+        alr_raw[~is_isolated], "ALR",
+        fallback_lower=cfg.alr_threshold_minor,
+        fallback_upper=cfg.alr_threshold_severe,
+        n_classes=cfg.threshold_n_classes,
+    )
+
+    gdf_sim["psi_val"] = psi_array
+    gdf_sim["alr_val"] = alr_final
+    gdf_sim["is_isolated"] = is_isolated.astype(bool)
+    gdf_sim["psi_class"] = classify_metric_values(
+        psi_array, psi_meta, "stable", "fragile", "critical"
+    )
+    gdf_sim["alr_class"] = classify_metric_values(
+        alr_raw, alr_meta, "minor", "moderate", "severe"
+    )
+    gdf_sim.loc[is_isolated, "alr_class"] = "isolated"
+    gdf_sim.attrs["pseudo_safety_thresholds"] = {"psi": psi_meta, "alr": alr_meta}
+
+    mask_semu = (
+        (psi_array >= float(psi_meta["upper"]))
+        & (is_isolated | (alr_raw >= float(alr_meta["upper"])))
+    )
+    gdf_sim["is_semu"] = mask_semu.astype(int)
+
+    n_semu = int(mask_semu.sum())
+    n_iso = int(is_isolated.sum())
+    log(
+        f"[detect_titik_aman_semu] PSI>={psi_meta['upper']:.4f} ({psi_meta['method']}) & "
+        f"(Iso={n_iso} | ALR>={alr_meta['upper']:.4f} ({alr_meta['method']})) -> semu={n_semu}",
+        "DATA",
+    )
+    if n_semu == 0:
+        return gpd.GeoDataFrame()
+
+    gdf_s = gdf_sim[mask_semu].copy()
+    gdf_s["_kategori"] = "titik_aman_semu"
+    gdf_s["_cluster"] = labels[mask_semu]
+    return gdf_s
+
+
+def run_bab46(
+    gdf_sim,
+    labels,
+    skenario,
+    sk,
+    cfg: Cfg,
+    baseline_times: Optional[np.ndarray] = None,
+    t_pen: Optional[float] = None,
+    is_isolated_override: Optional[np.ndarray] = None,
+) -> gpd.GeoDataFrame:
     section(f"4.6 — Titik Aman Semu [{sk}]", 1)
     out = cfg.bab_dir("4.6")
     tc  = f"waktu_tes_min_{sk}"
     if tc not in gdf_sim.columns:
         log(f"{tc} tidak ada", "WARN"); return gpd.GeoDataFrame()
 
-    pc = f"sim_prob_{skenario}"; hc = cfg.indeks_bahaya.get(skenario)
-    if pc in gdf_sim.columns:
-        m_haz = gdf_sim[pc].fillna(0).values >= 0.5
-    elif hc and hc in gdf_sim.columns:
-        m_haz = gdf_sim[hc].fillna(0).values >= 2
-    else:
-        m_haz = np.ones(len(gdf_sim), bool)
-
     tm    = gdf_sim[tc].fillna(cfg.unreachable_time).values
-    m_iso = tm >= cfg.isolation_time_threshold
-    oc    = f"jumlah_opsi_rute_{sk}"
-    if oc in gdf_sim.columns:
-        m_iso = m_iso | (gdf_sim[oc].fillna(0).values == 0)
-
-    mask_semu = m_haz & m_iso; n_semu = int(mask_semu.sum())
-    kv("Bahaya tinggi",  f"{m_haz.sum()} ({m_haz.sum() / len(gdf_sim) * 100:.1f}%)")
+    t_pen_v = float(t_pen if (t_pen is not None and t_pen > 0) else cfg.unreachable_time)
+    gdf_s = detect_titik_aman_semu(
+        gdf_sim, labels, skenario, sk, cfg,
+        baseline_times=baseline_times, t_pen=t_pen_v,
+        is_isolated_override=is_isolated_override,
+    )
+    mask_semu = gdf_sim.get("is_semu", pd.Series(np.zeros(len(gdf_sim), int))).values.astype(bool)
+    m_iso = gdf_sim.get("is_isolated", pd.Series(np.zeros(len(gdf_sim), bool))).values.astype(bool)
+    n_semu = int(mask_semu.sum())
     kv("Terisolasi",     f"{m_iso.sum()} ({m_iso.sum() / len(gdf_sim) * 100:.1f}%)")
     kv("TITIK AMAN SEMU",
        f"{n_semu} ({n_semu / len(gdf_sim) * 100:.1f}%)", ok=True)
 
-    gdf_s = gdf_sim[mask_semu].copy()
-    gdf_s["_kategori"] = "titik_aman_semu"
-    gdf_s["_cluster"]  = labels[mask_semu]
-
     # Plot 1: Peta titik aman semu
     fig, ax = plt.subplots(figsize=(10, 9))
     gdf_sim.plot(ax=ax, color=cfg.tipologi_colors["normal"], linewidth=0, alpha=0.4)
-    if (m_haz & ~mask_semu).any():
-        gdf_sim[m_haz & ~mask_semu].plot(
+    if (~mask_semu).any():
+        gdf_sim[~mask_semu].plot(
             ax=ax, color=cfg.tipologi_colors["rawan_jauh"],
-            linewidth=0, alpha=0.5, label="Bahaya tinggi (akses OK)")
+            linewidth=0, alpha=0.5, label="Non-semu")
     if n_semu > 0:
         gdf_s.plot(ax=ax, color=cfg.tipologi_colors["aman_semu"],
                    linewidth=0.3, edgecolor="white", alpha=0.95,
@@ -2566,7 +2701,7 @@ def download_outputs(cfg: Cfg):
 # ══════════════════════════════════════════════════════════════════════
 def main():
     t0 = time.time(); print_banner()
-    cfg = Cfg(base_dir="/content/drive/MyDrive/Bahan Pengolahan")   # ← UBAH PATH
+    cfg = Cfg(base_dir="data")
     log(f"PipelineConfig v24 | output_dir={cfg.output_dir}", "OK")
     log(f"Algoritma Utama  : SDWFCM", "OK")
     log(f"Algoritma Pembanding : SFCM · REDCAP · SKATER", "OK")
@@ -2600,6 +2735,7 @@ def main():
     metrics_per_s: dict = {s: [] for s in cfg.skenario_list}
     folium_paths: list = []
     k_bl_per_s:   dict = {}; t_max_per_s: dict = {}
+    baseline_tm_per_s: dict = {}
     semu_per_sk:  dict = {}; semu_counts:  dict = {}; aks_per_sk: dict = {}
 
     # ════════════════════════════════════════════════════════════════
@@ -2626,15 +2762,19 @@ def main():
 
             tes_v, _   = filter_tes(tes_sim, skenario, cfg)
             is_cached  = (sk in cached) or cache_ok(gdf_sim, sk, cfg)
-            net = ede = G = nl = tn = None
+            # Baseline harus selalu fresh untuk menjaga konsistensi K
+            # dengan logika dashboard terbaru (hindari cache historis).
+            if intensity == 0.0 and is_cached:
+                is_cached = False
+                log(f"Cache [{sk}] diabaikan untuk hitung K baseline", "DATA")
+            net = ede = None
+            G = nl = tn = None
 
             if not is_cached:
-                if PANDANA_OK and roads_sim is not None:
-                    net, _, ede, _ = build_pandana_network(roads_sim, cfg)
-                if net is None and roads_sim is not None:
+                if roads_sim is not None:
                     G, nl, tn = build_road_graph(roads_sim, skenario, intensity, cfg)
 
-                if net is not None or (G is not None and len(G.nodes()) > 0):
+                if G is not None and len(G.nodes()) > 0:
                     tpk, tm, _, iso, opsi = compute_distances(
                         gdf_sim, skenario, tes_v, cfg, intensity,
                         t_pen_s, net, ede, G, nl, tn)
@@ -2650,7 +2790,17 @@ def main():
                     t_max = calc_t_max(tpk, cfg)
                     t_max_per_s[skenario] = t_max
                     t_pen_s = 3.0 * t_max
+                    baseline_tm_per_s[skenario] = tm.copy()
                     log(f"  T_max={t_max:.2f} | T_pen={t_pen_s:.2f}", "OK")
+                    # Samakan dengan dashboard:
+                    # ganti nilai tak-terjangkau (inf/9999) menjadi t_pen baseline
+                    # SEBELUM preprocessing/PCA dan penentuan K.
+                    for k2 in cfg.kategori_fac:
+                        mask_unreachable = (
+                            (tpk[k2] >= cfg.unreachable_time * 0.9) | np.isinf(tpk[k2])
+                        )
+                        tpk[k2] = np.where(mask_unreachable, t_pen_s, tpk[k2])
+                    tm = np.column_stack(list(tpk.values())).min(axis=1)
                     iso  = {k2: (tpk[k2] >= t_pen_s).astype(int)
                             for k2 in cfg.kategori_fac}
                     opsi = np.column_stack(
@@ -2683,6 +2833,10 @@ def main():
                     if tpk_c:
                         t_max = calc_t_max(tpk_c, cfg)
                         t_max_per_s[skenario] = t_max; t_pen_s = 3 * t_max
+                if intensity == 0.0 and f"waktu_tes_min_{skenario}" in gdf_sim.columns:
+                    baseline_tm_per_s[skenario] = (
+                        gdf_sim[f"waktu_tes_min_{skenario}"].values.copy()
+                    )
                 for k2 in cfg.kategori_fac:
                     src = f"waktu_tes_{k2}_{sk}"; dst = f"waktu_tes_{k2}_{skenario}"
                     if src in gdf_sim.columns and dst not in gdf_sim.columns:
@@ -2691,6 +2845,35 @@ def main():
                     if (f"{cb}_{sk}" in gdf_sim.columns and
                             f"{cb}_{skenario}" not in gdf_sim.columns):
                         gdf_sim[f"{cb}_{skenario}"] = gdf_sim[f"{cb}_{sk}"]
+
+            # Samakan dengan dashboard: sebelum preprocess/PCA,
+            # nilai unreachable (inf/9999) dinormalisasi ke t_pen aktif.
+            if t_pen_s and t_pen_s > 0:
+                for k2 in cfg.kategori_fac:
+                    for col in [f"waktu_tes_{k2}_{sk}", f"waktu_tes_{k2}_{skenario}"]:
+                        if col in gdf_sim.columns:
+                            arr = gdf_sim[col].astype(float).values
+                            mask_unreachable = (
+                                (arr >= cfg.unreachable_time * 0.9) | np.isinf(arr)
+                            )
+                            gdf_sim[col] = np.where(mask_unreachable, t_pen_s, arr)
+
+                tcols = [f"waktu_tes_{k2}_{sk}" for k2 in cfg.kategori_fac
+                         if f"waktu_tes_{k2}_{sk}" in gdf_sim.columns]
+                if tcols:
+                    tm_norm = np.column_stack([gdf_sim[c].values for c in tcols]).min(axis=1)
+                    gdf_sim[f"waktu_tes_min_{sk}"] = tm_norm
+                    gdf_sim[f"waktu_tes_min_{skenario}"] = tm_norm
+                    iso = {k2: (gdf_sim[f"waktu_tes_{k2}_{sk}"].values >= t_pen_s).astype(int)
+                           for k2 in cfg.kategori_fac if f"waktu_tes_{k2}_{sk}" in gdf_sim.columns}
+                    if iso:
+                        for k2, arr in iso.items():
+                            gdf_sim[f"is_isolated_{k2}_{sk}"] = arr
+                        opsi = np.column_stack(
+                            [(gdf_sim[f"waktu_tes_{k2}_{sk}"].values < t_pen_s).astype(int)
+                             for k2 in cfg.kategori_fac if f"waktu_tes_{k2}_{sk}" in gdf_sim.columns]
+                        ).sum(axis=1)
+                        gdf_sim[f"jumlah_opsi_rute_{sk}"] = opsi
 
             gdf_sim = gdf_sim.reset_index(drop=True)
 
@@ -2766,7 +2949,30 @@ def main():
                           else sdwfcm_res)
                 if labs_s is not None:
                     try:
-                        gs = run_bab46(gdf_sim, labs_s, skenario, sk, cfg)
+                        iso_cols = [
+                            f"is_isolated_{kat}_{sk}"
+                            for kat in cfg.kategori_fac
+                            if f"is_isolated_{kat}_{sk}" in gdf_sim.columns
+                        ]
+                        if iso_cols:
+                            iso_override = np.column_stack([
+                                gdf_sim[c].fillna(0).astype(int).values
+                                for c in iso_cols
+                            ]).max(axis=1).astype(bool)
+                        else:
+                            t_pen_curr = 3.0 * t_max_per_s.get(
+                                skenario, cfg.unreachable_time / 3.0
+                            )
+                            iso_override = (
+                                gdf_sim[f"waktu_tes_min_{skenario}"].values
+                                >= (t_pen_curr * 0.98)
+                            )
+                        gs = run_bab46(
+                            gdf_sim, labs_s, skenario, sk, cfg,
+                            baseline_times=baseline_tm_per_s.get(skenario),
+                            t_pen=3.0 * t_max_per_s.get(skenario, cfg.unreachable_time / 3.0),
+                            is_isolated_override=iso_override,
+                        )
                         semu_per_sk[sk] = gs; semu_counts[sk] = len(gs)
                     except Exception as e: log(f"4.6 gagal: {e}", "WARN")
 

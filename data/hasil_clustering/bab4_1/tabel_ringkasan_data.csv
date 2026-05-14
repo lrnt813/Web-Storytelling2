@@ -1,0 +1,8 @@
+Layer,Jumlah,CRS,Format
+Mikrogrid (100×100m),22673,EPSG:32749,GeoPackage
+Segmen Jalan,162608,EPSG:32749,GeoPackage
+TES — Pendidikan,548,EPSG:32749,GeoPackage
+TES — Kesehatan,29,EPSG:32749,GeoPackage
+TES — Pemerintahan,238,EPSG:32749,GeoPackage
+TES — Ibadah,791,EPSG:32749,GeoPackage
+TES — Gor,41,EPSG:32749,GeoPackage

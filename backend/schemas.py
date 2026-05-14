@@ -28,6 +28,7 @@ class RouteRequest(BaseModel):
 class RouteAllTesRequest(BaseModel):
     lat: float = Field(..., description="Latitude asal (WGS84)")
     lng: float = Field(..., description="Longitude asal (WGS84)")
+    id_grid: Optional[int] = Field(None, description="ID grid asal bila request berasal dari klik polygon grid")
     skenario: str = Field("banjir")
     intensity: float = Field(0.0, ge=0.0, le=1.0)
     cut_roads: List[RoadCutItem] = Field(

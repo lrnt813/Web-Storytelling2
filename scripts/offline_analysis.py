@@ -14,6 +14,7 @@ from backend.engine import (
     Cfg, load_data, load_road_network, build_weights, 
     run_pipeline
 )
+from backend.pseudo_safety import compute_ordinal_psi
 
 # Setup logging
 logging.basicConfig(
@@ -85,6 +86,7 @@ def run_offline_analysis(data_dir=None):
                 
                 # Simpan ke cache columns
                 final_results[f"cl_sdwfcm_{sc}_{pct}pct"] = labels
+                final_results[f"cl_ord_sdwfcm_{sc}_{pct}pct"] = labels
                 final_results[f"mem_sdwfcm_{sc}_{pct}pct"] = membership
                 final_results[f"waktu_min_{sc}_{pct}pct"] = waktu_min
                 final_results[f"iso_{sc}_{pct}pct"] = is_isolated.astype(int)
@@ -97,22 +99,8 @@ def run_offline_analysis(data_dir=None):
         # 3. Hitung Weighted Transition Severity (PSI)
         # Formula: Σ|C_t - C_(t-1)| / ((N_scenario-1)(K-1))
         # history_arr shape: (n_intensities, n_grid)
-        history_arr = np.array(history)
-        
         logger.info(f"  Menghitung Weighted Transition Severity untuk {sc}...")
-        
-        # Hitung selisih absolut antar step berurutan
-        diffs = np.abs(np.diff(history_arr, axis=0)) # Shape: (10, n_grid)
-        sum_diffs = np.sum(diffs, axis=0)
-        
-        # Tentukan K (jumlah klaster unik dalam skenario ini)
-        unique_clusters = np.unique(history_arr)
-        K = len(unique_clusters)
-        if K < 2: K = 2 # Failsafe
-        
-        total_transitions = len(intensities) - 1
-        denominator = total_transitions * (K - 1)
-        psi_values = sum_diffs / denominator
+        psi_values = compute_ordinal_psi(history, k_locked=k_locked)
         
         col_name = f"PSI_{sc}"
         final_results[col_name] = psi_values

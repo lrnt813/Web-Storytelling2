@@ -1,0 +1,4 @@
+_cl,Road_Density_mean,banjir,waktu_tes_pendidikan_banjir_50pct,waktu_tes_kesehatan_banjir_50pct,waktu_tes_pemerintahan_banjir_50pct,waktu_tes_ibadah_banjir_50pct,waktu_tes_gor_banjir_50pct,jumlah_opsi_rute_banjir_50pct,is_isolated_pendidikan_banjir_50pct,is_isolated_kesehatan_banjir_50pct,is_isolated_pemerintahan_banjir_50pct,is_isolated_ibadah_banjir_50pct,is_isolated_gor_banjir_50pct,Jumlah_Grid
+0,0.713,0.252,7.493,50.02,21.517,6.408,67.497,4.954,0.0,0.0,0.0,0.0,0.046,8833
+1,0.839,1.72,358.164,402.263,401.761,353.605,402.263,0.244,0.882,1.0,0.999,0.875,1.0,3191
+2,0.819,1.005,21.879,109.697,48.08,17.064,80.97,4.943,0.0,0.0,0.0,0.0,0.057,10649

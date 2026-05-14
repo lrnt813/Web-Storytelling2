@@ -295,6 +295,7 @@ function goToLocation(latlng, name, type = 'poi', geojson = null) {
     // Tambahkan listener untuk membersihkan segalanya saat popup ditutup
     searchMarker.on('popupclose', () => {
         routeLayers.clearLayers();
+        if (contextRouteLayers) contextRouteLayers.clearLayers();
         if (searchBoundaryLayer) searchBoundaryLayer.clearLayers();
         if (searchMarker) {
             map.removeLayer(searchMarker);

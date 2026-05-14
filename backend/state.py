@@ -18,6 +18,7 @@ class AppState:
 
     graph_cache: Dict[tuple, tuple] = {}
     cluster_ranks: Dict[str, Dict[int, float]] = {}
+    pseudo_safety_thresholds: Dict[str, dict] = {}
     baseline_params: Dict[str, dict] = {}
     baseline_cache: Dict[str, dict] = {}
     baseline_times: Dict[str, np.ndarray] = {}

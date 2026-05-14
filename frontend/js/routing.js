@@ -4,7 +4,15 @@
     routingAbortController = new AbortController();
     
     isCalculating = true; showLoading(true);
-    const body = { lat: latlng.lat, lng: latlng.lng, skenario: document.getElementById('skenario').value, intensity: parseFloat(document.getElementById('intensitas').value), cut_roads: roadCuts };
+    const gridId = Number(latlng.id_grid);
+    const body = {
+        lat: latlng.lat,
+        lng: latlng.lng,
+        id_grid: Number.isFinite(gridId) ? Math.trunc(gridId) : null,
+        skenario: document.getElementById('skenario').value,
+        intensity: parseFloat(document.getElementById('intensitas').value),
+        cut_roads: roadCuts
+    };
 
     try {
         const resp = await fetch(`${API_BASE}/route-all-tes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: routingAbortController.signal });
@@ -14,12 +22,33 @@
     finally { showLoading(false); isCalculating = false; }
 }
 
+function runAfterMapMove(action, fallbackMs = 450) {
+    let done = false;
+    const finish = () => {
+        if (done) return;
+        done = true;
+        map.off('moveend', finish);
+        action();
+    };
+    map.once('moveend', finish);
+    window.setTimeout(finish, fallbackMs);
+}
+
+function restoreIsolatedOriginView() {
+    if (!isolatedOrigin) return;
+    const origin = isolatedOrigin;
+    map.setView(origin.latlng, 16, { animate: false });
+    renderRoutes(origin.routes, origin.latlng, true, origin.gridAttr, origin.recommendations);
+}
+
 function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendations = []) {
+    const isRecommendationView = Boolean(isolatedOrigin && latlng.isRecommendation);
     routeLayers.clearLayers();
-    map.closePopup(); // Tutup popup sebelumnya agar tidak tumpang tindih
+    if (!isRecommendationView) contextRouteLayers.clearLayers();
     const listEl = document.getElementById('route-list');
     listEl.innerHTML = '';
     document.getElementById('route-results').style.display = 'block';
+    updateRouteResultsLayout();
 
     const legend = document.querySelector('.info.legend');
     if (legend) legend.classList.add('legend-hidden');
@@ -35,9 +64,7 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span style="color:var(--text-dim); font-size:10px;">TIPOLOGI</span><span style="font-weight:700; color:${clusterColors[gridAttr.cluster_sdwfcm]}">Klaster ${gridAttr.cluster_sdwfcm}</span></div>
             <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-dim); font-size:10px;">MEMBERSHIP</span><span style="font-weight:700;">${(gridAttr.membership_max * 100).toFixed(1)}%</span></div>
             
-            ${gridAttr.psi_val !== undefined ? `
-            <div style="display:flex; justify-content:space-between; margin-top:4px;"><span style="color:var(--text-dim); font-size:10px;">PSI (Instability)</span><span style="font-weight:700; color:${gridAttr.psi_val >= 0.5 ? 'var(--warning)' : 'var(--accent-primary)'}">${gridAttr.psi_val.toFixed(2)}</span></div>
-            ` : ''}
+            ${renderPsiValue(gridAttr)}
             
             ${alrContent}
 
@@ -79,10 +106,15 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
                     </div>
                 `;
                 card.onclick = () => {
-                    const targetLatLng = L.latLng(rec.lat, rec.lng);
-                    targetLatLng.gridAttr = getGridAttrAt(targetLatLng);
+                    const recommendationLatLng = L.latLng(rec.lat, rec.lng);
+                    const recommendationGridAttr = getGridAttrAt(recommendationLatLng);
+                    const targetLatLng = recommendationGridAttr?.id_grid !== undefined && recommendationGridAttr?.id_grid !== null
+                        ? (getGridCenterById(recommendationGridAttr.id_grid) || recommendationLatLng)
+                        : recommendationLatLng;
+                    targetLatLng.gridAttr = recommendationGridAttr;
+                    targetLatLng.id_grid = recommendationGridAttr?.id_grid ?? null;
                     targetLatLng.isRecommendation = true; // Flag untuk navigasi
-                    map.flyTo(targetLatLng, 16);
+                    map.setView(targetLatLng, 16, { animate: false });
                     calculateRoutes(targetLatLng, true);
                 };
                 listEl.appendChild(card);
@@ -102,7 +134,7 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
                     fillOpacity: 0.05,
                     dashArray: i === steps ? '5, 10' : null,
                     pane: 'route-pane'
-                }).addTo(routeLayers);
+                }).addTo(contextRouteLayers);
             }
 
             // Garis Penunjuk ke Best Recommendation
@@ -113,7 +145,7 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
                 opacity: 0.7,
                 className: 'route-path-animated',
                 pane: 'route-pane'
-            }).addTo(routeLayers);
+            }).addTo(contextRouteLayers);
         }
     } else {
         // Cek apakah ini navigasi dari rekomendasi atau klik baru
@@ -131,9 +163,7 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
                 </div>
             `;
             backBtn.onclick = () => {
-                const origin = isolatedOrigin;
-                map.flyTo(origin.latlng, 16);
-                renderRoutes(origin.routes, origin.latlng, true, origin.gridAttr, origin.recommendations);
+                restoreIsolatedOriginView();
             };
             listEl.appendChild(backBtn);
         } else {
@@ -163,17 +193,23 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
         }
     }
     popupContent += `</div>`;
+    updateRouteResultsLayout();
 
     if (isGridClick) {
-        if (gridPopup) { gridPopup.off('remove'); map.closePopup(gridPopup); }
-        gridPopup = L.popup({ maxWidth: 320, autoClose: false, closeOnClick: false }).setLatLng(latlng).setContent(popupContent).openOn(map);
-        gridPopup.on('remove', () => { 
-            routeLayers.clearLayers(); 
-            document.getElementById('route-results').style.display = 'none';
-            // Tampilkan kembali legenda saat popup ditutup
-            const legend = document.querySelector('.info.legend');
-            if (legend) legend.classList.remove('legend-hidden');
-        });
+        gridPopup = ensureGridPopup();
+        suppressRecommendationRestore = true;
+        gridPopup
+            .setLatLng(latlng)
+            .setContent(popupContent)
+            .openOn(map);
+        suppressRecommendationRestore = false;
+        window.setTimeout(updateRouteResultsLayout, 0);
+        gridPopup._gridRouteState = {
+            latlng: clonePopupLatLng(latlng),
+            gridAttr,
+            recommendations,
+            isRecommendationView
+        };
     }
 }
 

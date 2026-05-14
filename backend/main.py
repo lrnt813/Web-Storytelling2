@@ -36,6 +36,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from shapely.geometry import Point
 from .engine import (
     PANDANA_OK,
     apply_road_cuts_to_graph, build_road_graph,
@@ -307,7 +308,7 @@ async def startup_event():
                 if col_time in gdf_res.columns:
                     state.baseline_times[sk] = gdf_res[col_time].values
 
-            data_klaster = _gdf_to_data_klaster(gdf_res, sk, "banjir")
+            data_klaster = _gdf_to_data_klaster(gdf_res, sk, cfg.sk_key(sk, 0.0))
             
             state.baseline_params[sk] = metadata
             state.baseline_cache[sk] = {
@@ -322,7 +323,9 @@ async def startup_event():
                 "data_klaster": data_klaster,
                 "k_optimal": _sanitize(metadata.get("k", 3)),
                 "t_pen": _sanitize(metadata.get("t_pen", 200.0)),
+                "pseudo_safety_thresholds": _sanitize(metadata.get("pseudo_safety_thresholds", {})),
             }
+            state.pseudo_safety_thresholds[sk] = metadata.get("pseudo_safety_thresholds", {})
             # Hitung rank cluster untuk rekomendasi
             # Cluster dengan rata-rata waktu_tes_min rendah = rank tinggi
             df_klaster = pd.DataFrame(data_klaster)
@@ -473,7 +476,9 @@ def _gdf_to_data_klaster(
         f"aksesibilitas_{sk}",
         "titik_aman_semu",
         "psi_val",
+        "psi_class",
         "alr_val",
+        "alr_class",
         "is_isolated",
         f"sim_dampak_{skenario}",
         cfg.indeks_bahaya.get(skenario, skenario), # Indeks bahaya mentah (0,1,2,3)
@@ -741,6 +746,7 @@ async def get_baseline(
         "elapsed_sec":  elapsed,
         "evaluation":   _eval_df_to_list(eval_df),
         "n_grid":       len(gdf_result),
+        "pseudo_safety_thresholds": _sanitize(state.baseline_params.get(skenario, {}).get("pseudo_safety_thresholds", {})),
         "n_titik_semu": int(gdf_result["titik_aman_semu"].sum())
                         if "titik_aman_semu" in gdf_result.columns else 0,
         "data_klaster": data_klaster,   # â† BARU (ringan, tanpa geometri)
@@ -830,6 +836,7 @@ async def post_simulate(body: SimulateRequest):
         "elapsed_sec":  elapsed,
         "evaluation":   _eval_df_to_list(eval_df),
         "n_grid":       len(gdf_result),
+        "pseudo_safety_thresholds": _sanitize(gdf_result.attrs.get("pseudo_safety_thresholds", {})),
         "n_titik_semu": int(gdf_result["titik_aman_semu"].sum())
                         if "titik_aman_semu" in gdf_result.columns else 0,
         "data_klaster": data_klaster,   # â† BARU (ringan, tanpa geometri)
@@ -957,6 +964,19 @@ async def post_route_all_tes(body: RouteAllTesRequest):
     t_req = time.time()
 
     origin_x, origin_y = _latlon_to_projected(body.lat, body.lng)
+    if body.id_grid is not None and state.gdf_base is not None:
+        grid_match = state.gdf_base[state.gdf_base["id_grid"] == int(body.id_grid)]
+        if not grid_match.empty:
+            row = grid_match.iloc[0]
+            if "cx" in grid_match.columns and "cy" in grid_match.columns:
+                origin_x, origin_y = float(row["cx"]), float(row["cy"])
+            else:
+                centroid = row.geometry.centroid
+                origin_x, origin_y = float(centroid.x), float(centroid.y)
+            logger.info(
+                f"[route-all-tes] origin dikunci ke centroid grid id_grid={int(body.id_grid)} "
+                f"({origin_x:.2f}, {origin_y:.2f})"
+            )
     cut_roads_converted = _prepare_cut_roads(body.cut_roads)
 
     # â”€â”€ Gunakan Cache Graph jika memungkinkan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1109,6 +1129,7 @@ async def post_route_all_tes(body: RouteAllTesRequest):
     
     if found_count == 0:
         logger.info("[route-all-tes] Deteksi isolasi total. Mencari rekomendasi...")
+        origin_grid_id = int(body.id_grid) if body.id_grid is not None else None
         # 1. Temukan semua node yang bisa mencapai TES manapun di G_use
         all_tes_nodes = []
         for kat in cfg.kategori_fac:
@@ -1140,7 +1161,16 @@ async def post_route_all_tes(body: RouteAllTesRequest):
                     node = r_nodes[idx]
                     dist_euc = euc_dists[idx]
                     dist_to_tes = reachable_lengths[node]
-                    
+
+                    if origin_grid_id is not None and state.gdf_base is not None:
+                        node_point = Point(float(node[0]), float(node[1]))
+                        same_grid = state.gdf_base[
+                            (state.gdf_base["id_grid"] == origin_grid_id) &
+                            state.gdf_base.geometry.covers(node_point)
+                        ]
+                        if not same_grid.empty:
+                            continue
+                     
                     # 3. Hitung skor kualitas (0-100)
                     # Faktor A: Kedekatan ke TES (waktu tempuh)
                     time_to_tes = dist_to_tes / cfg.walking_speed_m_per_min

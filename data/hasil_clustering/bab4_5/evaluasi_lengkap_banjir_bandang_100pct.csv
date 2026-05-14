@@ -1,0 +1,2 @@
+algoritma,n_cluster,n_noise,silhouette,calinski_harabasz,davies_bouldin,moran_cluster,moran_p,size_entropy,waktu_tes_mean,intensitas,sub_sk
+SKATER,4,0,0.6211,31.8962,0.7312,0.6665,0.01,0.0035,129.5,1.0,banjir_bandang_100pct

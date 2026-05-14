@@ -1,0 +1,5 @@
+algoritma,n_cluster,n_noise,silhouette,calinski_harabasz,davies_bouldin,moran_cluster,moran_p,size_entropy,waktu_tes_mean,ambig_pct,membership_mean,intensitas,sub_sk
+SDWFCM,3,0,0.2697,15648.2405,1.3689,0.8939,0.01,0.9835,108.4,8.22,0.8646,0.5,banjir_50pct
+SFCM,3,0,0.2631,15895.7249,1.3768,0.8127,0.01,0.9982,109.3,27.56,0.7146,0.5,banjir_50pct
+REDCAP,3,0,-0.0246,1783.3437,1.8209,1.0014,0.01,0.5794,70.1,,,0.5,banjir_50pct
+SKATER,3,0,0.2876,3.261,0.4895,-0.0001,0.02,0.001,285.5,,,0.5,banjir_50pct
