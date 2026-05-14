@@ -1,0 +1,312 @@
+{
+  "baseline_params": {
+    "banjir": {
+      "k": 3,
+      "t_pen": 402.2633795083148,
+      "pseudo_safety_thresholds": {
+        "psi": {
+          "metric": "PSI",
+          "method": "kmeans_1d",
+          "lower": 0.06541639486844895,
+          "upper": 0.1301774193548396,
+          "breaks": [
+            0.0,
+            0.06541639486844895,
+            0.1301774193548396,
+            0.35
+          ],
+          "n_samples": 22673,
+          "n_unique": 8
+        },
+        "alr": {
+          "metric": "ALR",
+          "method": "fallback",
+          "lower": 0.25,
+          "upper": 0.75,
+          "breaks": [
+            0.0,
+            0.25,
+            0.75,
+            0.0
+          ],
+          "n_samples": 22673,
+          "n_unique": 1
+        }
+      },
+      "cluster_names": {
+        "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+        "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+        "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang"
+      }
+    },
+    "banjir_bandang": {
+      "k": 4,
+      "t_pen": 402.2633795083148,
+      "pseudo_safety_thresholds": {
+        "psi": {
+          "metric": "PSI",
+          "method": "kmeans_1d",
+          "lower": 0.057657760459186504,
+          "upper": 0.14454040852575484,
+          "breaks": [
+            0.0,
+            0.057657760459186504,
+            0.14454040852575484,
+            0.3
+          ],
+          "n_samples": 22673,
+          "n_unique": 10
+        },
+        "alr": {
+          "metric": "ALR",
+          "method": "fallback",
+          "lower": 0.25,
+          "upper": 0.75,
+          "breaks": [
+            0.0,
+            0.25,
+            0.75,
+            0.0
+          ],
+          "n_samples": 22673,
+          "n_unique": 1
+        }
+      },
+      "cluster_names": {
+        "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+        "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+        "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+        "3": "Bahaya Sedang - Akses Menengah - Jaringan Jarang"
+      }
+    },
+    "tanah_longsor": {
+      "k": 4,
+      "t_pen": 431.27891818928356,
+      "pseudo_safety_thresholds": {
+        "psi": {
+          "metric": "PSI",
+          "method": "kmeans_1d",
+          "lower": 0.016666666666666767,
+          "upper": 0.05776658270361034,
+          "breaks": [
+            0.0,
+            0.016666666666666767,
+            0.05776658270361034,
+            0.23333333333333334
+          ],
+          "n_samples": 22673,
+          "n_unique": 8
+        },
+        "alr": {
+          "metric": "ALR",
+          "method": "fallback",
+          "lower": 0.25,
+          "upper": 0.75,
+          "breaks": [
+            0.0,
+            0.25,
+            0.75,
+            0.0
+          ],
+          "n_samples": 22673,
+          "n_unique": 1
+        }
+      },
+      "cluster_names": {
+        "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+        "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+        "2": "Bahaya Tinggi - Akses Menengah - Jaringan Jarang",
+        "3": "Bahaya Sedang - Akses Menengah - Jaringan Jarang"
+      }
+    }
+  },
+  "cluster_names_by_sk": {
+    "banjir_0pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang"
+    },
+    "banjir_10pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang"
+    },
+    "banjir_20pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang"
+    },
+    "banjir_30pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Tinggi - Akses Rendah - Jaringan Sedang"
+    },
+    "banjir_40pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Tinggi - Akses Rendah - Jaringan Sedang"
+    },
+    "banjir_50pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Tinggi - Akses Rendah - Jaringan Sedang"
+    },
+    "banjir_60pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Tinggi - Akses Rendah - Jaringan Sedang"
+    },
+    "banjir_70pct": {
+      "0": "Bahaya Sedang - Akses Tinggi - Jaringan Jarang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "2": "Bahaya Tinggi - Akses Rendah - Jaringan Sedang"
+    },
+    "banjir_80pct": {
+      "0": "Bahaya Sedang - Akses Tinggi - Jaringan Jarang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "2": "Bahaya Tinggi - Akses Rendah - Jaringan Sedang"
+    },
+    "banjir_90pct": {
+      "0": "Bahaya Sedang - Akses Tinggi - Jaringan Jarang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "2": "Bahaya Tinggi - Akses Rendah - Jaringan Sedang"
+    },
+    "banjir_100pct": {
+      "0": "Bahaya Sedang - Akses Tinggi - Jaringan Jarang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "2": "Bahaya Tinggi - Akses Rendah - Jaringan Sedang"
+    },
+    "banjir_bandang_0pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "3": "Bahaya Sedang - Akses Menengah - Jaringan Jarang"
+    },
+    "banjir_bandang_10pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "3": "Bahaya Sedang - Akses Menengah - Jaringan Jarang"
+    },
+    "banjir_bandang_20pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "3": "Bahaya Sedang - Akses Rendah - Jaringan Jarang"
+    },
+    "banjir_bandang_30pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "3": "Bahaya Sedang - Akses Rendah - Jaringan Jarang"
+    },
+    "banjir_bandang_40pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "3": "Bahaya Sedang - Akses Rendah - Jaringan Jarang"
+    },
+    "banjir_bandang_50pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "3": "Bahaya Sedang - Akses Rendah - Jaringan Jarang"
+    },
+    "banjir_bandang_60pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "3": "Bahaya Sedang - Akses Rendah - Jaringan Jarang"
+    },
+    "banjir_bandang_70pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "3": "Bahaya Sedang - Akses Rendah - Jaringan Jarang"
+    },
+    "banjir_bandang_80pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "3": "Bahaya Sedang - Akses Rendah - Jaringan Jarang"
+    },
+    "banjir_bandang_90pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "3": "Bahaya Sedang - Akses Rendah - Jaringan Jarang"
+    },
+    "banjir_bandang_100pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "3": "Bahaya Sedang - Akses Rendah - Jaringan Jarang"
+    },
+    "tanah_longsor_0pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Tinggi - Akses Menengah - Jaringan Jarang",
+      "3": "Bahaya Sedang - Akses Menengah - Jaringan Jarang"
+    },
+    "tanah_longsor_10pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Tinggi - Akses Menengah - Jaringan Jarang",
+      "3": "Bahaya Sedang - Akses Menengah - Jaringan Jarang"
+    },
+    "tanah_longsor_20pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang",
+      "3": "Bahaya Tinggi - Akses Rendah - Jaringan Jarang"
+    },
+    "tanah_longsor_30pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang",
+      "3": "Bahaya Tinggi - Akses Rendah - Jaringan Jarang"
+    },
+    "tanah_longsor_40pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang",
+      "3": "Bahaya Tinggi - Akses Rendah - Jaringan Jarang"
+    },
+    "tanah_longsor_50pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang",
+      "3": "Bahaya Tinggi - Akses Rendah - Jaringan Jarang"
+    },
+    "tanah_longsor_60pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang",
+      "3": "Bahaya Tinggi - Akses Rendah - Jaringan Jarang"
+    },
+    "tanah_longsor_70pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang",
+      "3": "Bahaya Tinggi - Akses Rendah - Jaringan Jarang"
+    },
+    "tanah_longsor_80pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang",
+      "3": "Bahaya Tinggi - Akses Rendah - Jaringan Jarang"
+    },
+    "tanah_longsor_90pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang",
+      "3": "Bahaya Tinggi - Akses Rendah - Jaringan Jarang"
+    },
+    "tanah_longsor_100pct": {
+      "0": "Bahaya Sedang - Akses Menengah - Jaringan Padat",
+      "1": "Bahaya Sedang - Akses Menengah - Jaringan Sedang",
+      "2": "Bahaya Sedang - Akses Menengah - Jaringan Jarang",
+      "3": "Bahaya Tinggi - Akses Rendah - Jaringan Jarang"
+    }
+  }
+}

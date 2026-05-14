@@ -21,7 +21,7 @@ function buildClusterLegendHtml(k) {
         const isActive = (activeCluster === i && activeMode !== 'semu') ? 'active' : '';
         html += `<div class="legend-item ${isActive}" onclick="filterByCluster(${i})">
                     <i style="background:${clusterColors[i]}; width:12px; height:12px; border-radius:3px; margin-right:10px;"></i>
-                    KLASTER ${i}
+                    ${getClusterName(i)}
                  </div>`;
     }
 

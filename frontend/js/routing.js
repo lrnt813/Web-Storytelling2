@@ -61,7 +61,7 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
         const isSemu = gridAttr.titik_aman_semu === 1;
         const alrContent = renderAlrValue(gridAttr, hasRouteAccess);
         popupContent += `<div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:12px; margin-bottom:15px; border:1px solid var(--glass-border);">
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span style="color:var(--text-dim); font-size:10px;">TIPOLOGI</span><span style="font-weight:700; color:${clusterColors[gridAttr.cluster_sdwfcm]}">Klaster ${gridAttr.cluster_sdwfcm}</span></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; gap:8px;"><span style="color:var(--text-dim); font-size:10px;">TIPOLOGI</span><span style="font-weight:700; color:${clusterColors[gridAttr.cluster_sdwfcm]}; text-align:right;">${getClusterName(gridAttr.cluster_sdwfcm)}</span></div>
             <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-dim); font-size:10px;">MEMBERSHIP</span><span style="font-weight:700;">${(gridAttr.membership_max * 100).toFixed(1)}%</span></div>
             
             ${renderPsiValue(gridAttr)}

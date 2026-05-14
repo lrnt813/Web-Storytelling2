@@ -494,6 +494,7 @@ async function fetchAndRenderData(retryCount = 0) {
         await tesUpdate;
 
         setPseudoSafetyThresholds(result.pseudo_safety_thresholds);
+        setClusterNames(result.cluster_names, result.sk_key);
         addLegend(result.k_optimal);
         const lookup = Object.fromEntries(result.data_klaster.map(d => [d.id_grid, d]));
         gridLayer.lookup = lookup;

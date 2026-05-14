@@ -49,12 +49,32 @@ from esda.moran import Moran
 from .pseudo_safety import (
     classify_metric_values,
     estimate_metric_thresholds,
+    generate_cluster_names,
     relabel_clustering_result,
 )
 
 warnings.filterwarnings("ignore")
 _SDWFCM_W_CACHE: Dict[tuple, csr_matrix] = {}
 _SDWFCM_SIGMA_CACHE: Dict[tuple, float] = {}
+
+
+def _resolve_cluster_profile_time_cols(
+    gdf: pd.DataFrame,
+    skenario: str,
+    sk: str,
+    kategori_fac: List[str],
+) -> List[str]:
+    resolved: List[str] = []
+    for kat in kategori_fac:
+        candidates = [
+            f"waktu_tes_{kat}_{sk}",
+            f"waktu_tes_{kat}_{skenario}",
+        ]
+        for col in candidates:
+            if col in gdf.columns:
+                resolved.append(col)
+                break
+    return resolved
 
 # ── Optional dependencies ─────────────────────────────────────────────────────
 try:
@@ -1632,12 +1652,14 @@ def run_pipeline(
     col_tm = f"waktu_min_{skenario}_{pct}pct"
     col_iso = f"iso_{skenario}_{pct}pct"
     
+    cache_profile_time_cols = _resolve_cluster_profile_time_cols(gdf_base, skenario, sk, cfg.kategori_fac)
     can_use_cache = (
         not bypass_cache and
         not cut_roads and 
         col_cl in gdf_base.columns and 
         col_mem in gdf_base.columns and 
-        col_tm in gdf_base.columns
+        col_tm in gdf_base.columns and
+        len(cache_profile_time_cols) == len(cfg.kategori_fac)
     )
     
     if can_use_cache:
@@ -1660,6 +1682,15 @@ def run_pipeline(
                        np.where(tm <= cfg.isolation_time_threshold, 2, 3))
         gdf_sim[f"aksesibilitas_{sk}"]       = aks
         gdf_sim[f"aksesibilitas_{skenario}"] = aks
+
+        cluster_names_cache = generate_cluster_names(
+            gdf_sim,
+            labs,
+            hazard_col=cfg.indeks_bahaya.get(skenario, skenario),
+            road_density_col="Road_Density_mean",
+            tes_time_cols=cache_profile_time_cols,
+        )
+        gdf_sim.attrs["cluster_names"] = cluster_names_cache
 
         finite_tm = tm[np.isfinite(tm) & (tm > 0)]
         # Offline cache stores only the minimum travel time, not the original
@@ -1688,6 +1719,7 @@ def run_pipeline(
             "k": int(len(np.unique(labs))),
             "t_pen": float(t_pen_cache),
             "pseudo_safety_thresholds": gdf_sim.attrs.get("pseudo_safety_thresholds", {}),
+            "cluster_names": cluster_names_cache,
         }
 
     # ── 1. Simulasi Bencana (Hazard Map) ──────────────────────────────────────
@@ -1788,6 +1820,15 @@ def run_pipeline(
                     cl_results[algo_name] = relabel_clustering_result(algo_result, metric_for_order)
             sdwfcm_res = cl_results.get("SDWFCM")
             labs = sdwfcm_res.get("labels")
+            profile_time_cols = _resolve_cluster_profile_time_cols(gdf_sim, skenario, sk, cfg.kategori_fac)
+            cluster_names = generate_cluster_names(
+                gdf_sim,
+                labs,
+                hazard_col=cfg.indeks_bahaya.get(skenario, skenario),
+                road_density_col="Road_Density_mean",
+                tes_time_cols=profile_time_cols,
+            )
+            gdf_sim.attrs["cluster_names"] = cluster_names
             gdf_sim["cluster_sdwfcm"]      = labs
             gdf_sim["membership_max"]      = sdwfcm_res.get("max_membership")
             gdf_sim["cluster_sfcm"]        = (cl_results.get("SFCM") or {}).get("labels")
@@ -1819,4 +1860,5 @@ def run_pipeline(
         "k": k_opt,
         "t_pen": t_pen,
         "pseudo_safety_thresholds": gdf_sim.attrs.get("pseudo_safety_thresholds", {}),
+        "cluster_names": gdf_sim.attrs.get("cluster_names", {}),
     }

@@ -2,6 +2,7 @@ import math
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import pandas as pd
 from sklearn.cluster import KMeans
 
 JENKS_MAX_POINTS = 2048
@@ -230,3 +231,64 @@ def classify_metric_values(
     out[finite & (arr >= lower) & (arr < upper)] = medium_label
     out[finite & (arr >= upper)] = high_label
     return out
+
+
+def generate_cluster_names(
+    gdf: pd.DataFrame,
+    labels: np.ndarray,
+    hazard_col: str,
+    road_density_col: str,
+    tes_time_cols: List[str],
+    z_threshold: float = 0.5,
+) -> Dict[int, str]:
+    labels_arr = np.asarray(labels, dtype=int)
+    valid_clusters = sorted(int(c) for c in np.unique(labels_arr) if int(c) >= 0)
+    if not valid_clusters:
+        return {}
+    if not tes_time_cols:
+        raise KeyError("Kolom profiling klaster untuk waktu TES tidak ditemukan")
+
+    feature_cols = [hazard_col, road_density_col, *tes_time_cols]
+    missing = [col for col in feature_cols if col not in gdf.columns]
+    if missing:
+        raise KeyError(f"Kolom profiling klaster tidak ditemukan: {missing}")
+
+    feature_df = gdf[feature_cols].apply(pd.to_numeric, errors="coerce")
+    global_mean = feature_df.mean(axis=0, skipna=True)
+    global_std = feature_df.std(axis=0, skipna=True, ddof=0).replace(0.0, np.nan)
+    global_std = global_std.fillna(1.0)
+
+    cluster_names: Dict[int, str] = {}
+    for cluster_id in valid_clusters:
+        cluster_mask = labels_arr == cluster_id
+        cluster_mean = feature_df.loc[cluster_mask, :].mean(axis=0, skipna=True)
+        z_scores = ((cluster_mean - global_mean) / global_std).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+        hazard_z = float(z_scores.get(hazard_col, 0.0))
+        access_z = float(np.nanmean([z_scores.get(col, 0.0) for col in tes_time_cols]))
+        infra_z = float(z_scores.get(road_density_col, 0.0))
+
+        if hazard_z > z_threshold:
+            hazard_label = "Bahaya Tinggi"
+        elif hazard_z < -z_threshold:
+            hazard_label = "Bahaya Rendah"
+        else:
+            hazard_label = "Bahaya Sedang"
+
+        if access_z > z_threshold:
+            access_label = "Akses Rendah"
+        elif access_z < -z_threshold:
+            access_label = "Akses Tinggi"
+        else:
+            access_label = "Akses Menengah"
+
+        if infra_z > z_threshold:
+            infra_label = "Jaringan Padat"
+        elif infra_z < -z_threshold:
+            infra_label = "Jaringan Jarang"
+        else:
+            infra_label = "Jaringan Sedang"
+
+        cluster_names[cluster_id] = f"{hazard_label} - {access_label} - {infra_label}"
+
+    return cluster_names

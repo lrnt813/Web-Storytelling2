@@ -1,5 +1,6 @@
 import os
 import logging
+import json
 import numpy as np
 import geopandas as gpd
 import pandas as pd
@@ -23,6 +24,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("OfflineAnalysis")
 
+OFFLINE_METADATA_FILE = "offline_cluster_metadata.json"
+
 def run_offline_analysis(data_dir=None):
     logger.info("Memulai Offline Multi-Scenario Transition Analysis...")
     
@@ -44,6 +47,10 @@ def run_offline_analysis(data_dir=None):
     
     # Simpan hasil sementara
     final_results = gdf_base[['id_grid', 'geometry']].copy()
+    offline_metadata = {
+        "baseline_params": {},
+        "cluster_names_by_sk": {},
+    }
     
     for sc in scenarios:
         logger.info(f"=== Menganalisis Skenario: {sc.upper()} ===")
@@ -58,6 +65,12 @@ def run_offline_analysis(data_dir=None):
                 w_override=w_base
             )
             k_locked = meta_bl.get("k", 3)
+            offline_metadata["baseline_params"][sc] = {
+                "k": meta_bl.get("k"),
+                "t_pen": meta_bl.get("t_pen"),
+                "pseudo_safety_thresholds": meta_bl.get("pseudo_safety_thresholds", {}),
+                "cluster_names": meta_bl.get("cluster_names", {}),
+            }
             logger.info(f"  K Optimal dikunci pada: {k_locked}")
         except Exception as e:
             logger.warning(f"  Gagal menentukan K baseline, menggunakan default 3: {e}")
@@ -67,7 +80,8 @@ def run_offline_analysis(data_dir=None):
             pct = int(i * 100)
             logger.info(f"  Menjalankan SDWFCM untuk Intensitas {pct}% (K={k_locked})...")
             try:
-                gdf_sim, _, _, _ = run_pipeline(
+                sk_key = cfg.sk_key(sc, i)
+                gdf_sim, _, _, meta_sim = run_pipeline(
                     gdf_base, roads_raw, tes_raw, sc, i, cfg, 
                     w_override=w_base,
                     k_opt_override=k_locked
@@ -90,6 +104,11 @@ def run_offline_analysis(data_dir=None):
                 final_results[f"mem_sdwfcm_{sc}_{pct}pct"] = membership
                 final_results[f"waktu_min_{sc}_{pct}pct"] = waktu_min
                 final_results[f"iso_{sc}_{pct}pct"] = is_isolated.astype(int)
+                for kategori in cfg.kategori_fac:
+                    col_time = f"waktu_tes_{kategori}_{sk_key}"
+                    if col_time in gdf_sim.columns:
+                        final_results[col_time] = gdf_sim[col_time].values
+                offline_metadata["cluster_names_by_sk"][sk_key] = meta_sim.get("cluster_names", {})
                 
             except Exception as e:
                 logger.error(f"  Gagal pada intensitas {i}: {e}")
@@ -116,6 +135,9 @@ def run_offline_analysis(data_dir=None):
     
     # Simpan permanen
     gdf_base.to_file(cfg.input_file, driver="GPKG")
+    metadata_path = Path(DATA_DIR) / OFFLINE_METADATA_FILE
+    metadata_path.write_text(json.dumps(offline_metadata, ensure_ascii=True, indent=2), encoding="utf-8")
+    logger.info(f"Metadata klaster offline tersimpan di: {metadata_path}")
     logger.info("Offline Analysis SELESAI. Dataset telah diperbarui dengan kolom PSI.")
 
 if __name__ == "__main__":

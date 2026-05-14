@@ -44,6 +44,8 @@ let lastK = 5; // Global store for cluster count
 let pseudoSafetyThresholds = { psi: null, alr: null };
 let activePopupSnapshot = null;
 let suppressRecommendationRestore = false;
+let clusterNames = {};
+let clusterNamesBySkKey = {};
 
 function ensureGridPopup() {
     if (!gridPopup) {
@@ -175,6 +177,25 @@ function isGridIsolated(gridAttr) {
 
 function setPseudoSafetyThresholds(thresholds) {
     pseudoSafetyThresholds = thresholds || { psi: null, alr: null };
+}
+
+function setClusterNames(names, skKey = null) {
+    const hasNames = names && typeof names === 'object' && Object.keys(names).length > 0;
+    if (hasNames) {
+        clusterNames = names;
+        if (skKey) clusterNamesBySkKey[skKey] = names;
+        return;
+    }
+    if (skKey && clusterNamesBySkKey[skKey]) {
+        clusterNames = clusterNamesBySkKey[skKey];
+        return;
+    }
+    clusterNames = {};
+}
+
+function getClusterName(clusterId) {
+    const key = String(clusterId);
+    return clusterNames?.[key] || clusterNames?.[clusterId] || `Klaster ${clusterId}`;
 }
 
 function classifyByThreshold(metricKey, value) {

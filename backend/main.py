@@ -49,6 +49,8 @@ from .config import BASE_DIR, DATA_DIR, cfg, utm_to_wgs84 as _utm_to_wgs84, wgs8
 from .schemas import RoadCutItem, RoadRequest, RouteAllTesRequest, RouteRequest, SimulateRequest
 from .state import state
 
+OFFLINE_METADATA_FILE = "offline_cluster_metadata.json"
+
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # 2. LOGGING SETUP
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -269,47 +271,51 @@ async def startup_event():
 
         # Step 5: Warm-up Baseline (Parallelized)
         logger.info("[startup] Step 5/5: Warm-up Baseline (Parallelized)...")
+        offline_cluster_meta = _load_offline_cluster_metadata()
         
         async def _warmup(sk):
             # OPTIMASI: Cek apakah baseline (0%) sudah ada di cache GPKG
             col_cache = f"waktu_min_{sk}_0pct"
-            if col_cache in state.gdf_base.columns:
-                logger.info(f"[startup] Baseline {sk} ditemukan di GPKG Cache. Memuat...")
+            if col_cache in state.gdf_base.columns and offline_cluster_meta:
+                logger.info(f"[startup] Baseline {sk} ditemukan di GPKG Cache + metadata offline. Memuat tanpa analisis ulang...")
                 state.baseline_times[sk] = state.gdf_base[col_cache].values
-                # Kita tetap jalankan run_pipeline sekali untuk populate baseline_cache (t_pen, k, dll)
-                # Tapi ini akan cepat karena CACHE HIT di engine.run_pipeline
-            
-            logger.info(f"[startup] Warm-up Baseline {sk}...")
-            res = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: run_pipeline(
-                    gdf_base=state.gdf_base,
-                    roads_raw=state.roads_raw,
-                    tes_raw=state.tes_raw,
-                    skenario=sk,
-                    intensity=0.0,
-                    cfg=cfg,
-                    k_opt_override=None,
-                    t_pen_override=None,
-                    cut_roads=None,
-                    G_override=state.nx_graph_base,
-                    nl_override=state.nx_node_list,
-                    tn_override=state.nx_kdtree,
-                    w_override=state.w_baseline,
-                    baseline_times_override=None, # Baseline tidak butuh baseline_override
-                    psi_array_override=state.gdf_base[f"PSI_{sk}"].values if f"PSI_{sk}" in state.gdf_base.columns else None
+                sk_key = cfg.sk_key(sk, 0.0)
+                metadata = (offline_cluster_meta.get("baseline_params", {}) or {}).get(sk, {})
+                state.baseline_params[sk] = metadata
+                gdf_res = _hydrate_cached_baseline_gdf(state.gdf_base, sk, metadata)
+                data_klaster = _gdf_to_data_klaster(gdf_res, sk, sk_key)
+                eval_res = pd.DataFrame()
+            else:
+                logger.info(f"[startup] Warm-up Baseline {sk}...")
+                res = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda: run_pipeline(
+                        gdf_base=state.gdf_base,
+                        roads_raw=state.roads_raw,
+                        tes_raw=state.tes_raw,
+                        skenario=sk,
+                        intensity=0.0,
+                        cfg=cfg,
+                        k_opt_override=None,
+                        t_pen_override=None,
+                        cut_roads=None,
+                        G_override=state.nx_graph_base,
+                        nl_override=state.nx_node_list,
+                        tn_override=state.nx_kdtree,
+                        w_override=state.w_baseline,
+                        baseline_times_override=None,
+                        psi_array_override=state.gdf_base[f"PSI_{sk}"].values if f"PSI_{sk}" in state.gdf_base.columns else None
+                    )
                 )
-            )
-            gdf_res, cl_res, eval_res, metadata = res
-            
+                gdf_res, cl_res, eval_res, metadata = res
+                data_klaster = _gdf_to_data_klaster(gdf_res, sk, cfg.sk_key(sk, 0.0))
+             
             # Simpan baseline times jika belum ada (jika tadi tidak hit GPKG cache secara eksplisit di sini)
             if sk not in state.baseline_times:
                 col_time = f"waktu_tes_min_{sk}"
                 if col_time in gdf_res.columns:
                     state.baseline_times[sk] = gdf_res[col_time].values
-
-            data_klaster = _gdf_to_data_klaster(gdf_res, sk, cfg.sk_key(sk, 0.0))
-            
+             
             state.baseline_params[sk] = metadata
             state.baseline_cache[sk] = {
                 "status": "ok",
@@ -324,6 +330,7 @@ async def startup_event():
                 "k_optimal": _sanitize(metadata.get("k", 3)),
                 "t_pen": _sanitize(metadata.get("t_pen", 200.0)),
                 "pseudo_safety_thresholds": _sanitize(metadata.get("pseudo_safety_thresholds", {})),
+                "cluster_names": _sanitize(metadata.get("cluster_names", {})),
             }
             state.pseudo_safety_thresholds[sk] = metadata.get("pseudo_safety_thresholds", {})
             # Hitung rank cluster untuk rekomendasi
@@ -535,6 +542,83 @@ def _prepare_cut_roads(cut_roads: List[RoadCutItem]) -> List[dict]:
     return result
 
 
+def _load_offline_cluster_metadata() -> Dict[str, Any]:
+    path = Path(DATA_DIR) / OFFLINE_METADATA_FILE
+    if not path.exists():
+        logger.info(f"[startup] Metadata offline belum ditemukan: {path}")
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.warning(f"[startup] Gagal membaca metadata offline {path}: {e}")
+        return {}
+
+
+def _hydrate_cached_baseline_gdf(
+    gdf_base: gpd.GeoDataFrame,
+    skenario: str,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> gpd.GeoDataFrame:
+    """Bangun ulang kolom standar pipeline dari cache offline baseline 0%."""
+    pct = 0
+    sk = cfg.sk_key(skenario, 0.0)
+    gdf_res = gdf_base.copy()
+    metadata = metadata or {}
+
+    col_cl = f"cl_sdwfcm_{skenario}_{pct}pct"
+    col_mem = f"mem_sdwfcm_{skenario}_{pct}pct"
+    col_tm = f"waktu_min_{skenario}_{pct}pct"
+    col_iso = f"iso_{skenario}_{pct}pct"
+    col_psi = f"PSI_{skenario}"
+
+    if col_cl in gdf_res.columns:
+        gdf_res["cluster_sdwfcm"] = gdf_res[col_cl]
+    if col_mem in gdf_res.columns:
+        gdf_res["membership_max"] = gdf_res[col_mem]
+    if col_tm in gdf_res.columns:
+        tm = gdf_res[col_tm].astype(float).values
+        gdf_res[f"waktu_tes_min_{skenario}"] = tm
+        gdf_res[f"waktu_tes_min_{sk}"] = tm
+        aks = np.where(tm <= cfg.golden_time_min, 1, np.where(tm <= cfg.isolation_time_threshold, 2, 3))
+        gdf_res[f"aksesibilitas_{skenario}"] = aks
+        gdf_res[f"aksesibilitas_{sk}"] = aks
+    if col_iso in gdf_res.columns:
+        is_isolated = gdf_res[col_iso].fillna(0).astype(bool).values
+    else:
+        is_isolated = np.zeros(len(gdf_res), dtype=bool)
+    gdf_res["is_isolated"] = is_isolated
+
+    gdf_res["psi_val"] = (
+        gdf_res[col_psi].astype(float).values
+        if col_psi in gdf_res.columns
+        else np.zeros(len(gdf_res), dtype=float)
+    )
+    gdf_res["alr_val"] = np.where(is_isolated, np.nan, 0.0)
+
+    thresholds = metadata.get("pseudo_safety_thresholds", {}) or {}
+    psi_meta = thresholds.get("psi", {}) or {}
+    alr_meta = thresholds.get("alr", {}) or {}
+    psi_upper = float(psi_meta.get("upper", np.nan)) if psi_meta else np.nan
+    alr_upper = float(alr_meta.get("upper", np.nan)) if alr_meta else np.nan
+
+    gdf_res["psi_class"] = "unknown"
+    if np.isfinite(psi_upper):
+        gdf_res.loc[gdf_res["psi_val"] >= psi_upper, "psi_class"] = "severe"
+        gdf_res.loc[gdf_res["psi_val"] < psi_upper, "psi_class"] = "minor"
+
+    gdf_res["alr_class"] = np.where(is_isolated, "isolated", "minor")
+    if np.isfinite(alr_upper):
+        finite_non_iso = (~is_isolated) & np.isfinite(gdf_res["alr_val"].values)
+        gdf_res.loc[finite_non_iso & (gdf_res["alr_val"].values >= alr_upper), "alr_class"] = "severe"
+
+    gdf_res["titik_aman_semu"] = 0
+    if np.isfinite(psi_upper):
+        gdf_res.loc[(gdf_res["psi_val"].values >= psi_upper) & is_isolated, "titik_aman_semu"] = 1
+
+    gdf_res.attrs["cluster_names"] = metadata.get("cluster_names", {}) or {}
+    return gdf_res
+
+
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # 9. ENDPOINTS
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -707,7 +791,7 @@ async def get_baseline(
             k_opt_ov = params.get("k")
             t_pen_ov = params.get("t_pen")
 
-            gdf_result, cl_results, eval_df, _ = await asyncio.get_event_loop().run_in_executor(
+            gdf_result, cl_results, eval_df, metadata = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: run_pipeline(
                     gdf_base     = state.gdf_base,
@@ -742,11 +826,12 @@ async def get_baseline(
         "skenario":     skenario,
         "intensity":    intensity,
         "sk_key":       sk,
-        "k_optimal":    state.baseline_params.get(skenario, {}).get("k", None),
+        "k_optimal":    metadata.get("k", state.baseline_params.get(skenario, {}).get("k", None)),
         "elapsed_sec":  elapsed,
         "evaluation":   _eval_df_to_list(eval_df),
         "n_grid":       len(gdf_result),
-        "pseudo_safety_thresholds": _sanitize(state.baseline_params.get(skenario, {}).get("pseudo_safety_thresholds", {})),
+        "pseudo_safety_thresholds": _sanitize(metadata.get("pseudo_safety_thresholds", state.baseline_params.get(skenario, {}).get("pseudo_safety_thresholds", {}))),
+        "cluster_names": _sanitize(metadata.get("cluster_names", state.baseline_params.get(skenario, {}).get("cluster_names", {}))),
         "n_titik_semu": int(gdf_result["titik_aman_semu"].sum())
                         if "titik_aman_semu" in gdf_result.columns else 0,
         "data_klaster": data_klaster,   # â† BARU (ringan, tanpa geometri)
@@ -793,7 +878,7 @@ async def post_simulate(body: SimulateRequest):
             k_opt_ov = params.get("k")
             t_pen_ov = params.get("t_pen")
 
-            gdf_result, cl_results, eval_df, _ = await asyncio.get_event_loop().run_in_executor(
+            gdf_result, cl_results, eval_df, metadata = await asyncio.get_event_loop().run_in_executor(
                 None,
                 lambda: run_pipeline(
                     gdf_base     = state.gdf_base,
@@ -832,11 +917,12 @@ async def post_simulate(body: SimulateRequest):
         "intensity":    body.intensity,
         "sk_key":       sk,
         "n_cut_roads":  len(body.cut_roads),
-        "k_optimal":    state.baseline_params.get(body.skenario, {}).get("k", None),
+        "k_optimal":    metadata.get("k", state.baseline_params.get(body.skenario, {}).get("k", None)),
         "elapsed_sec":  elapsed,
         "evaluation":   _eval_df_to_list(eval_df),
         "n_grid":       len(gdf_result),
-        "pseudo_safety_thresholds": _sanitize(gdf_result.attrs.get("pseudo_safety_thresholds", {})),
+        "pseudo_safety_thresholds": _sanitize(metadata.get("pseudo_safety_thresholds", gdf_result.attrs.get("pseudo_safety_thresholds", {}))),
+        "cluster_names": _sanitize(metadata.get("cluster_names", gdf_result.attrs.get("cluster_names", {}))),
         "n_titik_semu": int(gdf_result["titik_aman_semu"].sum())
                         if "titik_aman_semu" in gdf_result.columns else 0,
         "data_klaster": data_klaster,   # â† BARU (ringan, tanpa geometri)
