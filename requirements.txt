@@ -1,0 +1,19 @@
+# Dependensi server dashboard (versi disamakan dengan lingkungan pengembangan, Python 3.14)
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.53.0
+pydantic==2.13.5
+numpy==2.5.3
+pandas==3.0.5
+scipy==1.18.1
+scikit-learn==1.9.1
+networkx==3.6.1
+geopandas==1.1.4
+pyogrio==0.13.0
+shapely==2.1.2
+pyproj==3.8.0
+libpysal==4.15.0
+esda==2.10.0
+
+# Opsional — hanya untuk menjalankan ulang analisis offline (scripts/thesis_analysis.py --force):
+#   spopt==0.7.0  numba==0.67.0  kneed==0.8.6  tqdm==4.70.1

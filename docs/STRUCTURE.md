@@ -31,6 +31,8 @@ Web-Storytelling2/
     thesis_results.json, thesis_grid_results.csv.gz   Hasil analisis (dibaca dashboard)
     locked/               Salinan hasil terkunci + LOCK.json (checksum)
   scratch/                Cache & log sementara (tidak di-commit)
+  Dockerfile, requirements.txt, .github/workflows/deploy-huggingface.yml
+                          Deploy ke Hugging Face Spaces (lihat docs/DEPLOY.md)
 ```
 
 Hasil analisis dikunci. Untuk menghitung ulang: `python -m scripts.thesis_analysis --force`.
