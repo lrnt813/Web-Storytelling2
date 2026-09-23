@@ -1,14 +1,3 @@
----
-title: Aksesibilitas TES Banjir Kulon Progo
-emoji: 🌊
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 7860
-pinned: false
-short_description: Dashboard SDWFCM aksesibilitas TES banjir
----
-
 # Aksesibilitas TES Banjir · Kulon Progo
 
 Dashboard penelitian skripsi: pemetaan tingkat aksesibilitas spasial bangunan publik sebagai
@@ -24,15 +13,18 @@ dan grafik Bab IV yang dapat diunduh.
 
 ```bash
 pip install -r requirements.txt
-python start_dashboard.py          # membuka http://127.0.0.1:8000
+python start_dashboard.py            # lokal: http://127.0.0.1:8000
+python start_dashboard.py --publik   # + alamat publik https://….trycloudflare.com
 ```
+
+Di Windows cukup klik dua kali `Jalankan Dashboard.bat` atau `Jalankan Dashboard Publik.bat`.
 
 Hasil analisis sudah tersedia dan dikunci di `data/locked/`. Untuk menghitung ulang:
 `python -m scripts.thesis_analysis --force` (perlu paket opsional di `requirements.txt`).
 
-## Deploy ke Hugging Face Spaces
+## Membagikan secara online
 
-Lihat `docs/DEPLOY.md`.
+Lihat `docs/DEPLOY.md` (Cloudflare Tunnel, gratis tanpa akun).
 
 ## Sumber data
 

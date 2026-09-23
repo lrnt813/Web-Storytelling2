@@ -1,41 +1,40 @@
-# Deploy ke Hugging Face Spaces (versi lengkap)
+# Membagikan Dashboard secara Online (Cloudflare Tunnel)
 
-Dashboard dijalankan sebagai **Docker Space** di Hugging Face (gratis: 2 vCPU, 16 GB RAM).
-Kode tetap disimpan di GitHub; workflow GitHub Actions mengirim salinan ringkas
-(kode + ±130 MB data yang dipakai server) ke Space.
+Dashboard berjalan di laptop sendiri, lalu **Cloudflare Tunnel** memberinya alamat publik
+`https://…​.trycloudflare.com` yang dapat dibuka siapa saja. Gratis, tanpa akun, tanpa kartu kredit.
+Semua fitur tersedia (rute evakuasi, simulasi blokir jalan, pencarian alamat, unduhan).
 
-## Persiapan (sekali saja)
+## Cara menjalankan
 
-1. **Buat akun** di <https://huggingface.co/join>.
-2. **Buat Space**: <https://huggingface.co/new-space>
-   - *Space name*: mis. `dashboard-tes-banjir`
-   - *SDK*: **Docker** → template **Blank**
-   - *Hardware*: **CPU basic (free)**
-   - *Visibility*: Public (atau Private bila hanya untuk penguji)
-3. **Buat token**: <https://huggingface.co/settings/tokens> → *Create new token* →
-   tipe **Write** → salin token (diawali `hf_…`).
-4. **Isi pengaturan di GitHub** (repo → *Settings* → *Secrets and variables* → *Actions*):
-   - tab **Secrets** → *New repository secret* → nama `HF_TOKEN`, isi token dari langkah 3
-   - tab **Variables** → *New repository variable* → nama `HF_SPACE`,
-     isi `<username-hf>/<nama-space>`, mis. `lrnt813/dashboard-tes-banjir`
+- **Klik dua kali** `Jalankan Dashboard Publik.bat`, atau jalankan
+  `python start_dashboard.py --publik`
+- Tunggu ±20–30 detik. Alamat publik tampil di jendela, dibuka otomatis di browser,
+  dan disimpan di `scratch/alamat_publik.txt` untuk disalin/dibagikan.
+- **Menghentikan:** tekan `Ctrl+C` (atau tutup jendela). Alamat publik langsung tidak aktif.
 
-## Deploy / memperbarui
+Untuk pemakaian di laptop saja (tanpa alamat publik): `Jalankan Dashboard.bat`
+atau `python start_dashboard.py`.
 
-1. Push perubahan ke GitHub seperti biasa.
-2. GitHub → tab **Actions** → **Deploy ke Hugging Face Spaces** → **Run workflow**.
-3. Hugging Face otomatis membangun image (±5–10 menit; lihat tab *Logs* di Space).
-4. Dashboard tersedia di `https://<username-hf>-<nama-space>.hf.space`
-   (halaman Space di `https://huggingface.co/spaces/<username-hf>/<nama-space>`).
+Program `cloudflared` diunduh otomatis dari rilis resmi Cloudflare saat pertama kali
+dipakai (checksum SHA-256 diverifikasi) dan disimpan di `tools/` (tidak di-commit).
 
-## Catatan
+## Yang perlu diperhatikan
 
-- **Tidur saat tidak dipakai**: Space gratis berhenti setelah ±48 jam tanpa pengunjung;
-  pembukaan berikutnya menunggu 1–2 menit hingga server menyala kembali.
-- **Kuota LFS GitHub**: setiap deploy mengunduh ±130 MB data dari penyimpanan LFS GitHub,
-  karena itu workflow hanya berjalan saat dijalankan manual.
-- **Hasil penelitian terkunci**: server membaca `data/thesis_results.json` dan
-  `data/thesis_grid_results.csv.gz`; tidak ada analisis ulang di server.
-- **Unduhan & GPS**: gunakan alamat langsung `*.hf.space` (bukan halaman Space yang
-  memuat dashboard dalam bingkai) agar unduhan Excel/PNG dan tombol GPS berfungsi penuh.
-- **Beban server**: simulasi blokir jalan memakan ±15 detik CPU per permintaan dan
-  dijalankan bergiliran; cocok untuk demonstrasi, bukan untuk ribuan pengguna sekaligus.
+- **Alamat berubah** setiap kali dijalankan ulang → bagikan alamat yang baru.
+- **Laptop harus menyala & terhubung internet.** Atur *Power & sleep* agar laptop tidak
+  tidur (sleep) selama dashboard dibagikan, dan colokkan charger.
+- **Kecepatan** mengikuti internet laptop (terutama kecepatan *upload*). Data sudah
+  dikompresi: pembukaan awal ±3 MB, pergantian level ±1 MB.
+- **Jumlah pengguna:** cocok untuk demonstrasi, sidang, atau beberapa penguji sekaligus.
+  Simulasi blokir jalan memakan ±15 detik CPU per permintaan dan dijalankan bergiliran.
+- **Keamanan:** siapa pun yang tahu alamatnya dapat membuka dashboard (hanya-baca; hasil
+  penelitian terkunci dan tidak dapat diubah dari browser). Hentikan tunnel bila tidak dipakai.
+- Tunnel cepat (*quick tunnel*) ini ditujukan untuk pengujian/demonstrasi; untuk layanan
+  permanen dengan alamat tetap diperlukan akun Cloudflare dan domain sendiri.
+
+## Alternatif hosting permanen
+
+`Dockerfile` dan `requirements.txt` sudah tersedia, sehingga dashboard dapat dipasang di
+layanan berbasis container (mis. Google Cloud Run, Azure for Students) atau server Linux
+(mis. Oracle Cloud Always Free). Server membutuhkan RAM ±1,5 GB; layanan gratis dengan
+RAM 512 MB tidak mencukupi.

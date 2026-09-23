@@ -8,3 +8,6 @@ scratch/logs/
 
 # Cache runtime (graf jalan dibangun ulang otomatis)
 scratch/graph_cache/
+
+# Program bantu yang diunduh otomatis (cloudflared)
+tools/

@@ -2,7 +2,7 @@
 
 ```text
 Web-Storytelling2/
-  start_dashboard.py      Peluncur: memeriksa hasil analisis, menjalankan backend, membuka browser
+  start_dashboard.py      Peluncur: menjalankan server; --publik = alamat publik Cloudflare Tunnel
   main.py                 Shim kompatibilitas (`python main.py` → backend.main)
   backend/
     main.py               Aplikasi FastAPI (API level banjir, simulasi, rute, wilayah, geocoding)
@@ -31,8 +31,9 @@ Web-Storytelling2/
     thesis_results.json, thesis_grid_results.csv.gz   Hasil analisis (dibaca dashboard)
     locked/               Salinan hasil terkunci + LOCK.json (checksum)
   scratch/                Cache & log sementara (tidak di-commit)
-  Dockerfile, requirements.txt, .github/workflows/deploy-huggingface.yml
-                          Deploy ke Hugging Face Spaces (lihat docs/DEPLOY.md)
+  Jalankan Dashboard*.bat Peluncur klik-dua-kali (lokal / publik via Cloudflare Tunnel)
+  tools/                  cloudflared (diunduh otomatis, tidak di-commit)
+  Dockerfile, requirements.txt   Dependensi & image container (lihat docs/DEPLOY.md)
 ```
 
 Hasil analisis dikunci. Untuk menghitung ulang: `python -m scripts.thesis_analysis --force`.
