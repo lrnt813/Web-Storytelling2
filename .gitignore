@@ -5,3 +5,6 @@ scratch/*.log
 scratch/*.out
 scratch/*.err
 scratch/logs/
+
+# Cache runtime (graf jalan dibangun ulang otomatis)
+scratch/graph_cache/

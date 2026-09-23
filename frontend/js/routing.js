@@ -1,25 +1,54 @@
-﻿async function calculateRoutes(latlng, isGridClick = false) {
-    if (isCalculating) return;
+let routeRequestSeq = 0;
+
+function popupHeader() {
+    return `<div style="min-width:240px; padding:5px;"><h4 style="margin:0 0 12px; color:var(--accent-primary); border-bottom:1px solid var(--glass-border); padding-bottom:8px; font-size:14px; letter-spacing:1px;"><i class="fa fa-bullseye"></i> DETAIL LOKASI</h4>`;
+}
+
+function openGridDetail(latlng, statusHtml) {
+    // Rincian grid sudah tersedia di browser → popup langsung tampil tanpa menunggu rute.
+    gridPopup = ensureGridPopup();
+    const content = popupHeader()
+        + (latlng.gridAttr ? renderGridAttrPopup(latlng.gridAttr) : '<p class="route-status">Grid di luar wilayah analisis.</p>')
+        + `<div class="route-status" id="route-status">${statusHtml}</div></div>`;
+    suppressRecommendationRestore = true;
+    gridPopup.setLatLng(latlng).setContent(content).openOn(map);
+    suppressRecommendationRestore = false;
+    gridPopup._gridRouteState = { latlng: clonePopupLatLng(latlng), gridAttr: latlng.gridAttr, recommendations: [], isRecommendationView: false };
+}
+
+async function calculateRoutes(latlng, isGridClick = false) {
+    // Klik baru membatalkan permintaan rute sebelumnya (tidak pernah diabaikan).
     if (routingAbortController) routingAbortController.abort();
     routingAbortController = new AbortController();
-    
-    isCalculating = true; showLoading(true);
+    const seq = ++routeRequestSeq;
+
+    if (isGridClick) {
+        routeLayers.clearLayers();
+        if (!latlng.isRecommendation) contextRouteLayers.clearLayers();
+        openGridDetail(latlng, '<i class="fa fa-spinner fa-spin"></i> Menghitung rute ke TES terdekat…');
+    }
     const gridId = Number(latlng.id_grid);
     const body = {
         lat: latlng.lat,
         lng: latlng.lng,
         id_grid: Number.isFinite(gridId) ? Math.trunc(gridId) : null,
-        skenario: document.getElementById('skenario').value,
-        intensity: parseFloat(document.getElementById('intensitas').value),
+        level: activeLevel,
         cut_roads: roadCuts
     };
 
     try {
         const resp = await fetch(`${API_BASE}/route-all-tes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: routingAbortController.signal });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const result = await resp.json();
+        if (seq !== routeRequestSeq) return;                       // sudah ada klik yang lebih baru
+        if (isGridClick && !(gridPopup && map.hasLayer(gridPopup))) return;  // popup ditutup pengguna
         renderRoutes(result.routes, latlng, isGridClick, latlng.gridAttr, result.recommendations);
-    } catch (error) { if (error.name !== 'AbortError') console.error(error); }
-    finally { showLoading(false); isCalculating = false; }
+    } catch (error) {
+        if (error.name === 'AbortError' || seq !== routeRequestSeq) return;
+        console.error(error);
+        const st = document.getElementById('route-status');
+        if (st) st.innerHTML = '<i class="fa fa-triangle-exclamation"></i> Rute gagal dihitung. Klik grid lagi untuk mencoba ulang.';
+    }
 }
 
 function runAfterMapMove(action, fallbackMs = 450) {
@@ -55,22 +84,9 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
 
     const foundCount = Object.values(routes).filter(r => r.found).length;
     const hasRouteAccess = foundCount > 0;
-    let popupContent = `<div style="min-width:240px; padding:5px;"><h4 style="margin:0 0 12px; color:var(--accent-primary); border-bottom:1px solid var(--glass-border); padding-bottom:8px; font-size:14px; letter-spacing:1px;"><i class="fa fa-bullseye"></i> DETAIL LOKASI</h4>`;
+    let popupContent = popupHeader();
     
-    if (gridAttr) {
-        const isSemu = gridAttr.titik_aman_semu === 1;
-        const alrContent = renderAlrValue(gridAttr, hasRouteAccess);
-        popupContent += `<div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:12px; margin-bottom:15px; border:1px solid var(--glass-border);">
-            <div style="display:flex; justify-content:space-between; margin-bottom:8px; gap:8px;"><span style="color:var(--text-dim); font-size:10px;">TIPOLOGI</span><span style="font-weight:700; color:${clusterColors[gridAttr.cluster_sdwfcm]}; text-align:right;">${getClusterName(gridAttr.cluster_sdwfcm)}</span></div>
-            <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-dim); font-size:10px;">MEMBERSHIP</span><span style="font-weight:700;">${(gridAttr.membership_max * 100).toFixed(1)}%</span></div>
-            
-            ${renderPsiValue(gridAttr)}
-            
-            ${alrContent}
-
-            ${isSemu ? `<div style="margin-top:10px; padding:6px; background:rgba(245,158,11,0.2); border:1px solid var(--warning); border-radius:8px; font-size:10px; color:var(--warning); text-align:center;"><i class="fa fa-exclamation-triangle"></i> TITIK AMAN SEMU</div>` : ''}
-        </div>`;
-    }
+    if (gridAttr) popupContent += renderGridAttrPopup(gridAttr);
 
     if (foundCount === 0) {
         // Simpan data asal isolasi untuk navigasi "Kembali"
@@ -188,10 +204,12 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
                 card.innerHTML = `<div class="route-main"><div class="route-icon-box" style="color:${routeColors[kat]}">${categoryIcons[kat].options.html}</div><div class="route-name">${kat.toUpperCase()}</div></div><div class="route-time">${data.travel_time_min.toFixed(1)} <small>mnt</small></div>`;
                 listEl.appendChild(card);
     
-                popupContent += `<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px;"><span style="color:${routeColors[kat]}; font-weight:600;">${kat}</span><span>${data.travel_time_min.toFixed(1)} mnt</span></div>`;
             }
         }
     }
+    popupContent += foundCount > 0
+        ? `<div class="route-status ok"><i class="fa fa-route"></i> Rute ke ${foundCount} kategori TES ditampilkan di peta & panel kanan.</div>`
+        : '';
     popupContent += `</div>`;
     updateRouteResultsLayout();
 
@@ -213,3 +231,38 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
     }
 }
 
+
+function renderGridAttrPopup(g) {
+    const clr = clusterColors[g.cluster_sdwfcm] || NEUTRAL_FILL;
+    const desc = getClusterDesc(g.cluster_sdwfcm);
+    const waktuRows = Object.entries(tesCategories).map(([kat, meta]) => {
+        const v = g[`waktu_tes_${kat}`];
+        return popupRow(meta.label, v === null || v === undefined ? '–' : `${fmtNum(v, 1)} mnt`);
+    }).join('');
+    const isTas = g.titik_aman_semu === 1;
+    const adm = typeof gridAdminName === 'function' ? gridAdminName(g.id_grid) : null;
+    const lokasi = adm ? `<div class="popup-loc"><i class="fa fa-map-location-dot"></i> Kal. ${adm.desa.replace(/^Kelurahan\s+/i, '')}, Kap. ${adm.kecamatan}
+        <a href="#" class="popup-link" onclick="event.preventDefault(); openRegionPanel('desa', ${JSON.stringify(adm.desa).replace(/"/g, '&quot;')})">Ringkasan kalurahan</a></div>` : '';
+    return `${lokasi}<div class="popup-card">
+        <div class="popup-row"><span>TIPOLOGI (${levelLabel(activeLevel)})</span><b style="color:${clr}">${getClusterName(g.cluster_sdwfcm)}</b></div>
+        ${desc ? `<div class="popup-desc">${desc}</div>` : ''}
+        ${popupRow('Derajat keanggotaan', `${fmtNum((g.membership_max || 0) * 100, 1)}%`)}
+        ${popupRow('Indeks bahaya banjir', g.indeks_bahaya ?? '–')}
+        ${popupRow('Terdampak banjir', g.terdampak === 1 ? 'Ya' : 'Tidak', g.terdampak === 1 ? TERDAMPAK_COLOR : null)}
+        ${popupRow('Kerapatan jalan', fmtNum(g.road_density, 3))}
+    </div>
+    <div class="popup-card">
+        <div class="popup-section">Waktu tempuh ke TES terdekat</div>
+        ${waktuRows}
+        ${popupRow('Waktu minimum', `${fmtNum(g.waktu_tes_min, 1)} mnt`)}
+        ${popupRow('Jumlah opsi rute', `${g.jumlah_opsi_rute ?? '–'} / 5`)}
+        <div class="popup-note"><i class="fa fa-circle-info"></i> Nilai hasil analisis skripsi. Panel <b>Rute Evakuasi</b> menelusuri jalur jalan aktual dari simpul jalan terdekat, sehingga angkanya bisa sedikit berbeda.</div>
+    </div>
+    <div class="popup-card">
+        <div class="popup-section">Detour Index</div>
+        ${popupRow('T<sub>ideal</sub> (euclidean)', `${fmtNum(g.t_ideal, 2)} mnt`)}
+        ${popupRow('T<sub>aktual</sub> (jaringan)', `${fmtNum(g.t_aktual, 2)} mnt`)}
+        ${popupRow('Detour Index', fmtNum(g.detour_index, 2))}
+        ${isTas ? `<div class="popup-flag"><i class="fa fa-exclamation-triangle"></i> TITIK AMAN SEMU</div>` : ''}
+    </div>`;
+}

@@ -1,0 +1,8 @@
+{
+ "locked_at": "2026-09-23T15:37:10",
+ "note": "Hasil analisis dikunci. Jalankan 'python -m scripts.thesis_analysis --force' untuk menimpa.",
+ "files": {
+  "thesis_results.json": "f268fab1bba6efe23d3fb0aedb64cae78aae4b34047ba749669ec6d897ab18b6",
+  "thesis_grid_results.csv.gz": "171d33d2806374fcaa85a1b24d9f457b13e5af8ce894533be9eaa35bd4c6d790"
+ }
+}

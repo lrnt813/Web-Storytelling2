@@ -12,33 +12,25 @@ def start_dashboard():
     print("MEMULAI DASHBOARD EVAKUASI BENCANA KULON PROGO")
     print("=" * 60)
 
-    # 0. Jalankan Offline Analysis jika data PSI belum ada.
-    print("\n[0/4] Memeriksa integritas data PSI (Offline Analysis)...")
+    # 0. Jalankan analisis skripsi (Bab IV) jika hasilnya belum ada.
+    print("\n[0/3] Memeriksa hasil analisis skripsi...")
     try:
-        import geopandas as gpd
-
-        from backend.engine import Cfg
-        from scripts.offline_analysis import run_offline_analysis
+        from scripts.thesis_analysis import GRID_FILE, RESULTS_FILE, run_thesis_analysis
 
         base_path = os.path.dirname(os.path.abspath(__file__))
         data_path = os.path.join(base_path, "data")
-        cfg = Cfg(base_dir=data_path)
-
-        if os.path.exists(cfg.input_file):
-            gdf_check = gpd.read_file(cfg.input_file, rows=1)
-            if "PSI_banjir" not in gdf_check.columns:
-                print("[WARN] Data PSI (Instability Index) belum ada di dataset.")
-                print("   Menjalankan Offline Multi-Scenario Transition Analysis (~2 menit)...")
-                print("   Mohon tunggu, proses ini penting untuk validitas ilmiah 'Titik Aman Semu'.")
-                run_offline_analysis(data_dir=data_path)
-                print("[OK] Offline Analysis selesai.")
-            else:
-                print("[OK] Data PSI tersedia.")
+        missing = [f for f in (RESULTS_FILE, GRID_FILE) if not os.path.exists(os.path.join(data_path, f))]
+        if missing:
+            print(f"[WARN] Hasil analisis belum ada ({', '.join(missing)}).")
+            print("   Menjalankan analisis lengkap: 4 level banjir, pemilihan K, perbandingan")
+            print("   algoritma, transisi, dan Titik Aman Semu (~10-15 menit)...")
+            run_thesis_analysis(data_dir=data_path)
+            print("[OK] Analisis selesai.")
         else:
-            print(f"[WARN] File dataset tidak ditemukan: {cfg.input_file}")
+            print("[OK] Hasil analisis tersedia.")
     except Exception as e:
-        print(f"[WARN] Peringatan saat cek PSI: {e}")
-        print("   Melanjutkan startup tanpa jaminan data PSI...")
+        print(f"[WARN] Peringatan saat menjalankan analisis: {e}")
+        print("   Backend akan mencoba menjalankan analisis ringkas saat startup...")
 
     # 1. Jalankan Backend (Uvicorn).
     print("\n[1/3] Menjalankan server backend (FastAPI)...")
@@ -50,7 +42,7 @@ def start_dashboard():
     # 2. Tunggu backend siap (polling health check).
     print("[2/3] Menunggu backend siap (warm-up sedang berjalan)...")
     health_url = "http://127.0.0.1:8000/api/health"
-    max_retries = 30
+    max_retries = 150
     ready = False
 
     for i in range(max_retries):

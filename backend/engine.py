@@ -128,11 +128,10 @@ class Cfg:
         "banjir_bandang":  "banjir_bandang",
         "tanah_longsor":   "tanah_longsor",
     })
-    skenario_list: List[str] = field(default_factory=lambda: [
-        "banjir", "banjir_bandang", "tanah_longsor",
-    ])
+    # Skripsi: hanya bencana banjir, 4 level (Baseline, Rendah, Sedang, Tinggi)
+    skenario_list: List[str] = field(default_factory=lambda: ["banjir"])
     intensity_levels: List[float] = field(default_factory=lambda: [
-        0.0, 0.25, 0.50, 0.75, 1.00,
+        0.0, 0.25, 0.50, 0.75,
     ])
     indeks_bahaya: Dict[str, str] = field(default_factory=lambda: {
         "banjir":         "banjir",

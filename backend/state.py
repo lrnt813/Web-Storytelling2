@@ -2,26 +2,23 @@ import asyncio
 from typing import Dict, Optional
 
 import geopandas as gpd
-import numpy as np
+import pandas as pd
 
 
 class AppState:
     gdf_base: Optional[gpd.GeoDataFrame] = None
     roads_raw: Optional[gpd.GeoDataFrame] = None
     tes_raw: Dict[str, gpd.GeoDataFrame] = {}
-    w_baseline = None
-    nx_graph_base = None
-    nx_node_list = None
-    nx_kdtree = None
     is_ready: bool = False
     startup_error: Optional[str] = None
 
+    # Hasil analisis skripsi (offline)
+    thesis_results: dict = {}
+    thesis_grid: Optional[pd.DataFrame] = None
+    level_cache: Dict[str, dict] = {}
+    t_pen: Optional[float] = None
+
     graph_cache: Dict[tuple, tuple] = {}
-    cluster_ranks: Dict[str, Dict[int, float]] = {}
-    pseudo_safety_thresholds: Dict[str, dict] = {}
-    baseline_params: Dict[str, dict] = {}
-    baseline_cache: Dict[str, dict] = {}
-    baseline_times: Dict[str, np.ndarray] = {}
     compute_lock: Optional[asyncio.Lock] = None
     roads_signature: str = "unknown"
     graph_cache_stats: Dict[str, int] = {

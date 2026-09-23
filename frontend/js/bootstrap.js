@@ -1,7 +1,10 @@
-﻿function showLoading(show) { document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none'; }
+function showLoading(show) { document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none'; }
 
 window.onload = async () => { 
-    initMap(); 
+    if (!LEVELS.some(l => l.key === activeLevel)) activeLevel = 'baseline';
+    document.querySelectorAll('.level-btn').forEach(b => b.classList.toggle('active', b.dataset.level === activeLevel));
+    if (window.matchMedia('(max-width: 760px)').matches) document.getElementById('control-panel').classList.add('collapsed');
+    initMap();
     initTesLayerControls();
     
     // Load search list from GPKG
@@ -14,8 +17,15 @@ window.onload = async () => {
         }
     } catch (e) { console.error("Gagal memuat daftar wilayah dari GPKG:", e); }
 
+    loadGridAdmin();
     loadStaticGeometry().then(() => {
-        loadSession(); 
+        loadSession();
+        // Tautan langsung ke panel hasil, mis. #hasil-transisi
+        const m = window.location.hash.match(/^#hasil(?:-(\w+))?$/);
+        if (m) {
+            if (m[1] && RESULT_TABS.some(t => t.key === m[1])) activeResultsTab = m[1];
+            openResults();
+        }
     });
 };
 

@@ -4,7 +4,45 @@ const backendOrigin = backendOriginOverride || ((window.location.hostname === '1
     ? `${window.location.protocol}//${window.location.hostname}:8000`
     : window.location.origin);
 const RESOLVED_API_BASE = `${backendOrigin}/api`;
-const clusterColors = { 0: "#3b82f6", 1: "#ef4444", 2: "#10b981", 3: "#f59e0b", 4: "#8b5cf6", "-1": "#475569" };
+// Warna klaster mengikuti peta tipologi pada draft skripsi (Gambar 19–22)
+const clusterColors = { 0: "#1f77b4", 1: "#2ca02c", 2: "#9467bd", 3: "#e377c2", 4: "#bcbd22", 5: "#17becf", "-1": "#475569" };
+const TAS_COLOR = "#a855f7";
+const TERDAMPAK_COLOR = "#ff7f0e";
+const NEUTRAL_FILL = "#475569";
+
+// Level intensitas banjir sesuai Subbab 3.2 skripsi
+const LEVELS = [
+    { key: 'baseline', label: 'Baseline', intensity: 0.00 },
+    { key: 'rendah',   label: 'Rendah',   intensity: 0.25 },
+    { key: 'sedang',   label: 'Sedang',   intensity: 0.50 },
+    { key: 'tinggi',   label: 'Tinggi',   intensity: 0.75 }
+];
+
+const viewModes = {
+    klaster:   'Tipologi Klaster SDWFCM',
+    tas:       'Titik Aman Semu (TAS)',
+    terdampak: 'Grid Terdampak Banjir',
+    waktu:     'Waktu Tempuh Minimum ke TES',
+    bahaya:    'Indeks Bahaya Banjir'
+};
+
+// Kelas waktu tempuh (menit) — ramp sekuensial satu hue (oranye), terang → gelap
+const waktuBins = [
+    { max: 5,        color: '#fdd9b5', label: '≤ 5 menit' },
+    { max: 10,       color: '#fdb97d', label: '5 – 10 menit' },
+    { max: 15,       color: '#fd8d3c', label: '10 – 15 menit' },
+    { max: 30,       color: '#e6550d', label: '15 – 30 menit' },
+    { max: 60,       color: '#b33c06', label: '30 – 60 menit' },
+    { max: Infinity, color: '#7f2704', label: '> 60 menit / terisolasi' }
+];
+// Indeks bahaya banjir (InaRISK) — ramp sekuensial biru
+const bahayaColors = { 0: '#c6dbef', 1: '#6baed6', 2: '#2171b5', 3: '#08306b' };
+const bahayaLabels = { 0: 'Tidak Ada / Sangat Rendah', 1: 'Rendah', 2: 'Sedang', 3: 'Tinggi' };
+
+function waktuColor(v) {
+    if (v === null || v === undefined || !Number.isFinite(Number(v))) return NEUTRAL_FILL;
+    return waktuBins.find(b => Number(v) <= b.max).color;
+}
 const routeColors = { 'pendidikan': '#3b82f6', 'kesehatan': '#ef4444', 'pemerintahan': '#f59e0b', 'ibadah': '#8b5cf6', 'gor': '#10b981' };
 const mapTypeOptions = {
     'analitik': { label: 'Analitik', icon: 'fa-moon', requiresAdmin: false, requiresLandCover: false },
@@ -40,8 +78,10 @@ let roadCuts = [], cutMarkers = [], routeLayers, contextRouteLayers, originMarke
 let routingAbortController = null, isCalculating = false, markerPopupOpen = false;
 let searchMarker = null, activeCluster = null, clustersHidden = false, searchBoundaryLayer = null;
 let isolatedOrigin = null; // Store { latlng, routes, gridAttr, recommendations }
-let lastK = 5; // Global store for cluster count
-let pseudoSafetyThresholds = { psi: null, alr: null };
+let lastK = 6; // K terpilih pada skripsi (Tabel 10)
+let activeLevel = localStorage.getItem('evac_level') || 'baseline';
+let activeView = 'klaster';
+let lastLevelResult = null;
 let activePopupSnapshot = null;
 let suppressRecommendationRestore = false;
 let clusterNames = {};
@@ -49,7 +89,15 @@ let clusterNamesBySkKey = {};
 
 function ensureGridPopup() {
     if (!gridPopup) {
-        gridPopup = L.popup({ maxWidth: 320, autoClose: false, closeOnClick: false, autoPan: false });
+        const narrow = window.innerWidth <= 760;
+        gridPopup = L.popup({
+            maxWidth: narrow ? 260 : 300, minWidth: narrow ? 220 : 260, maxHeight: narrow ? 240 : 420,
+            autoClose: false, closeOnClick: false, autoPan: true,
+            // ruang untuk panel kiri/kanan (desktop) atau header & panel rute bawah (ponsel)
+            autoPanPaddingTopLeft: narrow ? L.point(10, 70) : L.point(380, 90),
+            autoPanPaddingBottomRight: narrow ? L.point(10, Math.round(window.innerHeight * 0.45)) : L.point(300, 30),
+            className: 'grid-popup'
+        });
     }
     return gridPopup;
 }
@@ -175,10 +223,6 @@ function isGridIsolated(gridAttr) {
     return gridAttr?.is_isolated === true || gridAttr?.is_isolated === 1;
 }
 
-function setPseudoSafetyThresholds(thresholds) {
-    pseudoSafetyThresholds = thresholds || { psi: null, alr: null };
-}
-
 function setClusterNames(names, skKey = null) {
     const hasNames = names && typeof names === 'object' && Object.keys(names).length > 0;
     if (hasNames) {
@@ -194,44 +238,29 @@ function setClusterNames(names, skKey = null) {
 }
 
 function getClusterName(clusterId) {
-    const key = String(clusterId);
-    return clusterNames?.[key] || clusterNames?.[clusterId] || `Klaster ${clusterId}`;
+    return `Klaster ${clusterId}`;
 }
 
-function classifyByThreshold(metricKey, value) {
-    const metric = pseudoSafetyThresholds?.[metricKey];
-    const numericValue = Number(value);
-    if (!metric || value === null || !Number.isFinite(numericValue)) return null;
-    if (numericValue >= Number(metric.upper)) return 'high';
-    if (numericValue >= Number(metric.lower)) return 'mid';
-    return 'low';
+function getClusterDesc(clusterId) {
+    return clusterNames?.[String(clusterId)] || '';
 }
 
-function renderPsiValue(gridAttr) {
-    if (!gridAttr || gridAttr.psi_val === undefined || gridAttr.psi_val === null) return '';
-    const psi = Number(gridAttr.psi_val);
-    if (!Number.isFinite(psi)) return '';
-    const level = gridAttr.psi_class || classifyByThreshold('psi', psi);
-    const color = level === 'critical' || level === 'high'
-        ? 'var(--danger)'
-        : (level === 'fragile' || level === 'mid' ? 'var(--warning)' : 'var(--accent-primary)');
-    const label = gridAttr.psi_class ? `${psi.toFixed(2)} • ${String(gridAttr.psi_class).toUpperCase()}` : psi.toFixed(2);
-    return `<div style="display:flex; justify-content:space-between; margin-top:4px;"><span style="color:var(--text-dim); font-size:10px;">PSI (Instability)</span><span style="font-weight:700; color:${color}">${label}</span></div>`;
+function fmtNum(v, digits = 2) {
+    const n = Number(v);
+    return (v === null || v === undefined || !Number.isFinite(n)) ? '–' : n.toLocaleString('id-ID', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
-function renderAlrValue(gridAttr, hasRouteAccess = false) {
-    if (!gridAttr || gridAttr.alr_val === undefined) return '';
-    const isolated = isGridIsolated(gridAttr) && !hasRouteAccess;
-    const alr = Number(gridAttr.alr_val);
-    const hasValidAlr = gridAttr.alr_val !== null && Number.isFinite(alr);
-    const level = isolated ? 'isolated' : (gridAttr.alr_class || classifyByThreshold('alr', alr));
-    const color = (level === 'isolated' || level === 'severe' || level === 'high')
-        ? 'var(--danger)'
-        : ((level === 'moderate' || level === 'mid') ? 'var(--warning)' : 'var(--accent-primary)');
-    const label = isolated
-        ? 'ISOLATED'
-        : (hasValidAlr ? `${(alr * 100).toFixed(0)}%${gridAttr.alr_class ? ` • ${String(gridAttr.alr_class).toUpperCase()}` : ''}` : 'N/A');
-    return `<div style="display:flex; justify-content:space-between; margin-top:4px;"><span style="color:var(--text-dim); font-size:10px;">ALR (Loss Ratio)</span><span style="font-weight:700; color:${color}">${label}</span></div>`;
+function fmtInt(v) {
+    const n = Number(v);
+    return (v === null || v === undefined || !Number.isFinite(n)) ? '–' : Math.round(n).toLocaleString('id-ID');
+}
+
+function levelLabel(key) {
+    return (LEVELS.find(l => l.key === key) || LEVELS[0]).label;
+}
+
+function popupRow(label, value, color = null) {
+    return `<div class="popup-row"><span>${label}</span><b${color ? ` style="color:${color}"` : ''}>${value}</b></div>`;
 }
 
 function interpolateColor(color1, color2, color3, factor) {

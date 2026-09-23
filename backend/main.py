@@ -1,27 +1,17 @@
-# â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
-# â•‘  main.py â€” FastAPI Application  (v2 â€” Payload-Optimized)                   â•‘
-# â•‘  Tipologi Kerawanan Evakuasi & Deteksi Titik Aman Semu, Kulon Progo        â•‘
-# â•‘                                                                             â•‘
-# â•‘  ARSITEKTUR v2 ("Aturan Emas Web GIS"):                                     â•‘
-# â•‘  * Geometri statis dimuat SATU KALI oleh frontend dari GeoJSON file         â•‘
-# â•‘  * API hanya mengembalikan array JSON ringan (id_grid + atribut)            â•‘
-# â•‘  * Frontend JOIN: geom[id_grid] <-> atribut[id_grid]                       â•‘
-# â•‘                                                                             â•‘
-# â•‘  PERUBAHAN dari v1:                                                         â•‘
-# â•‘  x  _gdf_to_geojson()  DIHAPUS â€” tidak ada lagi GeoJSON multi-MB           â•‘
-# â•‘  v  _gdf_to_data_klaster() BARU â€” array JSON ringan tanpa geometri         â•‘
-# â•‘  v  /api/baseline  -> field "data_klaster" (bukan "geojson")               â•‘
-# â•‘  v  /api/simulate  -> field "data_klaster" (bukan "geojson")               â•‘
-# â•‘  v  Startup WARNING sangat mencolok jika Pandana tidak aktif               â•‘
-# â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 1. IMPORTS
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  main.py — FastAPI Application                                              ║
+# ║  Aksesibilitas Spasial Bangunan Publik sebagai TES Banjir (SDWFCM)          ║
+# ║  Kabupaten Kulon Progo — disesuaikan dengan draft skripsi                   ║
+# ║                                                                             ║
+# ║  • Geometri grid statis dimuat SATU KALI oleh frontend (GeoJSON)            ║
+# ║  • API mengembalikan atribut ringan per id_grid untuk setiap level          ║
+# ║    intensitas banjir (Baseline, Rendah, Sedang, Tinggi)                     ║
+# ║  • Hasil Bab IV dihitung offline (scripts/thesis_analysis.py)               ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
 import asyncio
-import math
 import json
 import logging
+import math
 import os
 import pickle
 import time
@@ -29,69 +19,40 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import geopandas as gpd
+import networkx as nx
 import numpy as np
 import pandas as pd
-from scipy.spatial import cKDTree
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from scipy.sparse.csgraph import dijkstra as csgraph_dijkstra
+from scipy.spatial import cKDTree
 from shapely.geometry import Point
-from .engine import (
-    PANDANA_OK,
-    apply_road_cuts_to_graph, build_road_graph,
-    build_weights, compute_distances, calc_t_max,
-    detect_titik_aman_semu, filter_tes, load_data, load_road_network,
-    preprocess, route_to_nearest_tes, run_all_clustering, run_pipeline,
-    simulate_hazard, SpatialDistanceWeightedFCM,
-)
+
+from . import thesis as T
 from .config import BASE_DIR, DATA_DIR, cfg, utm_to_wgs84 as _utm_to_wgs84, wgs84_to_utm as _wgs84_to_utm
-from .schemas import RoadCutItem, RoadRequest, RouteAllTesRequest, RouteRequest, SimulateRequest
+from .engine import apply_road_cuts_to_graph, build_road_graph, filter_tes, load_data, load_road_network, simulate_hazard
+from .schemas import RoadRequest, RouteAllTesRequest, SimulateRequest
 from .state import state
 
-OFFLINE_METADATA_FILE = "offline_cluster_metadata.json"
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 2. LOGGING SETUP
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+RESULTS_FILE = "thesis_results.json"
+GRID_FILE = "thesis_grid_results.csv.gz"
 GRAPH_CACHE_MAX_ITEMS = 12
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 3. KONFIGURASI
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-def _has_offline_cluster_cache(gdf: gpd.GeoDataFrame) -> bool:
-    """True jika GPKG sudah berisi cache SDWFCM untuk semua skenario/intensitas UI."""
-    required = []
-    for skenario in cfg.skenario_list:
-        required.append(f"PSI_{skenario}")
-        for pct in range(0, 101, 10):
-            required.extend([
-                f"cl_sdwfcm_{skenario}_{pct}pct",
-                f"mem_sdwfcm_{skenario}_{pct}pct",
-                f"waktu_min_{skenario}_{pct}pct",
-            ])
-    missing = [c for c in required if c not in gdf.columns]
-    if missing:
-        logger.info(f"[startup] Offline cache belum lengkap. Contoh kolom hilang: {missing[:6]}")
-        return False
-    return True
+NAME_COLS = ["Nama_Objek", "nama", "Nama", "NAMA", "Name", "NAME", "REMARK", "Fasilitas", "KETERANGAN", "NAMA_UNSUR"]
 
 
-def _graph_cache_key(skenario: str, intensity: float) -> tuple:
-    return ("road_graph", skenario, round(float(intensity), 4))
-
-
-def _route_all_graph_cache_key(skenario: str, intensity: float, cut_roads_fingerprint) -> tuple:
-    return ("route_all_graph", skenario, round(float(intensity), 4), cut_roads_fingerprint)
-
-
+# ══════════════════════════════════════════════════════════════════════════════
+# 1. CACHE GRAPH JALAN PER LEVEL
+# ══════════════════════════════════════════════════════════════════════════════
 def _compute_roads_signature() -> str:
     try:
         stat = os.stat(cfg.roads_file)
@@ -104,19 +65,17 @@ def _graph_cache_root() -> Path:
     return BASE_DIR / "scratch" / "graph_cache"
 
 
-def _graph_cache_path(skenario: str, intensity: float) -> Path:
-    intensity_tag = str(round(float(intensity), 4)).replace(".", "p")
-    sig = state.roads_signature or "unknown"
-    return _graph_cache_root() / f"{sig}_{skenario}_{intensity_tag}.pkl"
+def _graph_cache_path(intensity: float) -> Path:
+    tag = str(round(float(intensity), 4)).replace(".", "p")
+    return _graph_cache_root() / f"{state.roads_signature}_{T.SKENARIO}_{tag}.pkl"
 
 
 def _prune_graph_cache_dir() -> None:
-    cache_root = _graph_cache_root()
-    if not cache_root.exists():
+    root = _graph_cache_root()
+    if not root.exists():
         return
-    sig = state.roads_signature or "unknown"
-    for path in cache_root.glob("*.pkl"):
-        if not path.name.startswith(f"{sig}_"):
+    for path in root.glob("*.pkl"):
+        if not path.name.startswith(f"{state.roads_signature}_{T.SKENARIO}_"):
             try:
                 path.unlink()
                 state.graph_cache_stats["stale_disk_pruned"] += 1
@@ -124,1417 +83,797 @@ def _prune_graph_cache_dir() -> None:
                 logger.warning(f"[graph-cache] Gagal menghapus cache usang: {path.name}")
 
 
-def _remember_graph_cache(cache_key: tuple, graph_pack) -> None:
-    state.graph_cache[cache_key] = graph_pack
+def _remember_graph_cache(key: tuple, pack) -> None:
+    state.graph_cache[key] = pack
     while len(state.graph_cache) > GRAPH_CACHE_MAX_ITEMS:
-        oldest_key = next(iter(state.graph_cache))
-        state.graph_cache.pop(oldest_key, None)
+        state.graph_cache.pop(next(iter(state.graph_cache)), None)
         state.graph_cache_stats["evictions"] += 1
 
 
-def _graph_cache_summary() -> dict:
-    cache_root = _graph_cache_root()
-    disk_entries = []
-    if cache_root.exists():
-        prefix = f"{state.roads_signature}_"
-        disk_entries = [p.name for p in cache_root.glob(f"{prefix}*.pkl")]
-    return {
-        "roads_signature": state.roads_signature,
-        "memory_entries": len(state.graph_cache),
-        "memory_keys": [str(k[:3]) for k in state.graph_cache.keys()],
-        "disk_entries": len(disk_entries),
-        "stats": dict(state.graph_cache_stats),
-    }
-
-
-def _get_or_build_graph(skenario: str, intensity: float):
-    cache_key = _graph_cache_key(skenario, intensity)
-    cached = state.graph_cache.get(cache_key)
+def _get_or_build_graph(intensity: float):
+    key = ("road_graph", round(float(intensity), 4))
+    cached = state.graph_cache.get(key)
     if cached is not None:
         state.graph_cache_stats["memory_hits"] += 1
-        state.graph_cache.pop(cache_key, None)
-        state.graph_cache[cache_key] = cached
         return cached
-
     if state.roads_raw is None:
         return None, None, None
 
-    cache_path = _graph_cache_path(skenario, intensity)
-    if cache_path.exists():
+    path = _graph_cache_path(intensity)
+    if path.exists():
         try:
-            with cache_path.open("rb") as fh:
-                G_use, nl_use = pickle.load(fh)
-            tn_use = cKDTree(nl_use) if len(nl_use) else None
-            graph_pack = (G_use, nl_use, tn_use)
+            with path.open("rb") as fh:
+                G, nl = pickle.load(fh)
+            pack = (G, nl, cKDTree(nl) if len(nl) else None)
             state.graph_cache_stats["disk_hits"] += 1
-            _remember_graph_cache(cache_key, graph_pack)
-            logger.info(f"[graph-cache] Disk cache hit: {cache_path.name}")
-            return graph_pack
+            _remember_graph_cache(key, pack)
+            return pack
         except Exception as e:
-            logger.warning(f"[graph-cache] Gagal membaca {cache_path.name}: {e}")
+            logger.warning(f"[graph-cache] Gagal membaca {path.name}: {e}")
 
     state.graph_cache_stats["misses"] += 1
-    graph_pack = build_road_graph(state.roads_raw, skenario, intensity, cfg)
-    _remember_graph_cache(cache_key, graph_pack)
+    pack = build_road_graph(state.roads_raw, T.SKENARIO, intensity, cfg)
+    _remember_graph_cache(key, pack)
     try:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        with cache_path.open("wb") as fh:
-            pickle.dump((graph_pack[0], graph_pack[1]), fh, protocol=pickle.HIGHEST_PROTOCOL)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("wb") as fh:
+            pickle.dump((pack[0], pack[1]), fh, protocol=pickle.HIGHEST_PROTOCOL)
         state.graph_cache_stats["writes"] += 1
     except Exception as e:
-        logger.warning(f"[graph-cache] Gagal menulis {cache_path.name}: {e}")
-    return graph_pack
+        logger.warning(f"[graph-cache] Gagal menulis {path.name}: {e}")
+    return pack
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 5. FASTAPI APP
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 2. FASTAPI APP
+# ══════════════════════════════════════════════════════════════════════════════
 app = FastAPI(
-    title="Tipologi Kerawanan Evakuasi API",
+    title="Aksesibilitas TES Banjir Kulon Progo API",
     description=(
-        "REST API untuk Web Storytelling Interaktif: Tipologi Kerawanan Evakuasi "
-        "& Deteksi Titik Aman Semu, Kulon Progo. "
-        "v2: Arsitektur 'Aturan Emas Web GIS' â€” API hanya kirim id_grid + atribut."
+        "REST API dashboard skripsi: pemetaan tingkat aksesibilitas spasial bangunan "
+        "publik sebagai Tempat Evakuasi Sementara (TES) banjir menggunakan SDWFCM "
+        "berbasis grid mikro 100 × 100 m."
     ),
-    version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    version="3.0.0",
 )
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
+                   allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(GZipMiddleware, minimum_size=2048)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 5.5 STATIC FILES & REDIRECT
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# Gunakan path absolut untuk mounting agar terhindar dari 404 jika CWD berbeda
+@app.middleware("http")
+async def no_cache_frontend(request, call_next):
+    """Browser selalu memvalidasi ulang berkas dashboard agar tampilan lama
+    (mis. pilihan tipe ancaman versi sebelumnya) tidak tertahan di cache."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith("/frontend") or path.startswith("/api"):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
+
 FRONTEND_DIR = BASE_DIR / "frontend"
-STATIC_DIR   = BASE_DIR / "static"
-
+STATIC_DIR = BASE_DIR / "static"
 if FRONTEND_DIR.exists():
     app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR)), name="frontend")
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+
 @app.get("/", include_in_schema=False)
 async def root_redirect():
-    """Otomatis arahkan user ke halaman dashboard."""
-    # Selalu arahkan ke path absolut relatif terhadap domain
     return RedirectResponse(url="/frontend/index.html")
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 6. STARTUP EVENT
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-@app.on_event("startup")
-async def startup_event():
-    t0 = time.time()
-    logger.info("=" * 70)
-    logger.info("STARTUP v2 â€” Memuat data, membangun network...")
-    logger.info(f"DATA_DIR = {DATA_DIR}")
-    logger.info("Arsitektur v2: endpoint kirim data_klaster (tanpa geometri).")
-    logger.info("=" * 70)
 
-    state.compute_lock = asyncio.Lock()
-
-    try:
-        # Step 1: Load grid
-        logger.info("[startup] Step 1/4: Load grid Kulon Progo...")
-        state.gdf_base = load_data(cfg)
-        logger.info(f"[startup] OK Grid: {len(state.gdf_base)} baris | id_grid: 0..{len(state.gdf_base)-1}")
-        offline_cache_ready = _has_offline_cluster_cache(state.gdf_base)
-        if offline_cache_ready:
-            logger.info("[startup] Offline SDWFCM cache lengkap -> mode startup cepat aktif.")
-
-        # Step 2: Load jalan & TES
-        logger.info("[startup] Step 2/4: Load jalan & TES...")
-        state.roads_raw, state.tes_raw = load_road_network(cfg)
-        state.roads_signature = _compute_roads_signature()
-        _prune_graph_cache_dir()
-        logger.info(
-            f"[startup] OK Jalan: {len(state.roads_raw) if state.roads_raw is not None else 0} segmen | "
-            f"TES: {sum(len(v) for v in state.tes_raw.values())} titik"
-        )
-
-        logger.info("[startup] Step 3/4: Bangun Spatial Weight Matrix baseline...")
-        state.w_baseline = build_weights(state.gdf_base)
-        logger.info(f"[startup] OK Spatial weight: N={state.w_baseline.n} | avg_nb={state.w_baseline.mean_neighbors:.2f}")
-
-        # Step 4: Routing network
-        if state.roads_raw is not None:
-            logger.info("[startup] Step 4/4: Routing Network disiapkan lazy per skenario/intensitas.")
-        else:
-            logger.warning("[startup] Tidak ada data jalan â†’ routing tidak tersedia")
-
-        # Step 5: Warm-up Baseline (Parallelized)
-        logger.info("[startup] Step 5/5: Warm-up Baseline (Parallelized)...")
-        offline_cluster_meta = _load_offline_cluster_metadata()
-        
-        async def _warmup(sk):
-            # OPTIMASI: Cek apakah baseline (0%) sudah ada di cache GPKG
-            col_cache = f"waktu_min_{sk}_0pct"
-            if col_cache in state.gdf_base.columns and offline_cluster_meta:
-                logger.info(f"[startup] Baseline {sk} ditemukan di GPKG Cache + metadata offline. Memuat tanpa analisis ulang...")
-                state.baseline_times[sk] = state.gdf_base[col_cache].values
-                sk_key = cfg.sk_key(sk, 0.0)
-                metadata = (offline_cluster_meta.get("baseline_params", {}) or {}).get(sk, {})
-                state.baseline_params[sk] = metadata
-                gdf_res = _hydrate_cached_baseline_gdf(state.gdf_base, sk, metadata)
-                data_klaster = _gdf_to_data_klaster(gdf_res, sk, sk_key)
-                eval_res = pd.DataFrame()
-            else:
-                logger.info(f"[startup] Warm-up Baseline {sk}...")
-                res = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: run_pipeline(
-                        gdf_base=state.gdf_base,
-                        roads_raw=state.roads_raw,
-                        tes_raw=state.tes_raw,
-                        skenario=sk,
-                        intensity=0.0,
-                        cfg=cfg,
-                        k_opt_override=None,
-                        t_pen_override=None,
-                        cut_roads=None,
-                        G_override=state.nx_graph_base,
-                        nl_override=state.nx_node_list,
-                        tn_override=state.nx_kdtree,
-                        w_override=state.w_baseline,
-                        baseline_times_override=None,
-                        psi_array_override=state.gdf_base[f"PSI_{sk}"].values if f"PSI_{sk}" in state.gdf_base.columns else None
-                    )
-                )
-                gdf_res, cl_res, eval_res, metadata = res
-                data_klaster = _gdf_to_data_klaster(gdf_res, sk, cfg.sk_key(sk, 0.0))
-             
-            # Simpan baseline times jika belum ada (jika tadi tidak hit GPKG cache secara eksplisit di sini)
-            if sk not in state.baseline_times:
-                col_time = f"waktu_tes_min_{sk}"
-                if col_time in gdf_res.columns:
-                    state.baseline_times[sk] = gdf_res[col_time].values
-             
-            state.baseline_params[sk] = metadata
-            state.baseline_cache[sk] = {
-                "status": "ok",
-                "arsitektur": "v2",
-                "skenario": sk,
-                "intensity": 0.0,
-                "elapsed_sec": 0.0,
-                "evaluation": _eval_df_to_list(eval_res),
-                "n_grid": len(gdf_res),
-                "n_titik_semu": int(gdf_res["titik_aman_semu"].sum()) if "titik_aman_semu" in gdf_res.columns else 0,
-                "data_klaster": data_klaster,
-                "k_optimal": _sanitize(metadata.get("k", 3)),
-                "t_pen": _sanitize(metadata.get("t_pen", 200.0)),
-                "pseudo_safety_thresholds": _sanitize(metadata.get("pseudo_safety_thresholds", {})),
-                "cluster_names": _sanitize(metadata.get("cluster_names", {})),
-            }
-            state.pseudo_safety_thresholds[sk] = metadata.get("pseudo_safety_thresholds", {})
-            # Hitung rank cluster untuk rekomendasi
-            # Cluster dengan rata-rata waktu_tes_min rendah = rank tinggi
-            df_klaster = pd.DataFrame(data_klaster)
-            t_col = f"waktu_tes_min_{sk}" # sk di sini adalah sk_key dari loop gather
-            if "cluster_sdwfcm" in df_klaster.columns and t_col in df_klaster.columns:
-                avg_t = df_klaster.groupby("cluster_sdwfcm")[t_col].mean()
-                # Score 0..1 (1 = paling cepat/aman)
-                if not avg_t.empty:
-                    t_min, t_max = avg_t.min(), avg_t.max()
-                    denom = (t_max - t_min) if t_max > t_min else 1.0
-                    ranks = {int(c): float(1.0 - (v - t_min) / denom) for c, v in avg_t.items()}
-                    state.cluster_ranks[sk.split("_")[0]] = ranks
-            
-            logger.info(f"[startup] Baseline {sk} tersimpan: k={metadata.get('k', '?')}")
-
-        await asyncio.gather(*[_warmup(sk) for sk in ["banjir", "banjir_bandang", "tanah_longsor"]])
-
-        elapsed = time.time() - t0
-        state.is_ready = True
-        logger.info("=" * 70)
-        logger.info(f"STARTUP SELESAI dalam {elapsed:.1f} detik")
-        logger.info("Arsitektur v2: /api/baseline & /api/simulate -> data_klaster (bukan geojson)")
-        logger.info("=" * 70)
-
-    except Exception as e:
-        state.startup_error = str(e)
-        logger.error(f"STARTUP GAGAL: {e}", exc_info=True)
-
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 7. PYDANTIC MODELS
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 8. HELPERS
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# 3. HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
 def _check_ready():
     if not state.is_ready:
         msg = state.startup_error or "Server sedang memuat data, coba lagi sebentar."
         raise HTTPException(status_code=503, detail=f"Service tidak tersedia: {msg}")
 
 
-def _validate_skenario(skenario: str):
-    if skenario not in cfg.skenario_list:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Skenario '{skenario}' tidak valid. Pilihan: {cfg.skenario_list}",
-        )
-
-
 def _sanitize(val: Any) -> Any:
-    """Konversi numpy types & NaN/Inf ke Python native / None secara rekursif."""
-    if val is None:
-        return None
-    
-    # Handle numpy scalars / arrays
-    if hasattr(val, "item") and not isinstance(val, (np.ndarray, list, dict, str)):
-        try:
-            val = val.item()
-        except:
-            pass
-
-    if isinstance(val, (np.integer, int)):
-        return int(val)
-    if isinstance(val, (np.floating, float)):
-        v = float(val)
-        return None if (math.isnan(v) or math.isinf(v)) else round(v, 6)
-    if isinstance(val, (np.bool_, bool)):
-        return bool(val)
-    
-    # Rekursi untuk list/dict agar semua level tersanitasi
+    """Konversi numpy types & NaN/Inf ke tipe Python / None secara rekursif."""
+    if val is None or isinstance(val, str):
+        return val
     if isinstance(val, dict):
         return {k: _sanitize(v) for k, v in val.items()}
     if isinstance(val, (list, tuple, np.ndarray)):
         return [_sanitize(x) for x in val]
-    
+    if isinstance(val, (bool, np.bool_)):
+        return bool(val)
+    if isinstance(val, (int, np.integer)):
+        return int(val)
+    if isinstance(val, (float, np.floating)):
+        v = float(val)
+        return None if (math.isnan(v) or math.isinf(v)) else v
     return val
 
 
+def _resolve_level(level: Optional[str], intensity: Optional[float]) -> dict:
+    if level and level not in T.LEVEL_BY_KEY:
+        raise HTTPException(status_code=422,
+                            detail=f"Level '{level}' tidak valid. Pilihan: {T.LEVEL_KEYS}")
+    return T.resolve_level(level, intensity)
+
+
 def _latlon_to_projected(lat: float, lng: float):
-    x, y = _wgs84_to_utm.transform(lng, lat)
-    return x, y
+    return _wgs84_to_utm.transform(lng, lat)
 
 
 def _snap(G, tn, nl, xy, max_snap: float = 300):
-    """
-    Snap titik [x, y] ke node terdekat di graph G menggunakan KDTree tn.
-    - G: NetworkX graph
-    - tn: scipy.spatial.KDTree dari koordinat node
-    - nl: List of node IDs sesuai urutan KDTree
-    - xy: [x, y] yang akan di-snap
-    - max_snap: Jarak maksimum (meter) untuk snapping
-    """
     if G is None or tn is None or nl is None:
         return None
     try:
         dist, idx = tn.query(xy)
         if dist > max_snap:
             return None
-        # WAJIB: Konversi ke tuple agar hashable (NetworkX requirement)
-        # Sesuai format di build_road_graph: (round(x, 2), round(y, 2))
         node = nl[idx]
         return (round(float(node[0]), 2), round(float(node[1]), 2))
-    except:
+    except Exception:
         return None
 
 
-# â”€â”€ TUGAS 3: _gdf_to_geojson() DIHAPUS TOTAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Endpoint TIDAK BOLEH lagi mengkonversi GDF â†’ GeoJSON feature collection.
-# Gunakan _gdf_to_data_klaster() di bawah.
-
-
-def _gdf_to_data_klaster(
-    gdf: gpd.GeoDataFrame,
-    skenario: str,
-    sk: str,
-) -> List[dict]:
-    """
-    Konversi GeoDataFrame hasil pipeline ke array JSON ringan TANPA geometri.
-
-    Reduksi payload: ~50 MB GeoJSON (22.000 polygon) â†’ ~2-4 MB array atribut.
-
-    Kolom yang dikembalikan (sesuai TUGAS 3):
-        id_grid              : PRIMARY KEY untuk JOIN geometri statis di frontend
-        cluster_sdwfcm       : label klaster SDWFCM
-        membership_max       : derajat keanggotaan tertinggi [0-1]
-        cluster_sfcm         : label klaster SFCM
-        cluster_redcap       : label klaster REDCAP
-        cluster_skater       : label klaster SKATER
-        waktu_tes_min_{sk}   : waktu ke TES terdekat (menit)
-        aksesibilitas_{sk}   : 1=Tinggi / 2=Sedang / 3=Rendah
-        titik_aman_semu      : 1 jika terdeteksi Titik Aman Semu
-        alr_val              : Accessibility Loss Ratio; null jika isolated
-        is_isolated          : true jika grid kehilangan seluruh akses TES
-        sim_dampak_{skenario}: dampak simulasi bencana
-        waktu_tes_{kat}_{sk} : waktu ke TES per kategori fasilitas
-
-    Nilai float NaN / Infinity â†’ None (JSON null, tidak menyebabkan error 500).
-    Tipe numpy integer/float â†’ Python native (JSON-serializable).
-    """
-    wanted: List[str] = [
-        "id_grid",              # WAJIB â€” primary key JOIN
-        "cluster_sdwfcm",
-        "membership_max",
-        "cluster_sfcm",
-        "cluster_redcap",
-        "cluster_skater",
-        f"waktu_tes_min_{sk}",
-        f"aksesibilitas_{sk}",
-        "titik_aman_semu",
-        "psi_val",
-        "psi_class",
-        "alr_val",
-        "alr_class",
-        "is_isolated",
-        f"sim_dampak_{skenario}",
-        cfg.indeks_bahaya.get(skenario, skenario), # Indeks bahaya mentah (0,1,2,3)
-    ]
-    for kat in cfg.kategori_fac:
-        wanted.append(f"waktu_tes_{kat}_{sk}")
-
-    existing = [c for c in wanted if c in gdf.columns]
-    missing  = [c for c in wanted if c not in gdf.columns]
-    if missing:
-        logger.debug(f"[_gdf_to_data_klaster] Kolom tidak ada (dilewati): {missing}")
-
-    # Failsafe: jika id_grid tidak ada, engine.py belum diupdate
-    if "id_grid" not in existing:
-        logger.error(
-            "[_gdf_to_data_klaster] 'id_grid' TIDAK ADA! "
-            "Pastikan load_data() di engine.py sudah diupdate (Tugas 2). "
-            "Membuat id_grid darurat dari RangeIndex..."
-        )
-        gdf = gdf.copy()
-        gdf["id_grid"] = range(len(gdf))
-        existing = ["id_grid"] + [c for c in existing if c != "id_grid"]
-
-    # Ambil subset (DataFrame biasa, tanpa kolom geometry)
-    df_out = pd.DataFrame(gdf[existing])
-
-    records: List[dict] = []
-    for row_tuple in df_out.itertuples(index=False, name=None):
-        records.append({col: _sanitize(val) for col, val in zip(existing, row_tuple)})
-
-    return records
-
-
-def _eval_df_to_list(eval_df: pd.DataFrame) -> List[dict]:
-    """Konversi DataFrame evaluasi ke list of dict, NaN/Inf â†’ null."""
-    if eval_df is None or len(eval_df) == 0:
-        return []
-    records = eval_df.to_dict(orient="records")
-    for row in records:
-        for key, val in row.items():
-            row[key] = _sanitize(val)
-    return records
-
-
-def _prepare_cut_roads(cut_roads: List[RoadCutItem]) -> List[dict]:
+def _prepare_cut_roads(cut_roads) -> List[dict]:
     result = []
     for item in cut_roads:
-        d = item.dict(exclude_none=True)
+        d = item.dict(exclude_none=True) if hasattr(item, "dict") else dict(item)
         if "lat" in d and "lng" in d and "x" not in d:
-            x, y = _latlon_to_projected(d["lat"], d["lng"])
-            d["x"] = x
-            d["y"] = y
+            d["x"], d["y"] = _latlon_to_projected(d["lat"], d["lng"])
         result.append(d)
     return result
 
 
-def _load_offline_cluster_metadata() -> Dict[str, Any]:
-    path = Path(DATA_DIR) / OFFLINE_METADATA_FILE
-    if not path.exists():
-        logger.info(f"[startup] Metadata offline belum ditemukan: {path}")
-        return {}
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception as e:
-        logger.warning(f"[startup] Gagal membaca metadata offline {path}: {e}")
-        return {}
+def _tes_name(row) -> str:
+    for c in NAME_COLS:
+        if c in row.index and pd.notna(row[c]):
+            v = str(row[c]).strip()
+            if v:
+                return v
+    return "Fasilitas TES"
 
 
-def _hydrate_cached_baseline_gdf(
-    gdf_base: gpd.GeoDataFrame,
-    skenario: str,
-    metadata: Optional[Dict[str, Any]] = None,
-) -> gpd.GeoDataFrame:
-    """Bangun ulang kolom standar pipeline dari cache offline baseline 0%."""
-    pct = 0
-    sk = cfg.sk_key(skenario, 0.0)
-    gdf_res = gdf_base.copy()
-    metadata = metadata or {}
-
-    col_cl = f"cl_sdwfcm_{skenario}_{pct}pct"
-    col_mem = f"mem_sdwfcm_{skenario}_{pct}pct"
-    col_tm = f"waktu_min_{skenario}_{pct}pct"
-    col_iso = f"iso_{skenario}_{pct}pct"
-    col_psi = f"PSI_{skenario}"
-
-    if col_cl in gdf_res.columns:
-        gdf_res["cluster_sdwfcm"] = gdf_res[col_cl]
-    if col_mem in gdf_res.columns:
-        gdf_res["membership_max"] = gdf_res[col_mem]
-    if col_tm in gdf_res.columns:
-        tm = gdf_res[col_tm].astype(float).values
-        gdf_res[f"waktu_tes_min_{skenario}"] = tm
-        gdf_res[f"waktu_tes_min_{sk}"] = tm
-        aks = np.where(tm <= cfg.golden_time_min, 1, np.where(tm <= cfg.isolation_time_threshold, 2, 3))
-        gdf_res[f"aksesibilitas_{skenario}"] = aks
-        gdf_res[f"aksesibilitas_{sk}"] = aks
-    if col_iso in gdf_res.columns:
-        is_isolated = gdf_res[col_iso].fillna(0).astype(bool).values
-    else:
-        is_isolated = np.zeros(len(gdf_res), dtype=bool)
-    gdf_res["is_isolated"] = is_isolated
-
-    gdf_res["psi_val"] = (
-        gdf_res[col_psi].astype(float).values
-        if col_psi in gdf_res.columns
-        else np.zeros(len(gdf_res), dtype=float)
-    )
-    gdf_res["alr_val"] = np.where(is_isolated, np.nan, 0.0)
-
-    thresholds = metadata.get("pseudo_safety_thresholds", {}) or {}
-    psi_meta = thresholds.get("psi", {}) or {}
-    alr_meta = thresholds.get("alr", {}) or {}
-    psi_upper = float(psi_meta.get("upper", np.nan)) if psi_meta else np.nan
-    alr_upper = float(alr_meta.get("upper", np.nan)) if alr_meta else np.nan
-
-    gdf_res["psi_class"] = "unknown"
-    if np.isfinite(psi_upper):
-        gdf_res.loc[gdf_res["psi_val"] >= psi_upper, "psi_class"] = "severe"
-        gdf_res.loc[gdf_res["psi_val"] < psi_upper, "psi_class"] = "minor"
-
-    gdf_res["alr_class"] = np.where(is_isolated, "isolated", "minor")
-    if np.isfinite(alr_upper):
-        finite_non_iso = (~is_isolated) & np.isfinite(gdf_res["alr_val"].values)
-        gdf_res.loc[finite_non_iso & (gdf_res["alr_val"].values >= alr_upper), "alr_class"] = "severe"
-
-    gdf_res["titik_aman_semu"] = 0
-    if np.isfinite(psi_upper):
-        gdf_res.loc[(gdf_res["psi_val"].values >= psi_upper) & is_isolated, "titik_aman_semu"] = 1
-
-    gdf_res.attrs["cluster_names"] = metadata.get("cluster_names", {}) or {}
-    return gdf_res
-
-
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 9. ENDPOINTS
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-# â”€â”€ 9.0 Health Check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-def _tes_to_geojson(tes_by_category: Dict[str, gpd.GeoDataFrame], skenario: str) -> Dict[str, Any]:
-    name_cols = ["Nama_Objek", "nama", "Nama", "NAMA", "Name", "NAME", "REMARK", "Fasilitas", "KETERANGAN", "NAMA_UNSUR"]
-    hazard_col = cfg.hazard_col_map.get(skenario, skenario)
-    features = []
-
-    for kategori in cfg.kategori_fac:
-        tes_gdf = tes_by_category.get(kategori)
-        if tes_gdf is None or tes_gdf.empty:
-            continue
-
-        tes_wgs = tes_gdf.to_crs("EPSG:4326")
-
-        for idx, row in tes_wgs.iterrows():
-            name = "Fasilitas TES"
-            for col in name_cols:
-                if col in tes_wgs.columns and pd.notna(row.get(col)):
-                    value = str(row.get(col)).strip()
-                    if value:
-                        name = value
-                        break
-
-            hazard_value = None
-            if hazard_col in tes_wgs.columns and pd.notna(row.get(hazard_col)):
-                hazard_value = _sanitize(row.get(hazard_col))
-            is_valid = (
-                int(row.get(hazard_col, 0)) < cfg.tes_hazard_threshold
-                if hazard_col in tes_wgs.columns and pd.notna(row.get(hazard_col))
-                else True
-            )
-
-            features.append({
-                "type": "Feature",
-                "geometry": row.geometry.__geo_interface__,
-                "properties": {
-                    "id_tes": f"{kategori}-{idx}",
-                    "kategori": kategori,
-                    "name": name,
-                    "hazard": hazard_value,
-                    "is_valid": bool(is_valid),
-                },
-            })
-
+def _level_payload(level: dict, summary: dict, records: List[dict], simulated: bool = False,
+                   n_cut: int = 0, elapsed: float = 0.0) -> dict:
     return {
-        "type": "FeatureCollection",
-        "features": features,
+        "status": "ok",
+        "skenario": T.SKENARIO,
+        "level": level["key"],
+        "level_label": level["label"],
+        "intensity": level["intensity"],
+        "sk_key": level["key"] + ("_sim" if simulated else ""),
+        "simulated": simulated,
+        "n_cut_roads": n_cut,
+        "elapsed_sec": round(elapsed, 2),
+        "k_optimal": int(state.thesis_results.get("k", T.K_THESIS)),
+        "cluster_names": summary.get("cluster_names", {}),
+        "cluster_profile": summary.get("cluster_profile", []),
+        "tas": summary.get("tas", {}),
+        "n_titik_semu": int(summary.get("tas", {}).get("jumlah_tas", 0) or 0),
+        "n_grid_terdampak": summary.get("n_grid_terdampak"),
+        "mean_waktu_min": summary.get("mean_waktu_min"),
+        "n_grid": len(records),
+        "data_klaster": records,
     }
 
 
+def _load_thesis_results() -> bool:
+    res_path = Path(DATA_DIR) / RESULTS_FILE
+    grid_path = Path(DATA_DIR) / GRID_FILE
+    if not (res_path.exists() and grid_path.exists()):
+        return False
+    state.thesis_results = json.loads(res_path.read_text(encoding="utf-8"))
+    state.thesis_grid = pd.read_csv(grid_path)
+    state.t_pen = state.thesis_results.get("t_pen")
+    return True
+
+
+def _build_level_cache():
+    for lv in T.LEVELS:
+        summary = state.thesis_results.get("levels", {}).get(lv["key"], {})
+        records = T.records_from_grid(state.thesis_grid, lv["key"], cfg)
+        state.level_cache[lv["key"]] = _sanitize(_level_payload(lv, summary, records))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. STARTUP
+# ══════════════════════════════════════════════════════════════════════════════
+@app.on_event("startup")
+async def startup_event():
+    t0 = time.time()
+    state.compute_lock = asyncio.Lock()
+    try:
+        logger.info("[startup] Memuat grid, jalan, dan TES...")
+        state.gdf_base = load_data(cfg)
+        state.roads_raw, state.tes_raw = load_road_network(cfg)
+        state.roads_signature = _compute_roads_signature()
+        _prune_graph_cache_dir()
+
+        if not _load_thesis_results():
+            from scripts.thesis_analysis import restore_locked
+            if restore_locked(DATA_DIR) and _load_thesis_results():
+                logger.info("[startup] Hasil terkunci dipulihkan dari data/locked/")
+        if not state.thesis_results:
+            logger.warning("[startup] Hasil analisis skripsi belum ada -> menjalankan analisis "
+                           "(tanpa perbandingan algoritma, ±3 menit)...")
+            from scripts.thesis_analysis import run_thesis_analysis
+            await asyncio.get_event_loop().run_in_executor(
+                None, lambda: run_thesis_analysis(data_dir=DATA_DIR, skip_comparison=True))
+            _load_thesis_results()
+
+        _build_level_cache()
+        # graph baseline disiapkan untuk routing klik grid
+        def _warm():
+            G, _, _ = _get_or_build_graph(0.0)
+            _level_tes_cache(T.LEVEL_BY_KEY["baseline"])
+            _graph_csr(G)
+        await asyncio.get_event_loop().run_in_executor(None, _warm)
+        state.is_ready = True
+        logger.info(f"[startup] SELESAI dalam {time.time() - t0:.1f} detik "
+                    f"(K={state.thesis_results.get('k')}, t_pen={state.t_pen:.2f} menit)")
+    except Exception as e:
+        state.startup_error = str(e)
+        logger.error(f"STARTUP GAGAL: {e}", exc_info=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. ENDPOINTS — SISTEM & HASIL SKRIPSI
+# ══════════════════════════════════════════════════════════════════════════════
 @app.get("/api/health", tags=["System"])
 async def health_check():
     return {
-        "status":          "ok" if state.is_ready else "loading",
-        "is_ready":        state.is_ready,
-        "startup_error":   state.startup_error,
-        "arsitektur":      "v2 â€” Geometri-Atribut dipisah (payload ringan)",
-        "routing_engine":  "Optimized NetworkX (Multi-Source Dijkstra)",
+        "status": "ok" if state.is_ready else "loading",
+        "is_ready": state.is_ready,
+        "startup_error": state.startup_error,
         "data": {
-            "n_grid":      len(state.gdf_base) if state.gdf_base is not None else 0,
-            "n_roads":     len(state.roads_raw) if state.roads_raw is not None else 0,
-            "tes_counts":  {k: len(v) for k, v in state.tes_raw.items()},
-            "nx_graph_ok": state.nx_graph_base is not None,
-            "baseline_params": state.baseline_params,
-            "graph_cache": _graph_cache_summary(),
+            "n_grid": len(state.gdf_base) if state.gdf_base is not None else 0,
+            "n_roads": len(state.roads_raw) if state.roads_raw is not None else 0,
+            "tes_counts": {k: len(v) for k, v in state.tes_raw.items()},
+            "k": state.thesis_results.get("k"),
+            "t_pen": state.t_pen,
         },
-        "config": {
-            "skenario_list":    cfg.skenario_list,
-            "intensity_levels": cfg.intensity_levels,
-            "target_crs":       cfg.target_crs,
-        },
+        "config": {"skenario": T.SKENARIO, "levels": T.LEVELS, "target_crs": cfg.target_crs},
     }
 
 
-@app.get("/api/debug/cache", tags=["System"], summary="Ringkasan cache graph dan baseline")
-async def debug_cache():
-    return {
-        "graph_cache": _graph_cache_summary(),
-        "baseline_cache_keys": sorted(state.baseline_cache.keys()),
-        "baseline_params": state.baseline_params,
-    }
+@app.get("/api/levels", tags=["System"], summary="Daftar level intensitas banjir")
+async def get_levels():
+    return {"status": "ok", "skenario": T.SKENARIO, "levels": T.LEVELS, "k": state.thesis_results.get("k")}
 
 
-# â”€â”€ 9.1 GET /api/baseline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-@app.get("/api/tes-layers", tags=["System"], summary="Ambil titik TES per kategori untuk layer peta")
-async def get_tes_layers(
-    skenario: str = Query("banjir", description="banjir | banjir_bandang | tanah_longsor"),
-    intensity: float = Query(0.0, ge=0.0, le=1.0),
+@app.get("/api/thesis-results", tags=["Hasil"], summary="Ringkasan seluruh hasil Bab IV")
+async def get_thesis_results():
+    _check_ready()
+    return JSONResponse(content=_sanitize(state.thesis_results))
+
+
+@app.get("/api/baseline", tags=["Clustering"],
+         summary="Tipologi SDWFCM per level (atribut ringan per id_grid, tanpa geometri)")
+async def get_level(
+    level: Optional[str] = Query(None, description="baseline | rendah | sedang | tinggi"),
+    intensity: Optional[float] = Query(None, ge=0.0, le=1.0, description="Alternatif numerik untuk level"),
+    skenario: Optional[str] = Query(None, description="Diabaikan — penelitian hanya banjir"),
 ):
     _check_ready()
-    _validate_skenario(skenario)
-
-    tes_source = state.tes_raw
-    if intensity > 0:
-        _, _, tes_source, _ = simulate_hazard(
-            state.gdf_base,
-            state.roads_raw,
-            state.tes_raw,
-            skenario,
-            intensity,
-            cfg,
-        )
-
-    tes_geojson = _tes_to_geojson(tes_source, skenario)
-    counts = {
-        kategori: len(tes_source.get(kategori, []))
-        for kategori in cfg.kategori_fac
-    }
-
-    return JSONResponse(content=_sanitize({
-        "status": "ok",
-        "skenario": skenario,
-        "intensity": intensity,
-        "categories": cfg.kategori_fac,
-        "counts": counts,
-        "geojson": tes_geojson,
-    }))
+    lv = _resolve_level(level, intensity)
+    return JSONResponse(content=state.level_cache[lv["key"]])
 
 
-@app.get(
-    "/api/baseline",
-    tags=["Clustering"],
-    summary="Klaster SDWFCM baseline â€” respons ringan (id_grid + atribut, TANPA geometri)",
-    response_class=JSONResponse,
-)
-async def get_baseline(
-    skenario:  str   = Query(..., description="banjir | banjir_bandang | tanah_longsor"),
-    intensity: float = Query(0.0, ge=0.0, le=1.0),
-    algo:      str   = Query("SDWFCM", description="SDWFCM | SFCM | REDCAP | SKATER | all"),
-):
-    """
-    Jalankan pipeline SDWFCM baseline dan kembalikan **array atribut ringan**.
-
-    ### Perubahan dari v1
-    - Field `geojson` **DIHAPUS** (penyebab crash browser ~50 MB).
-    - Field `data_klaster` **BARU** â€” array JSON ringan ~2-4 MB.
-
-    ### Cara JOIN di Frontend
-```javascript
-    // Init SATU KALI
-    const geom = await fetch('/static/static_grid_kulonprogo.geojson').then(r=>r.json());
-    const layer = L.geoJSON(geom).addTo(map);
-
-    // Saat update skenario (tanpa reload geometri)
-    const resp  = await fetch('/api/baseline?skenario=banjir&intensity=0').then(r=>r.json());
-    const lut   = Object.fromEntries(resp.data_klaster.map(d => [d.id_grid, d]));
-    layer.setStyle(feat => {
-        const d = lut[feat.properties.id_grid];
-        return { fillColor: clusterColor(d?.cluster_sdwfcm), fillOpacity: d?.membership_max ?? 0.6 };
-    });
-```
-    """
-    _check_ready()
-    _validate_skenario(skenario)
-
-    logger.info(f"[GET /api/baseline] skenario={skenario} intensity={intensity} algo={algo}")
-    t_req = time.time()
-
-    # 1. Cek Cache
-    if skenario in state.baseline_cache:
-        logger.info(f"[baseline] HIT Cache: {skenario}")
-        return state.baseline_cache[skenario]
-
-    async with state.compute_lock:
-        try:
-            params = state.baseline_params.get(skenario, {})
-            k_opt_ov = params.get("k")
-            t_pen_ov = params.get("t_pen")
-
-            gdf_result, cl_results, eval_df, metadata = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: run_pipeline(
-                    gdf_base     = state.gdf_base,
-                    roads_raw    = state.roads_raw,
-                    tes_raw      = state.tes_raw,
-                    skenario     = skenario,
-                    intensity    = intensity,
-                    cfg          = cfg,
-                    k_opt_override=k_opt_ov,
-                    t_pen_override=t_pen_ov,
-                    cut_roads    = None,
-                    G_override   = None,
-                    w_override   = state.w_baseline,
-                    baseline_times_override=state.baseline_times.get(skenario),
-                    psi_array_override=state.gdf_base[f"PSI_{skenario}"].values if f"PSI_{skenario}" in state.gdf_base.columns else None
-                )
-            )
-        except Exception as e:
-            logger.error(f"[GET /api/baseline] Pipeline error: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
-
-    sk = cfg.sk_key(skenario, intensity)
-    data_klaster = _gdf_to_data_klaster(gdf_result, skenario, sk)
-
-    elapsed = round(time.time() - t_req, 2)
-    est_kb  = len(json.dumps(data_klaster[:1])) * len(data_klaster) // 1024 if data_klaster else 0
-    logger.info(f"[GET /api/baseline] selesai {elapsed}s | n={len(data_klaster)} | ~{est_kb} KB")
-
-    return JSONResponse(content=_sanitize({
-        "status":       "ok",
-        "arsitektur":   "v2",
-        "skenario":     skenario,
-        "intensity":    intensity,
-        "sk_key":       sk,
-        "k_optimal":    metadata.get("k", state.baseline_params.get(skenario, {}).get("k", None)),
-        "elapsed_sec":  elapsed,
-        "evaluation":   _eval_df_to_list(eval_df),
-        "n_grid":       len(gdf_result),
-        "pseudo_safety_thresholds": _sanitize(metadata.get("pseudo_safety_thresholds", state.baseline_params.get(skenario, {}).get("pseudo_safety_thresholds", {}))),
-        "cluster_names": _sanitize(metadata.get("cluster_names", state.baseline_params.get(skenario, {}).get("cluster_names", {}))),
-        "n_titik_semu": int(gdf_result["titik_aman_semu"].sum())
-                        if "titik_aman_semu" in gdf_result.columns else 0,
-        "data_klaster": data_klaster,   # â† BARU (ringan, tanpa geometri)
-        # "geojson": ...               # â† DIHAPUS (penyebab crash)
-    }))
-
-
-# â”€â”€ 9.2 POST /api/simulate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-@app.post(
-    "/api/simulate",
-    tags=["Clustering"],
-    summary="Simulasi penutupan jalan + re-clustering â€” respons ringan (tanpa geometri)",
-    response_class=JSONResponse,
-)
+@app.post("/api/simulate", tags=["Clustering"],
+          summary="Simulasi blokir jalan pada suatu level + klasterisasi ulang SDWFCM")
 async def post_simulate(body: SimulateRequest):
-    """
-    Terima perintah penutupan jalan, hitung ulang SDWFCM, kembalikan `data_klaster` ringan.
-
-    Frontend cukup UPDATE warna layer via lookup id_grid â€” geometri TIDAK dimuat ulang.
-
-    **Body JSON:**
-```json
-    { "skenario": "banjir", "intensity": 0.5,
-      "cut_roads": [{"lat": -7.8, "lng": 110.1}] }
-```
-    """
     _check_ready()
-    _validate_skenario(body.skenario)
+    lv = _resolve_level(body.level, body.intensity)
+    if not body.cut_roads:
+        return JSONResponse(content=state.level_cache[lv["key"]])
 
-    logger.info(f"[POST /api/simulate] skenario={body.skenario} intensity={body.intensity} n_cut={len(body.cut_roads)}")
-    t_req = time.time()
-
-    cut_roads_converted = _prepare_cut_roads(body.cut_roads)
-
+    t0 = time.time()
+    cuts = _prepare_cut_roads(body.cut_roads)
     async with state.compute_lock:
         try:
-            G_sim = nl_sim = tn_sim = None
+            def _run():
+                G, nl, tn = _get_or_build_graph(lv["intensity"])
+                G_cut = apply_road_cuts_to_graph(G, nl, tn, cuts, cfg)
+                prep = T.prepare_level(state.gdf_base, state.roads_raw, state.tes_raw,
+                                       lv["intensity"], cfg, t_pen=state.t_pen,
+                                       graph_pack=(G_cut, nl, tn))
+                seed = state.thesis_results.get("levels", {}).get(lv["key"], {}).get("sdwfcm_seed")
+                cl = T.cluster_level(prep, state.gdf_base, cfg,
+                                     k=int(state.thesis_results.get("k", T.K_THESIS)), fast=False,
+                                     seeds=[int(seed)] if seed is not None else None)
+                grid = pd.concat([
+                    state.thesis_grid[["id_grid", "Road_Density_mean", T.SKENARIO]],
+                    T.level_grid_frame(lv["key"], prep["df"], cl, cfg),
+                ], axis=1)
+                return T.level_summary(lv["key"], prep, cl, cfg), T.records_from_grid(grid, lv["key"], cfg)
 
-            if cut_roads_converted and state.roads_raw is not None:
-                G_sim, nl_sim, tn_sim = _get_or_build_graph(body.skenario, body.intensity)
-                G_sim = apply_road_cuts_to_graph(G_sim, nl_sim, tn_sim, cut_roads_converted, cfg)
-
-            params = state.baseline_params.get(body.skenario, {})
-            k_opt_ov = params.get("k")
-            t_pen_ov = params.get("t_pen")
-
-            gdf_result, cl_results, eval_df, metadata = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: run_pipeline(
-                    gdf_base     = state.gdf_base,
-                    roads_raw    = state.roads_raw,
-                    tes_raw      = state.tes_raw,
-                    skenario     = body.skenario,
-                    intensity    = body.intensity,
-                    cfg          = cfg,
-                    k_opt_override=k_opt_ov,
-                    t_pen_override=t_pen_ov,
-                    cut_roads    = cut_roads_converted,
-                    G_override   = G_sim,
-                    nl_override  = nl_sim,
-                    tn_override  = tn_sim,
-                    w_override   = state.w_baseline,
-                    baseline_times_override=state.baseline_times.get(body.skenario),
-                    psi_array_override=state.gdf_base[f"PSI_{body.skenario}"].values if f"PSI_{body.skenario}" in state.gdf_base.columns else None,
-                    skip_evaluation=True,
-                    fast_clustering=True,
-                )
-            )
+            summary, records = await asyncio.get_event_loop().run_in_executor(None, _run)
         except Exception as e:
-            logger.error(f"[POST /api/simulate] Pipeline error: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
+            logger.error(f"[POST /api/simulate] error: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Simulasi gagal: {e}")
 
-    sk = cfg.sk_key(body.skenario, body.intensity)
-    data_klaster = _gdf_to_data_klaster(gdf_result, body.skenario, sk)
-
-    elapsed = round(time.time() - t_req, 2)
-    logger.info(f"[POST /api/simulate] selesai {elapsed}s | n={len(data_klaster)}")
-
-    return JSONResponse(content=_sanitize({
-        "status":       "ok",
-        "arsitektur":   "v2",
-        "skenario":     body.skenario,
-        "intensity":    body.intensity,
-        "sk_key":       sk,
-        "n_cut_roads":  len(body.cut_roads),
-        "k_optimal":    metadata.get("k", state.baseline_params.get(body.skenario, {}).get("k", None)),
-        "elapsed_sec":  elapsed,
-        "evaluation":   _eval_df_to_list(eval_df),
-        "n_grid":       len(gdf_result),
-        "pseudo_safety_thresholds": _sanitize(metadata.get("pseudo_safety_thresholds", gdf_result.attrs.get("pseudo_safety_thresholds", {}))),
-        "cluster_names": _sanitize(metadata.get("cluster_names", gdf_result.attrs.get("cluster_names", {}))),
-        "n_titik_semu": int(gdf_result["titik_aman_semu"].sum())
-                        if "titik_aman_semu" in gdf_result.columns else 0,
-        "data_klaster": data_klaster,   # â† BARU (ringan, tanpa geometri)
-        # "geojson": ...               # â† DIHAPUS
-    }))
+    payload = _level_payload(lv, summary, records, simulated=True,
+                             n_cut=len(body.cut_roads), elapsed=time.time() - t0)
+    return JSONResponse(content=_sanitize(payload))
 
 
-# â”€â”€ 9.3 POST /api/route â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-@app.post("/api/route", tags=["Routing"],
-          summary="Rute terpendek ke TES terdekat",
-          response_class=JSONResponse)
-async def post_route(body: RouteRequest):
-    """
-    Kembalikan GeoJSON LineString rute ke TES terdekat.
-    Endpoint ini TETAP mengembalikan GeoJSON â€” ukurannya kecil (satu garis, bukan 22.000 polygon).
-    """
+@app.get("/api/tes-layers", tags=["System"], summary="Titik TES per kategori (status aktif per level)")
+async def get_tes_layers(
+    level: Optional[str] = Query(None),
+    intensity: Optional[float] = Query(None, ge=0.0, le=1.0),
+    skenario: Optional[str] = Query(None),
+):
     _check_ready()
-    _validate_skenario(body.skenario)
-
-    logger.info(f"[POST /api/route] lat={body.lat} lng={body.lng} skenario={body.skenario}")
-    t_req = time.time()
-
-    origin_x, origin_y = _latlon_to_projected(body.lat, body.lng)
-
-    _, _, tes_sim, _ = simulate_hazard(
-        state.gdf_base,
-        state.roads_raw,
-        state.tes_raw, body.skenario, body.intensity, cfg,
-    )
-    tes_v, tes_stats = filter_tes(tes_sim, body.skenario, cfg)
-    G_use = nl_use = tn_use = None
-    if state.roads_raw is not None:
-        G_use, nl_use, tn_use = _get_or_build_graph(body.skenario, body.intensity)
-
-    try:
-        route_result = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: route_to_nearest_tes(
-                origin_x=origin_x, origin_y=origin_y, tes_v=tes_v, cfg=cfg,
-                G=G_use, nl=nl_use, tn=tn_use,
-                net=None, edge_df=None,
-                skenario=body.skenario, intensity=body.intensity, t_pen=None,
-            )
-        )
-    except Exception as e:
-        logger.error(f"[POST /api/route] Routing error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Routing error: {e}")
-
-    geojson_wgs84 = None
-    tes_coords_wgs84 = None
-
-    if route_result.get("path_coords"):
-        path_wgs84 = [list(_utm_to_wgs84.transform(xy[0], xy[1])) for xy in route_result["path_coords"]]
-        if len(path_wgs84) >= 2:
-            geojson_wgs84 = {
+    lv = _resolve_level(level, intensity)
+    tes_source = state.tes_raw
+    if lv["intensity"] > 0:
+        _, _, tes_source, _ = simulate_hazard(state.gdf_base, state.roads_raw, state.tes_raw,
+                                              T.SKENARIO, lv["intensity"], cfg)
+    features = []
+    counts = {}
+    for kat in cfg.kategori_fac:
+        tes_gdf = tes_source.get(kat)
+        if tes_gdf is None or tes_gdf.empty:
+            counts[kat] = 0
+            continue
+        counts[kat] = int(len(tes_gdf))
+        for idx, row in tes_gdf.to_crs("EPSG:4326").iterrows():
+            hazard = row.get(T.SKENARIO)
+            is_valid = int(hazard) < cfg.tes_hazard_threshold if pd.notna(hazard) else True
+            features.append({
                 "type": "Feature",
-                "geometry": {"type": "LineString", "coordinates": path_wgs84},
-                "properties": {
-                    "travel_time_min": route_result["travel_time_min"],
-                    "distance_m":      route_result["distance_m"],
-                    "tes_kategori":    route_result["tes_kategori"],
-                    "skenario":        body.skenario,
-                    "intensity":       body.intensity,
-                },
-            }
-
-    if route_result.get("tes_coords"):
-        lon, lat = _utm_to_wgs84.transform(route_result["tes_coords"][0], route_result["tes_coords"][1])
-        tes_coords_wgs84 = [lon, lat]
-
-    elapsed = round(time.time() - t_req, 2)
-    if not route_result["found"]:
-        raise HTTPException(status_code=404,
-            detail=f"Tidak ada rute dari ({body.lat:.4f},{body.lng:.4f}) ke TES manapun.")
-
+                "geometry": row.geometry.__geo_interface__,
+                "properties": {"id_tes": f"{kat}-{idx}", "kategori": kat, "name": _tes_name(row),
+                               "hazard": _sanitize(hazard), "is_valid": bool(is_valid)},
+            })
     return JSONResponse(content=_sanitize({
-        "status": "ok", "found": route_result["found"],
-        "travel_time_min": route_result["travel_time_min"],
-        "distance_m":      route_result["distance_m"],
-        "tes_kategori":    route_result["tes_kategori"],
-        "tes_coords_wgs84": tes_coords_wgs84,
-        "tes_stats":       tes_stats,
-        "elapsed_sec":     elapsed,
-        "geojson":         geojson_wgs84,
+        "status": "ok", "level": lv["key"], "counts": counts,
+        "geojson": {"type": "FeatureCollection", "features": features},
     }))
 
 
-# â”€â”€ 9.4 POST /api/route-all-tes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-@app.post("/api/route-all-tes", tags=["Routing"],
-          summary="Rute ke TES terdekat per 5 kategori, dengan simulasi jalan terputus",
-          response_class=JSONResponse)
-async def post_route_all_tes(body: RouteAllTesRequest):
-    """
-    Hitung rute terpendek dari satu titik asal ke TES terdekat di **setiap kategori**
-    (pendidikan, kesehatan, pemerintahan, ibadah, gor).
+_LEVEL_TES_CACHE: Dict[str, tuple] = {}
+_CSR_CACHE: Dict[int, tuple] = {}
 
-    User dapat mensimulasikan pemutusan jalan dengan mengirimkan `cut_roads` â€”
-    daftar titik yang dipilih sendiri di peta.
 
-    **Body JSON:**
-    ```json
-    {
-      "lat": -7.85, "lng": 110.20,
-      "skenario": "banjir", "intensity": 0.5,
-      "cut_roads": [{"lat": -7.84, "lng": 110.19}, ...]
-    }
-    ```
-
-    **Response:** dict `routes` berisi hasil per kategori:
-    ```json
-    {
-      "pendidikan": { "found": true, "travel_time_min": 12.3, "geojson": {...} },
-      "kesehatan":  { "found": false }
-    }
-    ```
-    """
-    _check_ready()
-    _validate_skenario(body.skenario)
-
-    logger.info(
-        f"[POST /api/route-all-tes] lat={body.lat} lng={body.lng} "
-        f"skenario={body.skenario} intensity={body.intensity} "
-        f"n_cut={len(body.cut_roads)}"
-    )
-    t_req = time.time()
-
-    origin_x, origin_y = _latlon_to_projected(body.lat, body.lng)
-    if body.id_grid is not None and state.gdf_base is not None:
-        grid_match = state.gdf_base[state.gdf_base["id_grid"] == int(body.id_grid)]
-        if not grid_match.empty:
-            row = grid_match.iloc[0]
-            if "cx" in grid_match.columns and "cy" in grid_match.columns:
-                origin_x, origin_y = float(row["cx"]), float(row["cy"])
-            else:
-                centroid = row.geometry.centroid
-                origin_x, origin_y = float(centroid.x), float(centroid.y)
-            logger.info(
-                f"[route-all-tes] origin dikunci ke centroid grid id_grid={int(body.id_grid)} "
-                f"({origin_x:.2f}, {origin_y:.2f})"
-            )
-    cut_roads_converted = _prepare_cut_roads(body.cut_roads)
-
-    # â”€â”€ Gunakan Cache Graph jika memungkinkan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    # Konversi cut_roads ke format yang bisa di-hash (tuple of sorted items)
-    # Gunakan frozenset agar urutan pemutusan jalan tidak mempengaruhi cache
-    cut_roads_tuple = []
-    for c in body.cut_roads:
-        d = c.dict(exclude_none=True)
-        # Konversi nested list (seperti edge_from) ke tuple agar hashable
-        hashable_item = tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in d.items()))
-        cut_roads_tuple.append(hashable_item)
-
-    cut_roads_fingerprint = frozenset(cut_roads_tuple)
-    cache_key = _route_all_graph_cache_key(body.skenario, body.intensity, cut_roads_fingerprint)
-    if cache_key in state.graph_cache:
-        G_use, nl_use, tn_use = state.graph_cache[cache_key]
-        state.graph_cache.pop(cache_key, None)
-        state.graph_cache[cache_key] = (G_use, nl_use, tn_use)
-        logger.info("[route-all-tes] Menggunakan Graph dari cache")
-    else:
-        # â”€â”€ Bangun graph sesuai skenario & intensitas saat ini â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-        G_use = nl_use = tn_use = None
-        
-        # Optimasi: Gunakan graph baseline jika intensity=0 dan tidak ada cut_roads
-        if body.intensity == 0.0 and not cut_roads_converted and body.skenario == "banjir" and state.nx_graph_base is not None:
-            G_use, nl_use, tn_use = state.nx_graph_base, state.nx_node_list, state.nx_kdtree
-        elif state.roads_raw is not None:
-            # Bangun graph sesuai kondisi (intensity/skenario mempengaruhi jalan yang putus)
-            G_use, nl_use, tn_use = _get_or_build_graph(body.skenario, body.intensity)
-            # Terapkan pemutusan jalan user jika ada
-            if cut_roads_converted:
-                G_use = apply_road_cuts_to_graph(G_use, nl_use, tn_use, cut_roads_converted, cfg)
-        
-        if G_use is None:
-            G_use, nl_use, tn_use = state.nx_graph_base, state.nx_node_list, state.nx_kdtree
-
-        _remember_graph_cache(cache_key, (G_use, nl_use, tn_use))
-        logger.info("[route-all-tes] Graph baru dibuat dan disimpan ke cache")
-    _, _, tes_sim, _ = simulate_hazard(
-        state.gdf_base,
-        state.roads_raw,
-        state.tes_raw, body.skenario, body.intensity, cfg,
-    )
-    tes_v_all, tes_stats = filter_tes(tes_sim, body.skenario, cfg)
-
-    # â”€â”€ Snap origin ke jalan terdekat (1000m) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    origin_node = _snap(G_use, tn_use, nl_use, [origin_x, origin_y], max_snap=1000)
-    
-    t_pen = state.baseline_params.get(body.skenario, {}).get("t_pen")
-
-    # â”€â”€ Jalankan routing (Optimized: Dijkstra 1x untuk semua kategori) â”€â”€â”€â”€â”€â”€â”€â”€
-    def _route_all_optimized():
-        import networkx as nx
-        routes = {}
-        
-        # 1. Dijkstra 1x dari origin ke semua node
-        try:
-            lengths, paths = nx.single_source_dijkstra(G_use, origin_node, weight="weight")
-        except Exception as e:
-            logger.error(f"[route-all-tes] Dijkstra gagal: {e}")
-            return {kat: {"found": False} for kat in cfg.kategori_fac}
-
-        # 2. Cari TES terdekat per kategori
-        name_cols = ["Nama_Objek", "nama", "Nama", "NAMA", "Name", "NAME", "REMARK", "Fasilitas", "KETERANGAN", "NAMA_UNSUR"]
-
-        for kat in cfg.kategori_fac:
-            # Filter TES kategori ini
-            tes_v_kat = tes_v_all[tes_v_all["kategori"] == kat]
-            if tes_v_kat.empty:
-                routes[kat] = {"found": False}
-                continue
-
-            # Snap & Cari minimum distance
-            best_d = float('inf')
-            best_node = None
-            tes_geom_map = {}
-            tes_name_map = {}
-
-            for _, row in tes_v_kat.iterrows():
-                # Gunakan radius 1000m untuk TES agar tidak gagal di area rural
-                nd = _snap(G_use, tn_use, nl_use, [row.geometry.x, row.geometry.y], max_snap=1000)
+def _level_tes_cache(lv: dict):
+    """TES valid + simpul jaringan terdekatnya per level (dihitung sekali per level)."""
+    key = lv["key"]
+    if key not in _LEVEL_TES_CACHE:
+        _, _, tes_sim, _ = simulate_hazard(state.gdf_base, state.roads_raw, state.tes_raw,
+                                           T.SKENARIO, lv["intensity"], cfg)
+        tes_v_all, tes_stats = filter_tes(tes_sim, T.SKENARIO, cfg)
+        G, nl, tn = _get_or_build_graph(lv["intensity"])
+        entries = []
+        if tes_v_all is not None:
+            for _, row in tes_v_all.iterrows():
+                nd = _snap(G, tn, nl, [row.geometry.x, row.geometry.y], max_snap=1000)
                 if nd:
-                    tes_geom_map[nd] = (row.geometry.x, row.geometry.y)
-                    # Cari nama
-                    name = "Fasilitas TES"
-                    for c in name_cols:
-                        if c in row.index and pd.notna(row[c]):
-                            name = str(row[c])
-                            break
-                    tes_name_map[nd] = name
-                    
-                    d = lengths.get(nd, float('inf'))
-                    if d < best_d:
-                        best_d = d
-                        best_node = nd
+                    entries.append({"kat": row["kategori"], "node": nd, "name": _tes_name(row),
+                                    "xy": (float(row.geometry.x), float(row.geometry.y))})
+        _LEVEL_TES_CACHE[key] = (tes_v_all, tes_stats, entries)
+    return _LEVEL_TES_CACHE[key]
 
-            if best_node is None or best_d == float('inf'):
+
+def _graph_csr(G):
+    """Matriks CSR + indeks simpul untuk graf jalan (di-cache per objek graf)."""
+    hit = _CSR_CACHE.get(id(G))
+    if hit is not None and hit[0] is G:
+        return hit[1:]
+    nodes = list(G.nodes())
+    csr = nx.to_scipy_sparse_array(G, nodelist=nodes, weight="weight", format="csr")
+    index = {n: i for i, n in enumerate(nodes)}
+    _CSR_CACHE[id(G)] = (G, csr, nodes, index)
+    while len(_CSR_CACHE) > 8:
+        _CSR_CACHE.pop(next(iter(_CSR_CACHE)))
+    return csr, nodes, index
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. ROUTING — rute ke TES terdekat per kategori
+# ══════════════════════════════════════════════════════════════════════════════
+@app.post("/api/route-all-tes", tags=["Routing"],
+          summary="Rute ke TES terdekat per 5 kategori pada level terpilih (+ blokir jalan)")
+async def post_route_all_tes(body: RouteAllTesRequest):
+    _check_ready()
+    lv = _resolve_level(body.level, body.intensity)
+    t_req = time.time()
+
+    origin_x, origin_y = _latlon_to_projected(body.lat, body.lng)
+    if body.id_grid is not None:
+        match = state.gdf_base[state.gdf_base["id_grid"] == int(body.id_grid)]
+        if not match.empty:
+            origin_x, origin_y = float(match.iloc[0]["cx"]), float(match.iloc[0]["cy"])
+
+    cuts = _prepare_cut_roads(body.cut_roads)
+    fingerprint = frozenset(
+        tuple(sorted((k, tuple(v) if isinstance(v, list) else v) for k, v in c.dict(exclude_none=True).items()))
+        for c in body.cut_roads
+    )
+    key = ("route_graph", lv["intensity"], fingerprint)
+    if key in state.graph_cache:
+        G_use, nl_use, tn_use = state.graph_cache[key]
+    else:
+        G_use, nl_use, tn_use = _get_or_build_graph(lv["intensity"])
+        if cuts:
+            G_use = apply_road_cuts_to_graph(G_use, nl_use, tn_use, cuts, cfg)
+            _remember_graph_cache(key, (G_use, nl_use, tn_use))
+
+    tes_v_all, tes_stats, tes_entries = _level_tes_cache(lv)
+    origin_node = _snap(G_use, tn_use, nl_use, [origin_x, origin_y], max_snap=1000)
+    speed = cfg.walking_speed_m_per_min
+
+    def _route_all():
+        """Dijkstra satu sumber (scipy, CSR ter-cache) lalu rekonstruksi jalur
+        hanya ke TES terdekat per kategori — jauh lebih cepat daripada
+        menyimpan jalur ke seluruh simpul jaringan."""
+        if origin_node is None or tes_v_all is None:
+            return {kat: {"found": False} for kat in cfg.kategori_fac}
+        csr, nodes, index = _graph_csr(G_use)
+        src = index.get(origin_node)
+        if src is None:
+            return {kat: {"found": False} for kat in cfg.kategori_fac}
+        dist, pred = csgraph_dijkstra(csr, directed=False, indices=src, return_predecessors=True)
+        routes = {}
+        for kat in cfg.kategori_fac:
+            best_d, best = float("inf"), None
+            for e in tes_entries:
+                if e["kat"] != kat:
+                    continue
+                j = index.get(e["node"])
+                if j is not None and dist[j] < best_d:
+                    best_d, best = float(dist[j]), (j, e)
+            if best is None or not np.isfinite(best_d):
                 routes[kat] = {"found": False}
                 continue
-
-            # Rekonstruksi rute
-            path_nodes = paths.get(best_node, [])
-            path_coords = [[float(n[0]), float(n[1])] for n in path_nodes]
-            
-            # Failsafe: Pastikan rute memiliki minimal 2 titik agar bisa dirender sebagai LineString
-            if not path_coords:
-                path_coords = [[origin_x, origin_y], [tes_geom_map[best_node][0], tes_geom_map[best_node][1]]]
-            elif len(path_coords) == 1:
-                path_coords = [[origin_x, origin_y]] + path_coords
+            j, e = best
+            chain = [j]
+            while chain[-1] != src and pred[chain[-1]] >= 0:
+                chain.append(int(pred[chain[-1]]))
+            coords = [[float(nodes[i][0]), float(nodes[i][1])] for i in reversed(chain)]
+            if len(coords) < 2:
+                coords = [[origin_x, origin_y], list(e["xy"])]
             else:
-                path_coords[0] = [origin_x, origin_y]
-                path_coords[-1] = list(tes_geom_map[best_node])
-
-            # Konversi rute ke WGS84
-            path_wgs84 = [list(_utm_to_wgs84.transform(xy[0], xy[1])) for xy in path_coords]
-            geojson_wgs84 = {
-                "type": "Feature",
-                "geometry": {"type": "LineString", "coordinates": path_wgs84},
-                "properties": {
-                    "kategori": kat,
-                    "travel_time_min": round(best_d / cfg.walking_speed_m_per_min, 2),
-                    "tes_name": tes_name_map.get(best_node, "Fasilitas TES")
-                },
-            }
-
-            lon, lat = _utm_to_wgs84.transform(tes_geom_map[best_node][0], tes_geom_map[best_node][1])
+                coords[0] = [origin_x, origin_y]
+                coords[-1] = list(e["xy"])
+            path_wgs = [list(_utm_to_wgs84.transform(x, y)) for x, y in coords]
+            lon, lat = _utm_to_wgs84.transform(*e["xy"])
+            t_min = round(best_d / speed, 2)
             routes[kat] = {
-                "found": True,
-                "travel_time_min": round(best_d / cfg.walking_speed_m_per_min, 2),
-                "distance_m": round(best_d, 1),
-                "tes_kategori": kat,
-                "tes_name": tes_name_map.get(best_node, "Fasilitas TES"),
-                "tes_coords_wgs84": [lon, lat],
-                "geojson": geojson_wgs84,
+                "found": True, "travel_time_min": t_min, "distance_m": round(best_d, 1),
+                "tes_kategori": kat, "tes_name": e["name"], "tes_coords_wgs84": [lon, lat],
+                "geojson": {"type": "Feature", "geometry": {"type": "LineString", "coordinates": path_wgs},
+                            "properties": {"kategori": kat, "travel_time_min": t_min}},
             }
         return routes
 
     try:
-        routes = await asyncio.get_event_loop().run_in_executor(None, _route_all_optimized)
+        routes = await asyncio.get_event_loop().run_in_executor(None, _route_all)
     except Exception as e:
-        logger.error(f"[POST /api/route-all-tes] Error: {e}", exc_info=True)
+        logger.error(f"[route-all-tes] Error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Routing error: {e}")
 
-    elapsed = round(time.time() - t_req, 2)
-    logger.info(f"[POST /api/route-all-tes] selesai {elapsed}s | n_cut={len(body.cut_roads)}")
-
-    # â”€â”€ Deteksi Isolasi & Rekomendasi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Rekomendasi bila grid terisolasi total ────────────────────────────────
     recommendations = []
     found_count = sum(1 for r in routes.values() if r["found"])
-    
-    if found_count == 0:
-        logger.info("[route-all-tes] Deteksi isolasi total. Mencari rekomendasi...")
-        origin_grid_id = int(body.id_grid) if body.id_grid is not None else None
-        # 1. Temukan semua node yang bisa mencapai TES manapun di G_use
-        all_tes_nodes = []
-        for kat in cfg.kategori_fac:
-            tes_v_kat = tes_v_all[tes_v_all["kategori"] == kat]
-            for _, row in tes_v_kat.iterrows():
-                nd = _snap(G_use, tn_use, nl_use, [row.geometry.x, row.geometry.y], max_snap=1000)
-                if nd: all_tes_nodes.append(nd)
-        
-        if all_tes_nodes:
-            # Dijkstra terbalik: Dari semua TES ke seluruh node
+    if found_count == 0 and tes_v_all is not None and G_use is not None:
+        tes_nodes = [e["node"] for e in tes_entries if e["node"] in G_use]
+        if tes_nodes:
             try:
-                # lengths[node] = jarak ke TES terdekat
-                import networkx as nx
-                reachable_lengths = nx.multi_source_dijkstra_path_length(G_use, all_tes_nodes, weight="weight")
-                
-                # 2. Cari kandidat node terdekat dari origin_x, origin_y (Euclidean)
-                # Kita ambil subset node yang reachable dan hitung jarak Euclidean-nya
-                candidates = []
-                r_nodes = list(reachable_lengths.keys())
-                r_coords = np.array(r_nodes) # [[x, y], ...]
-                
-                # Jarak Euclidean ke origin
-                euc_dists = np.hypot(r_coords[:, 0] - origin_x, r_coords[:, 1] - origin_y)
-                
-                # Ambil misal 100 node terdekat secara Euclidean untuk dievaluasi kualitasnya
-                top_idx = np.argsort(euc_dists)[:100]
-                
-                for idx in top_idx:
+                reach = nx.multi_source_dijkstra_path_length(G_use, tes_nodes, weight="weight")
+                r_nodes = list(reach.keys())
+                r_xy = np.array(r_nodes)
+                euc = np.hypot(r_xy[:, 0] - origin_x, r_xy[:, 1] - origin_y)
+                cands = []
+                origin_geom = None
+                if body.id_grid is not None:
+                    m = state.gdf_base[state.gdf_base["id_grid"] == int(body.id_grid)]
+                    origin_geom = m.iloc[0].geometry if not m.empty else None
+                for idx in np.argsort(euc)[:100]:
                     node = r_nodes[idx]
-                    dist_euc = euc_dists[idx]
-                    dist_to_tes = reachable_lengths[node]
-
-                    if origin_grid_id is not None and state.gdf_base is not None:
-                        node_point = Point(float(node[0]), float(node[1]))
-                        same_grid = state.gdf_base[
-                            (state.gdf_base["id_grid"] == origin_grid_id) &
-                            state.gdf_base.geometry.covers(node_point)
-                        ]
-                        if not same_grid.empty:
-                            continue
-                     
-                    # 3. Hitung skor kualitas (0-100)
-                    # Faktor A: Kedekatan ke TES (waktu tempuh)
-                    time_to_tes = dist_to_tes / cfg.walking_speed_m_per_min
-                    score_time = max(0, 100 * (1 - time_to_tes / 60)) # 60 menit sebagai penalti max
-                    
-                    # Faktor B: Cluster Rank (jika ada)
-                    score_cluster = 50 # default
-                    # Cari id_grid dari node ini (pencarian terdekat di state.gdf_base)
-                    if state.nx_kdtree is not None:
-                        # Ini node graph, kita cari grid terdekatnya
-                        # Tapi lebih akurat kalau kita simpan mapping node -> grid di startup
-                        # Untuk sekarang, kita gunakan Euclidean ke centroid grid
-                        pass
-
-                    total_score = round(score_time, 1)
-                    
-                    candidates.append({
-                        "node": node,
-                        "dist_euc": dist_euc,
-                        "score": total_score,
-                        "time_to_tes": round(time_to_tes, 1)
-                    })
-                
-                # 4. Pilih level rekomendasi: Terdekat dan Terbaik
-                candidates.sort(key=lambda x: x["dist_euc"])
-                
-                if candidates:
-                    # Level 1: Terdekat - "Pekat"
-                    c1 = candidates[0]
-                    lon1, lat1 = _utm_to_wgs84.transform(c1["node"][0], c1["node"][1])
-                    recommendations.append({
-                        "level": "Sub-Optimal",
-                        "lat": lat1, "lng": lon1,
-                        "dist_m": round(c1["dist_euc"], 1),
-                        "score": c1["score"],
-                        "desc": "Akses Terdekat",
-                        "color_type": "pekat"
-                    })
-                    
-                    # Level 2: Cari yang skornya tertinggi (Akses Terbaik)
-                    c_best = max(candidates, key=lambda x: x["score"])
-                    
-                    # Jika c_best jauh lebih baik atau lokasinya cukup berbeda dari c1
-                    if c_best["score"] > c1["score"] + 2 or c_best["dist_euc"] > c1["dist_euc"] + 20:
-                        lon2, lat2 = _utm_to_wgs84.transform(c_best["node"][0], c_best["node"][1])
-                        recommendations.append({
-                            "level": "Optimal",
-                            "lat": lat2, "lng": lon2,
-                            "dist_m": round(c_best["dist_euc"], 1),
-                            "score": c_best["score"],
-                            "desc": "Area Terhubung",
-                            "color_type": "gradient" # Label khusus untuk frontend
-                        })
+                    if origin_geom is not None and origin_geom.covers(Point(node)):
+                        continue
+                    t_tes = reach[node] / speed
+                    cands.append({"node": node, "dist_euc": float(euc[idx]),
+                                  "score": round(max(0.0, 100 * (1 - t_tes / 60)), 1)})
+                if cands:
+                    c1 = cands[0]
+                    lon1, lat1 = _utm_to_wgs84.transform(*c1["node"])
+                    recommendations.append({"level": "Sub-Optimal", "lat": lat1, "lng": lon1,
+                                            "dist_m": round(c1["dist_euc"], 1), "score": c1["score"],
+                                            "desc": "Akses Terdekat", "color_type": "pekat"})
+                    cb = max(cands, key=lambda c: c["score"])
+                    if cb["score"] > c1["score"] + 2 or cb["dist_euc"] > c1["dist_euc"] + 20:
+                        lon2, lat2 = _utm_to_wgs84.transform(*cb["node"])
+                        recommendations.append({"level": "Optimal", "lat": lat2, "lng": lon2,
+                                                "dist_m": round(cb["dist_euc"], 1), "score": cb["score"],
+                                                "desc": "Area Terhubung", "color_type": "gradient"})
             except Exception as e:
                 logger.error(f"[recommendation] Gagal: {e}")
 
     return JSONResponse(content=_sanitize({
-        "status": "ok",
-        "origin_lat": body.lat, "origin_lng": body.lng,
-        "skenario": body.skenario, "intensity": body.intensity,
-        "n_cut_roads": len(body.cut_roads),
-        "tes_stats": tes_stats,
-        "found_count": found_count,
-        "elapsed_sec": elapsed,
-        "routes": routes,
-        "recommendations": recommendations # â† BARU
+        "status": "ok", "level": lv["key"], "n_cut_roads": len(body.cut_roads),
+        "tes_stats": tes_stats, "found_count": found_count,
+        "elapsed_sec": round(time.time() - t_req, 2),
+        "routes": routes, "recommendations": recommendations,
     }))
 
 
-# â”€â”€ 9.5 POST /api/roads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-@app.post("/api/roads", tags=["System"], summary="Ambil data jalan dengan info keterputusan")
+@app.post("/api/roads", tags=["System"], summary="Jaringan jalan dengan status terputus per level")
 async def post_roads(body: RoadRequest):
-    """
-    Mengembalikan data jalan (GeoJSON) dengan atribut 'is_broken'.
-    - is_broken = true jika terdampak bahaya (intensity)
-    - is_broken = true jika dekat dengan titik cut_roads dari user.
-    """
     _check_ready()
     if state.roads_raw is None:
         raise HTTPException(status_code=404, detail="Data jalan tidak tersedia")
-
-    hc = cfg.hazard_col_map.get(body.skenario, body.skenario)
+    lv = _resolve_level(body.level, body.intensity)
     roads_sim = state.roads_raw.copy()
-
-    # 1. Tandai yang putus karena bahaya
-    # Sesuai logika build_road_graph: intensity * norm_haz >= threshold
     roads_sim["is_broken"] = False
-    if hc in roads_sim.columns:
-        haz_vals = roads_sim[hc].apply(lambda x: cfg.norm_haz(int(x))).values
-        impact = haz_vals * body.intensity
-        roads_sim.loc[impact >= cfg.impact_closure_threshold, "is_broken"] = True
+    if T.SKENARIO in roads_sim.columns:
+        haz = roads_sim[T.SKENARIO].fillna(0).astype(int).map(cfg.norm_haz).values
+        roads_sim.loc[haz * lv["intensity"] >= cfg.impact_closure_threshold, "is_broken"] = True
 
-    # 2. Tandai yang putus karena user-cut
     if body.cut_roads:
-        # Konversi cut_roads (WGS84) ke CRS target (UTM)
-        from shapely.geometry import Point
-        from pyproj import Transformer
-        
-        transformer = Transformer.from_crs("EPSG:4326", cfg.target_crs, always_xy=True)
-        cut_points = []
-        for c in body.cut_roads:
-            tx, ty = transformer.transform(c["lng"], c["lat"])
-            cut_points.append(Point(tx, ty))
-        
-        # Cari jalan yang dekat dengan titik cut (misal radius 10 meter)
-        # Gunakan buffer + intersection atau sjoin_nearest
-        if cut_points:
-            cut_gdf = gpd.GeoDataFrame(geometry=cut_points, crs=cfg.target_crs)
-            # Find roads within 50m of any cut point
-            # sjoin_nearest with max_distance is good
+        pts = [Point(*_latlon_to_projected(c["lat"], c["lng"])) for c in body.cut_roads
+               if "lat" in c and "lng" in c]
+        if pts:
+            cut_gdf = gpd.GeoDataFrame(geometry=pts, crs=cfg.target_crs)
             res = gpd.sjoin_nearest(roads_sim, cut_gdf, max_distance=50, how="inner")
             if not res.empty:
-                roads_sim.loc[res.index, "is_broken"] = True
+                roads_sim.loc[res.index.unique(), "is_broken"] = True
 
-    # 3. Kembalikan hasil (Optimized)
     if not body.full:
-        # Hanya kembalikan list index yang is_broken
-        broken_indices = roads_sim.index[roads_sim["is_broken"]].tolist()
-        return JSONResponse(content={
-            "status": "ok",
-            "broken_ids": broken_indices,
-            "n_total": len(roads_sim)
-        })
-
-    # Jika full=true, export GeoJSON lengkap (hanya untuk loading awal)
+        return JSONResponse(content={"status": "ok", "level": lv["key"],
+                                     "broken_ids": roads_sim.index[roads_sim["is_broken"]].tolist(),
+                                     "n_total": len(roads_sim)})
     roads_sim["geometry"] = roads_sim.geometry.simplify(0.0001, preserve_topology=True)
     roads_wgs = roads_sim.to_crs("EPSG:4326")
-    
-    # Tambahkan index sebagai id_jalan agar sinkron dengan broken_ids
     roads_wgs["id_jalan"] = roads_wgs.index
-    
-    cols = ["geometry", "is_broken", "id_jalan"]
-    if "name" in roads_wgs.columns: cols.append("name")
-    
+    cols = ["geometry", "is_broken", "id_jalan"] + (["name"] if "name" in roads_wgs.columns else [])
     return JSONResponse(content=json.loads(roads_wgs[cols].to_json()))
 
 
-# â”€â”€ 9.6 GET /api/skenario-info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-@app.get("/api/skenario-info", tags=["System"])
-async def get_skenario_info():
-    _check_ready()
-    info = {}
-    for skenario in cfg.skenario_list:
-        tes_v, tes_stats = filter_tes(state.tes_raw, skenario, cfg)
-        info[skenario] = {
-            "tes_stats":        tes_stats,
-            "k_optimal":        state.baseline_params.get(skenario, {}).get("k", None),
-            "t_pen":            state.baseline_params.get(skenario, {}).get("t_pen", None),
-            "intensity_levels": cfg.intensity_levels,
-        }
-    return {"status": "ok", "skenario_info": info}
+# ══════════════════════════════════════════════════════════════════════════════
+# 7. ADMINISTRASI & PENCARIAN
+# ══════════════════════════════════════════════════════════════════════════════
+def _admin_name_col(gdf: gpd.GeoDataFrame, kind: str) -> Optional[str]:
+    if kind == "kapanewon":
+        return "WADMKC" if "WADMKC" in gdf.columns else next(
+            (c for c in ["NAMOBJ", "KECAMATAN", "NAMA"] if c in gdf.columns), None)
+    return "WADMKD" if "WADMKD" in gdf.columns else next(
+        (c for c in ["NAMOBJ", "WADMKE", "DESA", "NAMA"] if c in gdf.columns), None)
 
 
-def _load_admin_gdf(file_name: str, primary_name_col: str, fallback_cols: List[str]) -> gpd.GeoDataFrame:
-    file_path = Path(DATA_DIR) / file_name
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"File GPKG tidak ditemukan: {file_path}")
-
-    gdf = gpd.read_file(file_path).to_crs("EPSG:4326")
-    name_col = primary_name_col if primary_name_col in gdf.columns else next((c for c in fallback_cols if c in gdf.columns), None)
-    if not name_col:
+def _load_admin_gdf(file_name: str, kind: str) -> gpd.GeoDataFrame:
+    path = Path(DATA_DIR) / file_name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"File GPKG tidak ditemukan: {path}")
+    gdf = gpd.read_file(path).to_crs("EPSG:4326")
+    col = _admin_name_col(gdf, kind)
+    if not col:
         raise HTTPException(status_code=500, detail=f"Kolom nama tidak ditemukan di {file_name}")
-
-    out = gdf[[name_col, "geometry"]].copy()
-    out = out.rename(columns={name_col: "name"})
+    out = gdf[[col, "geometry"]].rename(columns={col: "name"})
     out["geometry"] = out.geometry.simplify(0.0002, preserve_topology=True)
     return out
 
 
-@app.get("/api/admin-layers", tags=["System"], summary="Ambil layer administrasi Kulon Progo")
+@app.get("/api/admin-layers", tags=["System"], summary="Layer administrasi Kulon Progo")
 async def get_admin_layers():
-    try:
-        kec = _load_admin_gdf("KulonProgo_Kec.gpkg", "WADMKC", ["NAMOBJ", "KECAMATAN", "NAMA"])
-        desa = _load_admin_gdf("KulonProgo_Desa.gpkg", "WADMKD", ["NAMOBJ", "WADMKE", "DESA", "NAMA"])
-        return JSONResponse(content={
-            "status": "ok",
-            "kecamatan": json.loads(kec.to_json()),
-            "desa": json.loads(desa.to_json()),
-        })
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error loading admin layers: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    kec = _load_admin_gdf("KulonProgo_Kec.gpkg", "kapanewon")
+    desa = _load_admin_gdf("KulonProgo_Desa.gpkg", "kalurahan")
+    return JSONResponse(content={"status": "ok", "kecamatan": json.loads(kec.to_json()),
+                                 "desa": json.loads(desa.to_json())})
+
 
 @app.get("/api/boundary", tags=["Search"])
 async def get_boundary(name: str, type: str):
-    """
-    Ambil boundary GeoJSON dari file GPKG lokal berdasarkan nama dan tipe (kapanewon/kalurahan).
-    """
-    try:
-        file_path = Path(DATA_DIR) / ("KulonProgo_Kec.gpkg" if type == "kapanewon" else "KulonProgo_Desa.gpkg")
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail=f"File GPKG tidak ditemukan: {file_path}")
-            
-        gdf = gpd.read_file(file_path)
-        
-        # Cari kolom nama yang sesuai (prioritaskan WADMKC/WADMKD sesuai permintaan user)
-        if type == "kapanewon":
-            target_col = "WADMKC" if "WADMKC" in gdf.columns else next((c for c in ["NAMOBJ", "KECAMATAN", "NAMA"] if c in gdf.columns), None)
-        else:
-            target_col = "WADMKD" if "WADMKD" in gdf.columns else next((c for c in ["NAMOBJ", "WADMKE", "DESA", "NAMA"] if c in gdf.columns), None)
-        
-        if not target_col:
-            raise HTTPException(status_code=500, detail=f"Kolom nama tidak ditemukan di {file_path.name}. Columns: {list(gdf.columns)}")
-            
-        # Filter (exact match prioritized to avoid ambiguity between village/district with same name)
-        search_name = name.replace("Kelurahan ", "").replace("Desa ", "").replace("Kecamatan ", "").strip()
-        
-        # Try exact match first to avoid pulling partial matches that might hide the intended result
-        match = gdf[gdf[target_col].str.lower() == search_name.lower()]
-        
-        # If no exact match, try contains (fallback)
-        if match.empty:
-            match = gdf[gdf[target_col].str.contains(search_name, case=False, na=False)]
-            
-        if match.empty:
-            raise HTTPException(status_code=404, detail=f"Wilayah '{search_name}' ({type}) tidak ditemukan di {file_path.name}")
-            
-        # Convert to GeoJSON (first match)
-        res_gdf = match.iloc[[0]].to_crs("EPSG:4326")
-        return JSONResponse(content=json.loads(res_gdf.to_json()))
-        
-    except Exception as e:
-        logger.error(f"Error fetching boundary for {name}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    path = Path(DATA_DIR) / ("KulonProgo_Kec.gpkg" if type == "kapanewon" else "KulonProgo_Desa.gpkg")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"File GPKG tidak ditemukan: {path}")
+    gdf = gpd.read_file(path)
+    col = _admin_name_col(gdf, type)
+    if not col:
+        raise HTTPException(status_code=500, detail=f"Kolom nama tidak ditemukan di {path.name}")
+    search = name.replace("Kelurahan ", "").replace("Desa ", "").replace("Kecamatan ", "").strip()
+    match = gdf[gdf[col].str.lower() == search.lower()]
+    if match.empty:
+        match = gdf[gdf[col].str.contains(search, case=False, na=False)]
+    if match.empty:
+        raise HTTPException(status_code=404, detail=f"Wilayah '{search}' ({type}) tidak ditemukan")
+    return JSONResponse(content=json.loads(match.iloc[[0]].to_crs("EPSG:4326").to_json()))
 
 
 @app.get("/api/search-list", tags=["Search"])
 async def get_search_list():
-    """
-    Kembalikan daftar lengkap wilayah dari GPKG untuk sinkronisasi KULON_PROGO_LIST.
-    """
-    try:
-        kec_path = Path(DATA_DIR) / "KulonProgo_Kec.gpkg"
-        desa_path = Path(DATA_DIR) / "KulonProgo_Desa.gpkg"
-        
-        results = []
-        
-        if kec_path.exists():
-            gdf = gpd.read_file(kec_path)
-            # Prioritaskan WADMKC
-            col = "WADMKC" if "WADMKC" in gdf.columns else next((c for c in ["NAMOBJ", "KECAMATAN", "NAMA"] if c in gdf.columns), None)
-            if col:
-                names = sorted([str(n) for n in gdf[col].unique() if pd.notna(n)])
-                for n in names:
-                    results.append({"name": n, "type": "kapanewon", "desc": "Kecamatan di Kulon Progo"})
-                    
-        if desa_path.exists():
-            gdf = gpd.read_file(desa_path)
-            # Prioritaskan WADMKD
-            col = "WADMKD" if "WADMKD" in gdf.columns else next((c for c in ["NAMOBJ", "WADMKE", "DESA", "NAMA"] if c in gdf.columns), None)
-            # Kolom kecamatan (parent) untuk deskripsi
-            kec_col = "WADMKC" if "WADMKC" in gdf.columns else next((c for c in ["KECAMATAN"] if c in gdf.columns), None)
-            
-            if col:
-                # Gunakan data lengkap agar deskripsi kecamatan akurat
-                for _, row in gdf.iterrows():
-                    parent = row[kec_col] if kec_col in row and pd.notna(row[kec_col]) else "Kulon Progo"
-                    results.append({
-                        "name": str(row[col]),
-                        "type": "kalurahan",
-                        "desc": f"Kalurahan di {parent}"
-                    })
-                    
-        return {"status": "ok", "results": results}
-    except Exception as e:
-        logger.error(f"Error building search list: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    results = []
+    kec_path = Path(DATA_DIR) / "KulonProgo_Kec.gpkg"
+    desa_path = Path(DATA_DIR) / "KulonProgo_Desa.gpkg"
+    if kec_path.exists():
+        gdf = gpd.read_file(kec_path)
+        col = _admin_name_col(gdf, "kapanewon")
+        if col:
+            for n in sorted(str(n) for n in gdf[col].unique() if pd.notna(n)):
+                results.append({"name": n, "type": "kapanewon", "desc": "Kecamatan di Kulon Progo"})
+    if desa_path.exists():
+        gdf = gpd.read_file(desa_path)
+        col = _admin_name_col(gdf, "kalurahan")
+        kec_col = "WADMKC" if "WADMKC" in gdf.columns else ("KECAMATAN" if "KECAMATAN" in gdf.columns else None)
+        if col:
+            for _, row in gdf.iterrows():
+                parent = row[kec_col] if kec_col and pd.notna(row[kec_col]) else "Kulon Progo"
+                results.append({"name": str(row[col]), "type": "kalurahan", "desc": f"Kalurahan di {parent}"})
+    return {"status": "ok", "results": results}
 
 
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-# 10. ENTRYPOINT
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# ══════════════════════════════════════════════════════════════════════════════
+# 8. BATAS WILAYAH & GEOCODING ALAMAT
+# ══════════════════════════════════════════════════════════════════════════════
+import threading
+import urllib.parse
+import urllib.request
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
+
+GEOCODE_UA = "KulonProgo-TES-Dashboard/1.0 (skripsi aksesibilitas TES banjir)"
+# Kotak pencarian: Kulon Progo + sekitarnya (DIY/Purworejo) agar hasil relevan
+GEOCODE_BBOX = (109.95, -8.05, 110.45, -7.55)          # lon_min, lat_min, lon_max, lat_max
+_ADMIN_CACHE: Dict[str, Any] = {}
+_GEOCODE_CACHE: "OrderedDict[tuple, list]" = OrderedDict()
+_NOMINATIM_LOCK = threading.Lock()
+_NOMINATIM_LAST = [0.0]
+
+
+def _admin_frames():
+    """Desa (88), kecamatan (12) dan kabupaten (hasil dissolve) dalam EPSG:4326."""
+    if "frames" in _ADMIN_CACHE:
+        return _ADMIN_CACHE["frames"]
+    desa = gpd.read_file(Path(DATA_DIR) / "KulonProgo_Desa.gpkg").to_crs("EPSG:4326")
+    desa = desa[["WADMKD", "WADMKC", "geometry"]].rename(columns={"WADMKD": "desa", "WADMKC": "kecamatan"})
+    desa["geometry"] = desa.geometry.buffer(0)
+    kec = desa.dissolve(by="kecamatan", as_index=False)[["kecamatan", "geometry"]]
+    kab = gpd.GeoDataFrame({"kabupaten": ["Kulon Progo"]},
+                           geometry=[desa.geometry.union_all().buffer(0)], crs="EPSG:4326")
+    _ADMIN_CACHE["frames"] = (kab, kec, desa)
+    return _ADMIN_CACHE["frames"]
+
+
+def _boundary_fc(gdf: gpd.GeoDataFrame, name_col: str, tol: float, extra: Optional[List[str]] = None) -> dict:
+    feats = []
+    for _, row in gdf.iterrows():
+        geom = row.geometry.simplify(tol, preserve_topology=True)
+        lab = row.geometry.representative_point()
+        props = {"name": str(row[name_col]), "label": [round(lab.x, 6), round(lab.y, 6)]}
+        for c in extra or []:
+            props[c] = str(row[c])
+        feats.append({"type": "Feature", "properties": props, "geometry": geom.__geo_interface__})
+    return {"type": "FeatureCollection", "features": feats}
+
+
+@app.get("/api/admin-boundaries", tags=["Wilayah"], summary="Batas kabupaten, kecamatan (kapanewon), desa (kalurahan)")
+async def get_admin_boundaries():
+    if "boundaries" not in _ADMIN_CACHE:
+        kab, kec, desa = _admin_frames()
+        _ADMIN_CACHE["boundaries"] = _sanitize({
+            "status": "ok",
+            "kabupaten": _boundary_fc(kab, "kabupaten", 0.0002),
+            "kecamatan": _boundary_fc(kec, "kecamatan", 0.0002),
+            "desa": _boundary_fc(desa, "desa", 0.0001, extra=["kecamatan"]),
+        })
+    return JSONResponse(content=_ADMIN_CACHE["boundaries"])
+
+
+@app.get("/api/grid-admin", tags=["Wilayah"], summary="Desa & kecamatan untuk setiap id_grid (ringkas)")
+async def get_grid_admin():
+    _check_ready()
+    if "grid_admin" not in _ADMIN_CACHE:
+        _, _, desa = _admin_frames()
+        pts = gpd.GeoDataFrame({"id_grid": state.gdf_base["id_grid"].values},
+                               geometry=gpd.points_from_xy(state.gdf_base["cx"], state.gdf_base["cy"]),
+                               crs=cfg.target_crs)
+        desa_utm = desa.reset_index(names="desa_idx").to_crs(cfg.target_crs)
+        j = gpd.sjoin_nearest(pts, desa_utm[["desa_idx", "geometry"]], how="left", max_distance=500)
+        j = j[~j.index.duplicated()]
+        _ADMIN_CACHE["grid_admin"] = {
+            "status": "ok",
+            "desa": desa[["desa", "kecamatan"]].values.tolist(),   # [[desa, kecamatan], ...]
+            "grid": {str(int(g)): (int(i) if pd.notna(i) else None) for g, i in zip(j["id_grid"], j["desa_idx"])},
+        }
+    return JSONResponse(content=_ADMIN_CACHE["grid_admin"])
+
+
+def _locate_admin(lon: float, lat: float) -> dict:
+    kab, _, desa = _admin_frames()
+    pt = Point(lon, lat)
+    hit = desa[desa.contains(pt)]
+    return {
+        "in_kulon_progo": bool(kab.geometry.iloc[0].contains(pt)),
+        "desa": None if hit.empty else hit.iloc[0]["desa"],
+        "kecamatan": None if hit.empty else hit.iloc[0]["kecamatan"],
+    }
+
+
+def _http_json(url: str, timeout: float = 6.0):
+    req = urllib.request.Request(url, headers={"User-Agent": GEOCODE_UA, "Accept-Language": "id,en"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _photon(q: str, limit: int) -> List[dict]:
+    lo1, la1, lo2, la2 = GEOCODE_BBOX
+    url = "https://photon.komoot.io/api/?" + urllib.parse.urlencode(
+        {"q": q, "limit": limit, "bbox": f"{lo1},{la1},{lo2},{la2}", "lat": -7.86, "lon": 110.16})
+    out = []
+    for f in _http_json(url).get("features", []):
+        pr = f.get("properties", {})
+        name = pr.get("name") or " ".join(str(x) for x in (pr.get("street"), pr.get("housenumber")) if x)
+        if not name:
+            continue
+        addr_parts = [pr.get("street") if pr.get("name") else None, pr.get("district"),
+                      pr.get("city") or pr.get("county"), pr.get("state")]
+        out.append({"name": name, "address": ", ".join(str(x) for x in addr_parts if x),
+                    "lon": f["geometry"]["coordinates"][0], "lat": f["geometry"]["coordinates"][1],
+                    "type": pr.get("osm_value") or pr.get("type") or "place", "source": "photon"})
+    return out
+
+
+def _nominatim(q: str, limit: int) -> List[dict]:
+    lo1, la1, lo2, la2 = GEOCODE_BBOX
+    url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
+        {"q": q, "format": "jsonv2", "limit": limit, "countrycodes": "id",
+         "viewbox": f"{lo1},{la2},{lo2},{la1}", "bounded": 1})
+    with _NOMINATIM_LOCK:                          # kebijakan Nominatim: maks. 1 permintaan/detik
+        wait = 1.0 - (time.time() - _NOMINATIM_LAST[0])
+        if wait > 0:
+            time.sleep(wait)
+        _NOMINATIM_LAST[0] = time.time()
+        data = _http_json(url)
+    out = []
+    for x in data:
+        parts = [p.strip() for p in x.get("display_name", "").split(",")]
+        out.append({"name": parts[0] if parts else q, "address": ", ".join(parts[1:5]),
+                    "lon": float(x["lon"]), "lat": float(x["lat"]), "type": x.get("type") or "place",
+                    "source": "nominatim"})
+    return out
+
+
+@app.get("/api/geocode", tags=["Wilayah"], summary="Cari alamat/tempat (OpenStreetMap: Photon & Nominatim)")
+async def get_geocode(q: str = Query(..., min_length=2, max_length=120),
+                      full: bool = Query(False, description="True = sertakan Nominatim (pencarian alamat lengkap)")):
+    key = (q.strip().lower(), full)
+    if key in _GEOCODE_CACHE:
+        _GEOCODE_CACHE.move_to_end(key)
+        return {"status": "ok", "results": _GEOCODE_CACHE[key], "cached": True}
+
+    def _run():
+        results, errors = [], []
+        jobs = [("photon", lambda: _photon(q, 8))]
+        if full:
+            jobs.append(("nominatim", lambda: _nominatim(q, 6)))
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            futs = {name: ex.submit(fn) for name, fn in jobs}
+            for name, fut in futs.items():
+                try:
+                    results.extend(fut.result())
+                except Exception as e:
+                    errors.append(f"{name}: {e}")
+        seen, merged = set(), []
+        for r in results:
+            k = (r["name"].lower(), round(r["lat"], 3), round(r["lon"], 3))
+            if k in seen:
+                continue
+            seen.add(k)
+            r.update(_locate_admin(r["lon"], r["lat"]))
+            merged.append(r)
+        merged.sort(key=lambda r: not r["in_kulon_progo"])
+        return merged[:10], errors
+
+    merged, errors = await asyncio.get_event_loop().run_in_executor(None, _run)
+    if merged or not errors:
+        _GEOCODE_CACHE[key] = merged
+        while len(_GEOCODE_CACHE) > 500:
+            _GEOCODE_CACHE.popitem(last=False)
+    return {"status": "ok" if (merged or not errors) else "error", "results": merged, "errors": errors}
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000,
-                reload=False, log_level="info", workers=1)
-
-
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=False, log_level="info", workers=1)

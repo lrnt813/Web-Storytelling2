@@ -1,11 +1,13 @@
-﻿function initMap() {
+function initMap() {
     map = L.map('map', { zoomControl: false }).setView([-7.83, 110.15], 11);
     map.createPane('base-overlay-pane');
     map.getPane('base-overlay-pane').style.zIndex = 240;
     map.createPane('admin-pane');
     map.getPane('admin-pane').style.zIndex = 420;
     map.getPane('admin-pane').style.pointerEvents = 'none';
-    baseMapLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; CARTO' }).addTo(map);
+    map.createPane('label-pane');
+    map.getPane('label-pane').style.zIndex = 450;
+    map.getPane('label-pane').style.pointerEvents = 'none';
     L.control.zoom({ position: 'topright' }).addTo(map);
 
     map.createPane('route-pane');
@@ -20,9 +22,12 @@
     tesLayer = L.layerGroup().addTo(map);
     searchBoundaryLayer = L.layerGroup().addTo(map);
     adminBoundaryLayer = L.layerGroup().addTo(map);
-    roadsLayer = L.geoJSON(null, { style: { color: '#fbbf24', weight: 4, opacity: 0.4 } }).addTo(map);
+    roadsLayer = L.geoJSON(null, { renderer: L.canvas({ padding: 0.3 }), interactive: false, style: roadStyle(false) });
+    initBoundaryPanes();
     addTesLayerHoverControl();
     initMapTypeControls();
+    initBoundaryControls();
+    renderBoundaries();
     applyMapType(activeMapType);
 
     map.on('click', onMapClick);
@@ -44,15 +49,53 @@
     window.addEventListener('resize', updateRouteResultsLayout);
 }
 
+function roadStyle(isBroken) {
+    return isBroken
+        ? { color: '#ef4444', weight: 2.2, opacity: 0.95 }
+        : { color: '#e2e8f0', weight: 1, opacity: 0.45 };
+}
+
+const MODE_HINTS = {
+    visualize: 'Klik grid pada peta untuk melihat detail dan rute ke TES terdekat.',
+    cut: 'Klik ruas jalan pada peta untuk menandai blokir (klik tanda merah untuk menghapus), lalu tekan <b>Terapkan Blokir</b>.'
+};
+
 function toggleMode(newMode) {
     mode = (mode === newMode) ? 'visualize' : newMode;
-    document.querySelectorAll('.btn-outline').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.mode-container .btn-outline').forEach(b => b.classList.remove('active'));
     document.getElementById(`btn-mode-${mode}`).classList.add('active');
+    const hint = document.getElementById('mode-hint');
+    if (hint) hint.innerHTML = MODE_HINTS[mode];
+    map.getContainer().classList.toggle('cut-mode', mode === 'cut');
+    if (mode === 'cut' && gridPopup && map.hasLayer(gridPopup)) {
+        suppressRecommendationRestore = true;
+        map.closePopup(gridPopup);
+        suppressRecommendationRestore = false;
+    }
+}
+
+let appliedCutsSig = '[]';
+function updateCutUI() {
+    const count = document.getElementById('cut-count');
+    const btn = document.getElementById('btn-apply-cuts');
+    if (count) count.textContent = roadCuts.length;
+    if (btn) btn.disabled = JSON.stringify(roadCuts) === appliedCutsSig;
+}
+
+function applyRoadCuts() {
+    routeLayers.clearLayers(); contextRouteLayers.clearLayers();
+    if (gridPopup && map.hasLayer(gridPopup)) map.closePopup(gridPopup);
+    document.getElementById('route-results').style.display = 'none';
+    fetchAndRenderData();
+}
+
+function togglePanel() {
+    document.getElementById('control-panel').classList.toggle('collapsed');
 }
 
 function toggleRoads(show) {
-    if (show) { loadRoads(); roadsLayer.setStyle({ opacity: 0.6 }); }
-    else roadsLayer.setStyle({ opacity: 0 });
+    if (show) { loadRoads(); if (!map.hasLayer(roadsLayer)) roadsLayer.addTo(map); }
+    else if (map.hasLayer(roadsLayer)) map.removeLayer(roadsLayer);
 }
 
 function addTesLayerHoverControl() {
@@ -69,6 +112,10 @@ function addTesLayerHoverControl() {
                     <div class="layer-section">
                         <div class="layer-section-title">Tipe Peta</div>
                         <div class="layer-list" id="map-type-controls"></div>
+                    </div>
+                    <div class="layer-section">
+                        <div class="layer-section-title">Batas Wilayah</div>
+                        <div class="layer-list" id="boundary-controls"></div>
                     </div>
                     <div class="layer-section">
                         <div class="layer-section-title">Kategori TES</div>
@@ -161,43 +208,33 @@ function updateLayerSourceInfo(type) {
     renderLayerRuntimeNote();
 }
 
+// Seluruh basemap memakai layanan tanpa API key (Esri ArcGIS Online & OSM).
+// CARTO/Stadia kini mewajibkan API key sehingga tile-nya bertuliskan "API KEY REQUIRED".
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
+const ESRI_ATTR = 'Tiles &copy; Esri';
+
 function getBaseLayerConfig(type) {
     if (type === 'jalan') {
-        return {
-            url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-            options: { attribution: '&copy; OpenStreetMap contributors &copy; CARTO', maxZoom: 20 }
-        };
+        return { url: `${ESRI}/World_Street_Map/MapServer/tile/{z}/{y}/{x}`,
+                 options: { attribution: `${ESRI_ATTR} — Esri, HERE, OpenStreetMap contributors`, maxZoom: 19 } };
     }
     if (type === 'terrain') {
-        return {
-            url: 'https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.png',
-            options: { attribution: '&copy; Stadia Maps &copy; Stamen Design', maxZoom: 18 }
-        };
+        return { url: `${ESRI}/World_Topo_Map/MapServer/tile/{z}/{y}/{x}`,
+                 options: { attribution: `${ESRI_ATTR} — Esri, USGS, NOAA`, maxZoom: 19 } };
     }
     if (type === 'satelit') {
-        return {
-            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-            options: { attribution: 'Tiles &copy; Esri', maxZoom: 19 }
-        };
+        return { url: `${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`,
+                 options: { attribution: `${ESRI_ATTR} — Esri, Maxar, Earthstar Geographics`, maxZoom: 19 },
+                 labels: `${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}` };
     }
-    if (type === 'administrasi' || type === 'tutupan_lahan') {
-        return {
-            url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-            options: { attribution: '&copy; OpenStreetMap contributors &copy; CARTO', maxZoom: 20 }
-        };
-    }
-    return {
-        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-        options: { attribution: '&copy; CARTO', maxZoom: 20 }
-    };
+    return { url: `${ESRI}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
+             options: { attribution: `${ESRI_ATTR} — Esri, HERE, OpenStreetMap contributors`, maxZoom: 19, maxNativeZoom: 16 },
+             labels: `${ESRI}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}` };
 }
 
-function getFallbackBaseLayerConfig(type) {
-    if (type === 'analitik') return getBaseLayerConfig('analitik');
-    return {
-        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-        options: { attribution: '&copy; OpenStreetMap contributors &copy; CARTO', maxZoom: 20 }
-    };
+function getFallbackBaseLayerConfig() {
+    return { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+             options: { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 } };
 }
 
 function attachBaseLayerGuards(layer, type) {
@@ -205,25 +242,36 @@ function attachBaseLayerGuards(layer, type) {
         setMapRuntimeState({ basemap: 'ready', message: '' });
         updateLayerSourceInfo(activeMapType);
     });
+    let errors = 0;
     layer.on('tileerror', () => {
-        if (layer._fallbackApplied || activeMapType !== type) return;
+        errors += 1;
+        if (layer._fallbackApplied || activeMapType !== type || errors < 6) return;
         layer._fallbackApplied = true;
-        const fallback = getFallbackBaseLayerConfig(type);
-        if (baseMapLayer && map.hasLayer(baseMapLayer)) map.removeLayer(baseMapLayer);
+        const fallback = getFallbackBaseLayerConfig();
+        clearBaseLayers();
         baseMapLayer = L.tileLayer(fallback.url, fallback.options).addTo(map);
         setMapRuntimeState({
             basemap: 'fallback',
-            message: `Basemap ${mapTypeOptions[type].label} sedang bermasalah. Sistem memakai basemap cadangan agar peta tetap tampil.`
+            message: `Basemap ${mapTypeOptions[type].label} sedang bermasalah. Sistem memakai OpenStreetMap agar peta tetap tampil.`
         });
         updateLayerSourceInfo(activeMapType);
-        addLegend();
     });
+}
+
+let baseLabelLayer = null;
+function clearBaseLayers() {
+    if (baseMapLayer && map.hasLayer(baseMapLayer)) map.removeLayer(baseMapLayer);
+    if (baseLabelLayer && map.hasLayer(baseLabelLayer)) map.removeLayer(baseLabelLayer);
+    baseLabelLayer = null;
 }
 
 function setBaseMap(type) {
     const cfg = getBaseLayerConfig(type);
-    if (baseMapLayer) map.removeLayer(baseMapLayer);
+    clearBaseLayers();
     baseMapLayer = L.tileLayer(cfg.url, cfg.options).addTo(map);
+    if (cfg.labels) {
+        baseLabelLayer = L.tileLayer(cfg.labels, { pane: 'label-pane', maxZoom: 19, maxNativeZoom: cfg.options.maxNativeZoom || 19 }).addTo(map);
+    }
     attachBaseLayerGuards(baseMapLayer, type);
 }
 
@@ -373,9 +421,7 @@ function initTesLayerControls() {
 
 async function loadTesLayers() {
     try {
-        const skenario = document.getElementById('skenario').value;
-        const intensitas = parseFloat(document.getElementById('intensitas').value);
-        const resp = await fetch(`${API_BASE}/tes-layers?skenario=${skenario}&intensity=${intensitas}`);
+        const resp = await fetch(`${API_BASE}/tes-layers?level=${activeLevel}`);
         const result = await resp.json();
         tesGeoJSON = result.geojson;
 
@@ -408,7 +454,7 @@ function renderTesLayers() {
             const kat = props.kategori;
             const meta = tesCategories[kat] || { label: kat };
             const status = props.is_valid === false
-                ? '<div style="margin-top:8px; color:var(--danger); font-size:11px;">Tidak aktif pada skenario ini</div>'
+                ? `<div style="margin-top:8px; color:var(--danger); font-size:11px;">Tidak valid sebagai TES pada level ${levelLabel(activeLevel)} (berada di zona bahaya banjir)</div>`
                 : '';
             layer.bindPopup(`
                 <div style="min-width:180px;">
@@ -433,10 +479,21 @@ function onMapClick(e) {
 }
 
 function addRoadCut(latlng, skipSave = false) {
-    roadCuts.push({ lat: latlng.lat, lng: latlng.lng });
-    const marker = L.circleMarker(latlng, { radius: 8, color: '#ef4444', weight: 3, fillOpacity: 0.8, fillColor: '#000' }).addTo(map);
+    const cut = { lat: latlng.lat, lng: latlng.lng };
+    roadCuts.push(cut);
+    const marker = L.circleMarker(latlng, { radius: 8, color: '#ef4444', weight: 3, fillOpacity: 0.8, fillColor: '#000', pane: 'marker-pane' })
+        .bindTooltip('Blokir jalan — klik untuk menghapus', { direction: 'top' })
+        .addTo(map);
+    marker.on('click', e => {
+        L.DomEvent.stopPropagation(e);
+        roadCuts = roadCuts.filter(c => c !== cut);
+        cutMarkers = cutMarkers.filter(m => m !== marker);
+        map.removeLayer(marker);
+        saveSession(); updateCutUI();
+    });
     cutMarkers.push(marker);
     if (!skipSave) saveSession();
+    updateCutUI();
 }
 
 function saveSession() {
@@ -455,6 +512,7 @@ function loadSession() {
 async function resetSimulation() {
     roadCuts = []; cutMarkers.forEach(m => map.removeLayer(m)); cutMarkers = [];
     localStorage.removeItem('evac_road_cuts');
+    updateCutUI();
     routeLayers.clearLayers(); contextRouteLayers.clearLayers(); if (originMarker) map.removeLayer(originMarker);
     document.getElementById('route-results').style.display = 'none';
     
@@ -469,36 +527,36 @@ async function fetchAndRenderData(retryCount = 0) {
     isCalculating = true; showLoading(true);
     const popupSnapshot = captureActivePopupState();
     let shouldRestorePopup = false;
-    const skenario = document.getElementById('skenario').value;
-    const intensitas = document.getElementById('intensitas').value;
 
-    // Trigger update jalan secara paralel jika checkbox aktif
+    // Update jalan & TES secara paralel
     const roadUpdate = document.getElementById('check-roads').checked ? loadRoads() : Promise.resolve();
     const tesUpdate = loadTesLayers();
 
     try {
-        const endpoint = (roadCuts.length > 0 || parseFloat(intensitas) > 0) ? 'simulate' : 'baseline';
-        const resp = (endpoint === 'simulate') 
-            ? await fetch(`${API_BASE}/simulate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skenario, intensity: parseFloat(intensitas), cut_roads: roadCuts }) })
-            : await fetch(`${API_BASE}/baseline?skenario=${skenario}&intensity=${intensitas}`);
+        const resp = roadCuts.length > 0
+            ? await fetch(`${API_BASE}/simulate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: activeLevel, cut_roads: roadCuts }) })
+            : await fetch(`${API_BASE}/baseline?level=${activeLevel}`);
 
-        if (resp.status === 503 && retryCount < 5) {
+        if (resp.status === 503 && retryCount < 60) {
             setTimeout(() => { isCalculating = false; fetchAndRenderData(retryCount + 1); }, 3000);
             return;
         }
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
         const result = await resp.json();
-        
-        // Pastikan update jalan selesai sebelum menghilangkan loading
         await roadUpdate;
         await tesUpdate;
 
-        setPseudoSafetyThresholds(result.pseudo_safety_thresholds);
+        lastLevelResult = result;
+        appliedCutsSig = JSON.stringify(roadCuts);
+        updateCutUI();
         setClusterNames(result.cluster_names, result.sk_key);
         addLegend(result.k_optimal);
-        const lookup = Object.fromEntries(result.data_klaster.map(d => [d.id_grid, d]));
-        gridLayer.lookup = lookup;
+        gridLayer.lookup = Object.fromEntries(result.data_klaster.map(d => [d.id_grid, d]));
         applyGridStyle();
+        renderLevelSummary(result);
+        if (compareLevel) applyCompareStyle();
+        if (typeof renderRegionPanel === 'function') renderRegionPanel();
         updateRouteResultsLayout();
         shouldRestorePopup = Boolean(popupSnapshot);
     } catch (error) { console.error(error); }
@@ -511,37 +569,84 @@ async function fetchAndRenderData(retryCount = 0) {
     }
 }
 
+function setLevel(key) {
+    if (!LEVELS.some(l => l.key === key)) key = 'baseline';
+    activeLevel = key;
+    localStorage.setItem('evac_level', key);
+    document.querySelectorAll('.level-btn').forEach(b => b.classList.toggle('active', b.dataset.level === key));
+    fetchAndRenderData();
+}
+
+function setView(view) {
+    activeView = viewModes[view] ? view : 'klaster';
+    activeCluster = null;
+    document.getElementById('view-mode').value = activeView;
+    applyGridStyle();
+    addLegend();
+}
+
+function renderLevelSummary(result) {
+    const el = document.getElementById('level-summary');
+    if (!el || !result) return;
+    const tas = result.tas || {};
+    const sim = result.simulated
+        ? `<div class="summary-note sim"><i class="fa fa-flask"></i> SIMULASI: ${result.n_cut_roads} titik blokir jalan — angka di atas bukan hasil skripsi</div>` : '';
+    const banner = document.getElementById('sim-banner');
+    if (banner) {
+        banner.hidden = !result.simulated;
+        const t = document.getElementById('sim-banner-text');
+        if (t && result.simulated) t.textContent = `level ${levelLabel(result.level)}, ${result.n_cut_roads} titik blokir jalan, klasterisasi ulang`;
+    }
+    el.innerHTML = `
+        <div class="summary-grid">
+            <div class="summary-tile"><span>Grid terdampak</span><b>${fmtInt(result.n_grid_terdampak)}</b></div>
+            <div class="summary-tile"><span>Rata-rata waktu min.</span><b>${fmtNum(result.mean_waktu_min)} <small>mnt</small></b></div>
+            <div class="summary-tile"><span>Titik Aman Semu</span><b>${fmtInt(tas.jumlah_tas)} <small>(${fmtNum(tas.persen_tas)}%)</small></b></div>
+            <div class="summary-tile"><span>Rerata DI TAS / Non-TAS</span><b>${fmtNum(tas.mean_di_tas)} / ${fmtNum(tas.mean_di_non_tas)}</b></div>
+        </div>${sim}`;
+}
+
+function gridStyleFor(d) {
+    if (clustersHidden) return { fillColor: NEUTRAL_FILL, fillOpacity: 0.25, stroke: false };
+    const dim = activeCluster !== null && activeView === 'klaster' && d.cluster_sdwfcm !== activeCluster;
+    if (activeView === 'tas') {
+        return d.titik_aman_semu === 1
+            ? { fillColor: TAS_COLOR, fillOpacity: 0.9, stroke: false }
+            : { fillColor: NEUTRAL_FILL, fillOpacity: 0.18, stroke: false };
+    }
+    if (activeView === 'terdampak') {
+        return d.terdampak === 1
+            ? { fillColor: TERDAMPAK_COLOR, fillOpacity: 0.8, stroke: false }
+            : { fillColor: NEUTRAL_FILL, fillOpacity: 0.18, stroke: false };
+    }
+    if (activeView === 'waktu') return { fillColor: waktuColor(d.waktu_tes_min), fillOpacity: 0.8, stroke: false };
+    if (activeView === 'bahaya') return { fillColor: bahayaColors[d.indeks_bahaya] || NEUTRAL_FILL, fillOpacity: 0.8, stroke: false };
+    return {
+        fillColor: clusterColors[d.cluster_sdwfcm] || NEUTRAL_FILL,
+        fillOpacity: dim ? 0.05 : Math.max(0.45, d.membership_max || 0.7), stroke: false
+    };
+}
+
+function gridStyleFromLookup(lookup) {
+    return f => {
+        const d = lookup[f.properties.id_grid];
+        if (!d) return { fillOpacity: 0, stroke: false };
+        const st = gridStyleFor(d);
+        return { ...st, stroke: true, color: st.fillColor, weight: 0.6, opacity: st.fillOpacity };
+    };
+}
+
 function applyGridStyle() {
+    if (compareLevel) applyCompareStyle();
     if (!gridLayer || !gridLayer.lookup) return;
     const lookup = gridLayer.lookup;
     gridLayer.setStyle(f => {
         const d = lookup[f.properties.id_grid];
-        if (!d) return { fillOpacity: 0, weight: 0 };
-        
-        let opacity = d.membership_max || 0.7;
-        
-        // Logika Filtering Legend
-        if (activeMode === 'semu') {
-            if (d.titik_aman_semu !== 1) opacity = 0.05;
-        } else if (activeCluster !== null) {
-            if (d.cluster_sdwfcm !== activeCluster) opacity = 0.05;
-        }
-
-        // Feature request: Gray mode
-        if (clustersHidden) {
-            return { fillColor: '#475569', fillOpacity: opacity * 0.4, color: '#fff', weight: 0.1 };
-        }
-
-        if (d.titik_aman_semu === 1) {
-            return { 
-                fillColor: '#000', 
-                fillOpacity: opacity > 0.1 ? 0.9 : 0.05, 
-                color: '#f59e0b', 
-                weight: activeMode === 'semu' ? 2.5 : 1.5 
-            };
-        }
-        
-        return { fillColor: clusterColors[d.cluster_sdwfcm] || '#475569', fillOpacity: opacity, color: '#fff', weight: 0.2 };
+        if (!d) return { fillOpacity: 0, stroke: false };
+        // Garis tipis sewarna isian menutup celah antialias antarsel pada zoom kecil
+        // tanpa memunculkan garis putih (grid tampak bergaris).
+        const st = gridStyleFor(d);
+        return { ...st, stroke: true, color: st.fillColor, weight: 0.6, opacity: st.fillOpacity };
     });
 }
 
@@ -550,8 +655,10 @@ async function loadStaticGeometry() {
     try {
         const response = await fetch('./static_grid_kulonprogo.geojson');
         const geojsonData = await response.json();
+        gridGeoJSONData = geojsonData;
         gridLayer = L.geoJSON(geojsonData, {
-            style: { fillColor: '#1e293b', color: 'white', weight: 0.1, fillOpacity: 0.1 },
+            renderer: L.canvas({ padding: 0.5 }),
+            style: { fillColor: '#1e293b', stroke: false, fillOpacity: 0.1 },
             onEachFeature: (feature, layer) => {
                 layer.on('click', e => {
                     if (mode === 'visualize') {
@@ -573,8 +680,7 @@ async function loadRoads() {
     try {
         const isFirstLoad = (roadsGeoJSON === null);
         const body = { 
-            skenario: document.getElementById('skenario').value, 
-            intensity: parseFloat(document.getElementById('intensitas').value), 
+            level: activeLevel,
             cut_roads: roadCuts,
             full: isFirstLoad
         };
@@ -590,24 +696,122 @@ async function loadRoads() {
         if (isFirstLoad) {
             roadsGeoJSON = result;
             roadsLayer.clearLayers().addData(roadsGeoJSON);
-            roadsLayer.setStyle(f => ({ 
-                color: f.properties.is_broken ? '#ef4444' : '#fbbf24', 
-                weight: f.properties.is_broken ? 3 : 5, 
-                opacity: 0.5 
-            }));
+            roadsLayer.setStyle(f => roadStyle(f.properties.is_broken));
         } else {
             // Optimized Update: Hanya update style berdasarkan broken_ids tanpa render ulang geometri
             const brokenIds = new Set(result.broken_ids);
             roadsLayer.eachLayer(layer => {
                 const id = layer.feature.properties.id_jalan;
                 const isBroken = brokenIds.has(id);
-                layer.setStyle({ 
-                    color: isBroken ? '#ef4444' : '#fbbf24', 
-                    weight: isBroken ? 3 : 5, 
-                    opacity: isBroken ? 0.8 : 0.5 
-                });
+                layer.setStyle(roadStyle(isBroken));
             });
         }
     } catch (e) { console.error(e); }
 }
 
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// PEMBANDING LEVEL (swipe): kiri = level aktif, kanan = level pembanding
+// ══════════════════════════════════════════════════════════════════════════
+let gridGeoJSONData = null;
+let compareLevel = '';
+let compareLayer = null;
+let compareFraction = 0.5;
+const compareLookups = {};
+
+async function fetchLevelLookup(level) {
+    if (compareLookups[level]) return compareLookups[level];
+    const resp = await fetch(`${API_BASE}/baseline?level=${level}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const result = await resp.json();
+    compareLookups[level] = Object.fromEntries(result.data_klaster.map(d => [d.id_grid, d]));
+    return compareLookups[level];
+}
+
+function ensureComparePane() {
+    if (!map.getPane('compare-pane')) {
+        map.createPane('compare-pane');
+        map.getPane('compare-pane').style.zIndex = 402;
+        map.getPane('compare-pane').style.pointerEvents = 'none';
+    }
+    if (!document.getElementById('compare-divider')) {
+        const div = L.DomUtil.create('div', 'compare-divider', map.getContainer());
+        div.id = 'compare-divider';
+        div.innerHTML = `<div class="cd-line"></div>
+            <div class="cd-handle" title="Geser untuk membandingkan"><i class="fa fa-left-right"></i></div>
+            <div class="cd-label cd-left" id="cd-left"></div><div class="cd-label cd-right" id="cd-right"></div>`;
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.disableScrollPropagation(div);
+        const handle = div.querySelector('.cd-handle');
+        const onMove = e => {
+            const rect = map.getContainer().getBoundingClientRect();
+            const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+            compareFraction = Math.min(0.98, Math.max(0.02, x / rect.width));
+            updateCompareClip();
+        };
+        const stop = () => {
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', stop);
+            map.dragging.enable();
+        };
+        handle.addEventListener('pointerdown', e => {
+            e.preventDefault(); e.stopPropagation();
+            map.dragging.disable();
+            document.addEventListener('pointermove', onMove);
+            document.addEventListener('pointerup', stop);
+        });
+        map.on('move zoom resize viewreset zoomend moveend', updateCompareClip);
+    }
+}
+
+function updateCompareClip() {
+    const pane = map.getPane('compare-pane');
+    const divider = document.getElementById('compare-divider');
+    if (!pane || !divider) return;
+    if (!compareLevel) { pane.style.clip = ''; divider.hidden = true; return; }
+    divider.hidden = false;
+    const size = map.getSize();
+    const x = Math.round(size.x * compareFraction);
+    const nw = map.containerPointToLayerPoint([0, 0]);
+    const se = map.containerPointToLayerPoint(size);
+    const cx = map.containerPointToLayerPoint([x, 0]).x;
+    pane.style.clip = `rect(${nw.y}px, ${se.x}px, ${se.y}px, ${cx}px)`;
+    divider.style.left = `${x}px`;
+    document.getElementById('cd-left').textContent = `◀ ${levelLabel(activeLevel)}${lastLevelResult?.simulated ? ' (simulasi)' : ''}`;
+    document.getElementById('cd-right').textContent = `${levelLabel(compareLevel)} ▶`;
+}
+
+function applyCompareStyle() {
+    if (!compareLayer || !compareLevel || !compareLookups[compareLevel]) return;
+    compareLayer.setStyle(gridStyleFromLookup(compareLookups[compareLevel]));
+    updateCompareClip();
+}
+
+async function setCompareLevel(level) {
+    compareLevel = level || '';
+    ensureComparePane();
+    if (!compareLevel) {
+        if (compareLayer && map.hasLayer(compareLayer)) map.removeLayer(compareLayer);
+        updateCompareClip();
+        return;
+    }
+    try {
+        showLoading(true);
+        await fetchLevelLookup(compareLevel);
+        if (!compareLayer) {
+            compareLayer = L.geoJSON(gridGeoJSONData, {
+                pane: 'compare-pane', interactive: false,
+                renderer: L.canvas({ pane: 'compare-pane', padding: 0.5 }),
+                style: gridStyleFromLookup(compareLookups[compareLevel])
+            });
+        }
+        if (!map.hasLayer(compareLayer)) compareLayer.addTo(map);
+        applyCompareStyle();
+    } catch (e) {
+        console.error(e);
+        if (typeof showToast === 'function') showToast('Gagal memuat level pembanding.', 'warn');
+    } finally {
+        showLoading(false);
+    }
+}
