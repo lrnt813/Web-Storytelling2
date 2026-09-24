@@ -221,3 +221,13 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
 - **P2-F9. Waktu komputasi.** Log mencatat total 15.086 detik, tetapi termasuk jeda ± 8.890 detik saat
   komputer sleep (13:32–16:00, kedua run berhenti bersamaan pada K = 4). Waktu efektif ± 6.200 detik
   (± 1,7 jam), sesuai estimasi P2-C3. — *DICATAT*
+
+---
+
+# Putaran 3 (branch `revisi-v3`)
+
+- **P3-1. Kelas bahaya ruas jalan dan TES berasal dari sumber berbeda dengan kelas grid.** Rincian,
+  besaran dampak, dan opsi ada di `docs/DIAGNOSTIK_JALAN_GRID.md`. Kesesuaian kelas ruas vs grid yang
+  dilalui hanya 61% (panjang). Level Rendah praktis tidak menutup jalan di area penelitian (3,6 km).
+  Sebanyak 161 km ruas tertutup di Level Tinggi melintasi grid kelas 0. Menunggu keputusan pengguna
+  (titik berhenti Langkah 1). — *MENUNGGU KEPUTUSAN*
