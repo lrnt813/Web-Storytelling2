@@ -314,3 +314,29 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
   Parameter tidak diubah (di luar instruksi); dicatat untuk verifikasi peneliti. — *DICATAT*
 - **P4-6. Label tipologi diganti label peringkat** (penyajian, bukan perubahan model), menjawab P3-9.
   — *SELESAI*
+
+## P4-H. Pengamatan dari hasil v4 (untuk dibahas dengan pembimbing)
+
+- **P4-7. K = 4 memisahkan grid Terputus/terisolasi.** Tipologi 4 (terburuk) berisi 1.422 baris (1,8%).
+  Sebanyak 96,3% barisnya bernilai penalti (Terputus), 98,8% berwaktu minimum > 30 menit, dan proporsi
+  terisolasi 0,963. Tipologi 1–3 hampir tanpa penalti (≤ 0,07%) dan membagi grid terhubung menurut
+  waktu tempuh: median 3,4 / 4,3 / 9,9 menit, P90 6,6 / 6,9 / 18,2 menit. — *DICATAT*
+- **P4-8. Aturan TAS utama v4 sangat ketat.** TAS Baseline/Rendah/Sedang/Tinggi = 62 / 70 / 77 / 44
+  (0,27–0,40% grid non-Tergenang), dibanding 5.758 pada aturan absolut v3 dan 1.842 pada aturan
+  persentil. Hanya 36–55% TAS utama yang tetap TAS pada ambang 40 menit, jadi jumlahnya peka terhadap
+  ambang. Median T_aktual TAS 35–43 menit. — *PERLU DIBAHAS*
+- **P4-9. TAS baru akibat banjir kecil**: Rendah 8, Sedang 54, Tinggi 27, semuanya dari Non-TAS
+  Baseline. TAS hilang Sedang 39 (31 jadi Tergenang, 7 jadi Terputus) dan Tinggi 45 (35 jadi Tergenang,
+  8 jadi Terputus). — *DICATAT*
+- **P4-10. Dua definisi "Terputus" berbeda jumlahnya.** Kategori akses Terputus (waktu minimum =
+  penalti, tidak mencapai TES mana pun) di Baseline = 111. Status TAS Terputus (T_aktual ke TES
+  Euclidean terdekat = penalti) = 168. Selisihnya adalah grid yang tidak dapat mencapai TES terdekat
+  secara garis lurus, tetapi masih mencapai TES lain. — *DICATAT*
+- **P4-11. REDCAP K = 4 tidak ditandai degeneratif** (klaster terbesar 89,3%, tepat di bawah batas
+  90%), tetapi Silhouette 0,002 dan CH 256. Batas degeneratif ditetapkan sebelumnya dan tidak diubah.
+  — *DICATAT*
+- **P4-12. Kategori akses (30 menit).** Porsi Terjangkau: Baseline 98,6%, Rendah 98,2%, Sedang 82,6%,
+  Tinggi 64,1%. Grid "Jauh" hanya 0,3–1,4%, dan "Terputus" 0,5–2,9%. Penurunan akses terutama
+  disebabkan grid Tergenang (14,9% dan 31,6%), bukan waktu tempuh > 30 menit. — *DICATAT*
+- **P4-13. Waktu komputasi.** Pemilihan K tidak dijalankan ulang, sehingga satu run ± 8,6 menit (518 dan
+  507 detik). Kedua run tanpa jeda (sleep dicegah) dan fingerprint identik. — *DICATAT*
