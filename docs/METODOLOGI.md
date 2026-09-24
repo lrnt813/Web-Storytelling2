@@ -1,8 +1,8 @@
-# Metodologi — sebagaimana diimplementasikan (desain v4)
+# Metodologi — sebagaimana diimplementasikan (hasil final v5)
 
 Dokumen ini menjelaskan pipeline analisis **persis seperti kode** di `backend/engine.py`,
 `backend/hazard_raster.py`, `backend/thesis.py`, dan `scripts/thesis_analysis.py` (tag
-`hasil-skripsi-v4`). Rujukan setiap parameter beserta status verifikasinya: `docs/RUJUKAN_PARAMETER.md`. Nilai parameter yang dipakai pada run final tercatat di `data/locked/LOCK.json`.
+`hasil-skripsi-v5`; model, data, dan ambang sama dengan v4). Rujukan setiap parameter beserta status verifikasinya: `docs/RUJUKAN_PARAMETER.md`. Nilai parameter yang dipakai pada run final tercatat di `data/locked/LOCK.json`.
 Hal yang masih perlu diputuskan tercatat di `docs/CATATAN_TEMUAN.md`. Versi sebelumnya diarsipkan:
 v1 di `data/locked/arsip_v1/` (model per level + Hungarian) dan v2 di `data/locked/arsip_v2/`
 (kelas bahaya grid dari atribut GPKG, aturan TAS persentil, keluaran K = 2 saja), dan v3 di
@@ -195,6 +195,13 @@ peneliti, karena data gabungan berubah.
   K = 3 dipertahankan sebagai pembanding dari v3, meskipun tidak setara secara stabilitas. K utama
   dicatat di `pengaturan_hasil.json` (dibaca `scripts/export_bab4.py` dan dashboard); K lainnya
   dilaporkan sebagai sensitivitas.
+- **(e) Model utama: K = 4 (Putaran 5).** Peneliti menetapkan **K = 4** sebagai model utama
+  **setelah** hasil v3 dan v4 terlihat. Pilihan diambil dari himpunan K yang setara secara stabilitas
+  dengan K terbaik (selisih rerata ARI subsampel ≤ 0,01; pada data v3: {2, 4}). Alasannya: K = 4
+  memisahkan tipologi grid Terputus. Tipologi 4 berisi 1,8% baris data gabungan, 96,3% di antaranya
+  bernilai penalti (CATATAN P4-7). K = 2 (pilihan aturan stabilitas dengan pemecah seri "K terkecil")
+  dan K = 3 (tidak setara secara stabilitas) dilaporkan sebagai sensitivitas. Keputusan ini tidak
+  mengubah model, data, maupun ambang apa pun.
 - **(d) Pemilihan K tidak dijalankan ulang pada Putaran 4.** Tabel stabilitas v3 dipakai apa adanya,
   setelah pipeline memverifikasi bahwa data gabungan (baris, level, dan skor PCA) identik dengan v3
   (`verifikasi_v3` di hasil). Model K = 2, 3, dan 4 adalah solusi J terkecil dari seed 42–51 pada data
@@ -263,7 +270,9 @@ diuji pada data asli). Batas 50 m pada \(T^{\text{aktual}}\) adalah keputusan pe
 Kategori per level:
 
 - **Tergenang**: \(\text{Tergenang}_{i,s} = 1\), dikeluarkan dari seluruh perhitungan TAS.
-- **Terputus**: non-Tergenang dengan \(T^{\text{aktual}} = T_{\text{pen}}\).
+- **TES terdekat tidak terjangkau** (sebelum Putaran 5 bernama "Terputus"): non-Tergenang dengan
+  \(T^{\text{aktual}} = T_{\text{pen}}\). TES terdekat secara garis lurus \(e(i)\) tidak dapat dicapai
+  lewat jaringan jalan (gagal snapping ≤ 300 m atau tidak terhubung).
 - **Aturan utama (Putaran 4).** Untuk \(R\) = grid non-Tergenang yang terjangkau:
 \[
 \mathrm{TAS}_i \iff \mathrm{DI}_i \ge 2 \;\wedge\; T_i^{\text{ideal}} \le 5\ \text{menit}
@@ -279,8 +288,8 @@ Kategori per level:
   (\(T^{\text{ideal}} \le P_{25} \wedge \mathrm{DI} \ge P_{75}\) pada \(R\)).
 - **Perubahan TAS terhadap Baseline (aturan utama):** *TAS baru akibat banjir* = grid yang bukan TAS di
   Baseline dan menjadi TAS di level \(s\); *TAS hilang* = grid TAS di Baseline yang tidak lagi TAS di
-  level \(s\), dipecah menjadi jadi Tergenang, jadi Terputus, dan lainnya (Non-TAS).
-- **Yang dilaporkan:** jumlah TAS, Non-TAS, Terputus, dan Tergenang per level; sebaran DI (median,
+  level \(s\), dipecah menjadi jadi Tergenang, jadi TES terdekat tidak terjangkau, dan lainnya (Non-TAS).
+- **Yang dilaporkan:** jumlah TAS, Non-TAS, TES terdekat tidak terjangkau, dan Tergenang per level; sebaran DI (median,
   P25, P75, P90) pada TAS dan Non-TAS; median \(T^{\text{ideal}}\) dan \(T^{\text{aktual}}\) TAS;
   jumlah TAS per kategori TES terdekat (\(e(i)\)); peta TAS per level; dan peta TAS baru/hilang untuk
   Sedang dan Tinggi.
@@ -298,6 +307,13 @@ komunitas tanpa akses pada Li dkk. (2026, hlm. 2919):
 | Terputus | *isolated* | non-Tergenang, \(t^{\min}_{i,s} = T_{\text{pen}}\) (tidak mencapai TES mana pun) |
 | Jauh | *remote* | non-Tergenang, terhubung, \(t^{\min}_{i,s} > T_{\text{evak}}\) |
 | Terjangkau | — | \(t^{\min}_{i,s} \le T_{\text{evak}}\) |
+
+**Beda dengan status TAS "TES terdekat tidak terjangkau".** Kategori akses **Terputus** menilai semua
+TES valid (\(t^{\min} = T_{\text{pen}}\): tidak ada kategori TES yang dapat dicapai). Status TAS
+"TES terdekat tidak terjangkau" hanya menilai satu TES, yaitu TES terdekat secara garis lurus \(e(i)\).
+Karena itu setiap grid Terputus pasti juga "TES terdekat tidak terjangkau", tetapi tidak sebaliknya:
+sebuah grid bisa gagal mencapai TES terdekatnya, tetapi masih mencapai TES lain lewat jaringan. Di
+Baseline, jumlahnya 111 (Terputus) dan 168 (TES terdekat tidak terjangkau) (CATATAN P4-10).
 
 Dilaporkan untuk \(T_{\text{evak}}\) = 30 menit (utama) serta 20 dan 40 menit (sensitivitas):
 jumlah dan persentase per level, peta untuk Baseline, Sedang, dan Tinggi, dan matriks transisi kategori

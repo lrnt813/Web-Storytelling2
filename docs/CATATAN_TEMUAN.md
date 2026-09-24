@@ -340,3 +340,26 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
   disebabkan grid Tergenang (14,9% dan 31,6%), bukan waktu tempuh > 30 menit. — *DICATAT*
 - **P4-13. Waktu komputasi.** Pemilihan K tidak dijalankan ulang, sehingga satu run ± 8,6 menit (518 dan
   507 detik). Kedua run tanpa jeda (sleep dicegah) dan fingerprint identik. — *DICATAT*
+
+---
+
+# Putaran 5 (branch `revisi-v5`, hasil final)
+
+Model, K, data, dan semua ambang tidak diubah; putaran ini hanya penyajian, validasi, dan finalisasi.
+
+- **P5-1. K utama = 4** (`pengaturan_hasil.json`), dipilih peneliti setelah hasil v3/v4 terlihat dari
+  himpunan K yang setara secara stabilitas {2, 4}, karena memisahkan tipologi Terputus (P4-7). K = 2 dan
+  K = 3 menjadi sensitivitas. Ditulis di METODOLOGI §9 (e). — *SELESAI*
+- **P5-2. Status TAS 2 berganti nama menjadi "TES terdekat tidak terjangkau"** di keluaran, dashboard,
+  dan dokumentasi (menyelesaikan P4-10). Kunci JSON ikut berganti (`jumlah_tes_terdekat_tidak_terjangkau`,
+  `tas_hilang_jadi_tes_terdekat_tidak_terjangkau`), sehingga fingerprint v5 berbeda dengan v4, walaupun
+  semua angka sama. Perbedaan kedua definisi dijelaskan di METODOLOGI §11b. — *SELESAI*
+- **P5-3. Catatan "nyaris degeneratif"** pada tabel algoritma memakai aturan penyajian klaster
+  terbesar ≥ 85% (batas degeneratif tetap 90%). Aturan ini hanya berlaku untuk REDCAP K = 4 (89,3%).
+  — *SELESAI (menjawab P4-11)*
+- **P5-4. Lembar validasi TAS** (`output_bab4/validasi/validasi_TAS.xlsx` + peta per TAS) dibuat oleh
+  `scripts/lembar_validasi_TAS.py`. Skrip ini menghitung ulang rute jaringan dengan aturan yang sama dan
+  mencocokkan T_aktual dengan nilai terkunci (kolom "Cek T_aktual"). Rekap dibuat oleh
+  `scripts/rekap_validasi_TAS.py` setelah lembar diisi peneliti (belum dijalankan). — *MENUNGGU PENGISIAN*
+- **P5-5. Referensi draft lama di kode**: tidak ada (diperiksa dengan grep di backend/, scripts/,
+  frontend/, tests/). `docs/angka_draft_lama.json` tetap sebagai arsip dokumentasi. — *SELESAI*
