@@ -48,18 +48,26 @@ def restore_locked(data_dir) -> bool:
     return all((Path(data_dir) / f).exists() for f in (RESULTS_FILE, GRID_FILE))
 
 
-def clean_json(obj):
+UNROUNDED_KEYS = {"pesc"}   # nilai sangat kecil: disimpan tanpa pembulatan
+
+
+def clean_json(obj, key=None):
+    """Konversi ke tipe JSON; float dibulatkan 6 desimal kecuali kunci di UNROUNDED_KEYS."""
     if isinstance(obj, dict):
-        return {str(k): clean_json(v) for k, v in obj.items()}
+        return {str(k): clean_json(v, str(k)) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
-        return [clean_json(v) for v in obj]
+        return [clean_json(v, key) for v in obj]
     if isinstance(obj, np.ndarray):
-        return clean_json(obj.tolist())
+        return clean_json(obj.tolist(), key)
+    if isinstance(obj, (bool, np.bool_)):
+        return bool(obj)
     if isinstance(obj, (np.integer,)):
         return int(obj)
     if isinstance(obj, (np.floating, float)):
         v = float(obj)
-        return None if not np.isfinite(v) else round(v, 6)
+        if not np.isfinite(v):
+            return None
+        return v if key in UNROUNDED_KEYS else round(v, 6)
     return obj
 
 
@@ -125,12 +133,13 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
             results["preprocessing"] = preprocessor.to_dict()
             results["baseline_time_stats"] = T.describe_times(df, cfg)
             logger.info("Evaluasi kandidat K (2–10) pada Baseline...")
-            k_rows, k_best = T.evaluate_k_candidates(X, gdf, prep["mask"], A, xy, cfg)
-            k_final = k_best
+            k_rows, k_summary = T.evaluate_k_candidates(X, gdf, prep["mask"], A, xy, cfg)
+            k_final = k_summary["k_terpilih"]
             results["k"] = k_final
             results["k_selection"] = {
                 "candidates": k_rows,
-                "k_composite_best": k_best,
+                **k_summary,
+                "k_composite_best": k_final,
                 "k_selected": k_final,
             }
 
@@ -152,7 +161,7 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
         summary = T.level_summary(key, prep, cl, cfg)
         summary["validity"] = {
             "iidx": T.i_index(X, cl["labels"], centers=T.fuzzy_centers(X, cl["U"], cfg.sdwfcm_m)),
-            "cdvm": T.membership_distribution_metric(cl["U"], X, cfg.sdwfcm_m),
+            "ketegasan_partisi": T.ketegasan_partisi(cl["U"], X, cfg.sdwfcm_m),
             "dunn": T.dunn_index(X, cl["labels"]),
             "desc": desc,
             "pesc": pesc,

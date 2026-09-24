@@ -411,10 +411,11 @@ def wcss(X, labels) -> float:
     return float(sum(((X[labels == c] - C[i]) ** 2).sum() for i, c in enumerate(ks)))
 
 
-def membership_distribution_metric(U: np.ndarray, X: Optional[np.ndarray] = None,
-                                   m: Optional[float] = None) -> float:
-    """CDVM pada seleksi K: 1 − PE / ln K, dengan PE = partition entropy
-    keanggotaan fuzzy (0 = keanggotaan merata, 1 = partisi tegas).
+def ketegasan_partisi(U: np.ndarray, X: Optional[np.ndarray] = None,
+                      m: Optional[float] = None) -> float:
+    """Ketegasan partisi = 1 − PE / ln K, dengan PE = partition entropy keanggotaan
+    fuzzy (0 = keanggotaan merata, 1 = partisi tegas). Dipakai pada pemilihan K.
+    (Nama "cdvm" hanya dipakai untuk total variation distance antarlevel.)
 
     Bila X dan m diberikan, keanggotaan dihitung ulang di ruang atribut
     (rumus FCM standar pada pusat fuzzy akhir, tanpa suku spasial) sehingga
@@ -481,7 +482,7 @@ def desc_pesc(X, labels, A: csr_matrix, coords: np.ndarray) -> Tuple[float, floa
     DESC = Σ_i V_i² / d_i²      (blok berukuran ≥ 2)
     PESC = Σ_k Σ_{i<j} V_i V_j / (D_ij · d_ij · B_nk)
     V_i  = proporsi ukuran blok terhadap klaster, d_i = rata-rata jarak atribut
-    anggota ke pusat blok, D_ij = jarak spasial (m) antar pusat blok,
+    anggota ke pusat blok, D_ij = jarak spasial (km) antar pusat blok,
     d_ij = jarak atribut antar pusat blok, B_nk = jumlah blok klaster k.
     """
     comp = _spatial_blocks(labels, A)
@@ -512,7 +513,7 @@ def desc_pesc(X, labels, A: csr_matrix, coords: np.ndarray) -> Tuple[float, floa
             continue
         V = (sizes[idx] / cl_size[lab]).values
         P = Xs.loc[idx].values[:, :n_attr]
-        Q = Cs.loc[idx].values
+        Q = Cs.loc[idx].values / 1000.0          # meter → km
         # batasi jumlah blok (blok terbesar) agar pasangan tetap terkelola
         if Bn > 3000:
             top = np.argsort(-V)[:3000]
@@ -562,41 +563,61 @@ def cdvm_distribution(labels_a, labels_b, k: int) -> float:
 # ══════════════════════════════════════════════════════════════════════════════
 # 6. PENENTUAN K OPTIMAL (Subbab 3.2.7)
 # ══════════════════════════════════════════════════════════════════════════════
+K_SCORE_METRICS = ["iidx", "dunn", "desc", "ketegasan_partisi"]
+
+
 def evaluate_k_candidates(X, coords_gdf, mask, A, coords, cfg: Cfg,
-                          k_range=K_RANGE) -> Tuple[List[dict], int]:
+                          k_range=K_RANGE) -> Tuple[List[dict], dict]:
+    """Evaluasi K kandidat pada Baseline.
+
+    Tiap K memakai SDWFCM multi-start dengan SDWFCM_N_INIT inisialisasi (sama dengan model
+    final); solusi dengan J terkecil dinilai. Skor komposit = rata-rata (bobot sama) dari
+    percentile rank I-Index, Dunn, DESC, ketegasan partisi (semakin besar semakin baik) dan
+    skor parsimoni linear 1 − (K − K_min)/(K_max − K_min). K final = skor tertinggi.
+    """
     rows = []
     for k in k_range:
-        res = run_sdwfcm(X, coords_gdf, k, mask, cfg, n_init=1)
+        res = run_sdwfcm(X, coords_gdf, k, mask, cfg, n_init=SDWFCM_N_INIT)
         labels = res["labels"]
         desc, pesc = desc_pesc(X, labels, A, coords)
         row = {
             "k": k, "m": cfg.sdwfcm_m, "alpha": cfg.sdwfcm_alpha, "knn": cfg.sdwfcm_knn,
+            "n_init": SDWFCM_N_INIT, "seed_terbaik": res["seed"], "objective": res["objective"],
             "iidx": i_index(X, labels, centers=fuzzy_centers(X, res["U"], cfg.sdwfcm_m)),
-            "cdvm": membership_distribution_metric(res["U"], X, cfg.sdwfcm_m),
+            "ketegasan_partisi": ketegasan_partisi(res["U"], X, cfg.sdwfcm_m),
             "dunn": dunn_index(X, labels),
             "desc": desc,
             "pesc": pesc,
             "size_entropy": size_entropy(labels),
             "time_sec": res["time"],
         }
-        logger.info(f"[K={k}] IIdx={row['iidx']:.3f} CDVM={row['cdvm']:.3f} "
+        logger.info(f"[K={k}] IIdx={row['iidx']:.3f} Ketegasan={row['ketegasan_partisi']:.3f} "
                     f"Dunn={row['dunn']:.4f} DESC={row['desc']:.3f} PESC={row['pesc']:.3g}")
         rows.append(row)
 
-    # Skor komposit berbasis peringkat (semakin besar semakin baik) +
-    # skor kesederhanaan (K kecil lebih disukai).
     df = pd.DataFrame(rows)
-    rank_cols = ["iidx", "dunn", "desc", "cdvm"]
-    for c in rank_cols:
+    for c in K_SCORE_METRICS:
         df[f"rank_{c}"] = df[c].rank(pct=True)
-    # skor kesederhanaan linear: 1 untuk K terkecil, 0 untuk K terbesar
     kmin, kmax = df["k"].min(), df["k"].max()
-    df["rank_parsimony"] = 1.0 - (df["k"] - kmin) / max(kmax - kmin, 1)
-    df["composite"] = df[[f"rank_{c}" for c in rank_cols] + ["rank_parsimony"]].mean(axis=1)
-    best_k = int(df.loc[df["composite"].idxmax(), "k"])
-    for row, comp in zip(rows, df["composite"].values):
-        row["composite"] = float(comp)
-    return rows, best_k
+    df["parsimoni"] = 1.0 - (df["k"] - kmin) / max(kmax - kmin, 1)
+    df["composite"] = df[[f"rank_{c}" for c in K_SCORE_METRICS] + ["parsimoni"]].mean(axis=1)
+    for row, (_, r) in zip(rows, df.iterrows()):
+        row.update({f"rank_{c}": float(r[f"rank_{c}"]) for c in K_SCORE_METRICS})
+        row["parsimoni"] = float(r["parsimoni"])
+        row["composite"] = float(r["composite"])
+    ordered = df.sort_values(["composite", "k"], ascending=[False, True]).reset_index(drop=True)
+    best, runner = ordered.iloc[0], ordered.iloc[1]
+    ties = df.loc[np.isclose(df["composite"], best["composite"]), "k"].astype(int).tolist()
+    summary = {
+        "k_terpilih": int(best["k"]),
+        "skor_terpilih": float(best["composite"]),
+        "k_runner_up": int(runner["k"]),
+        "skor_runner_up": float(runner["composite"]),
+        "selisih_skor": float(best["composite"] - runner["composite"]),
+        "k_dengan_skor_sama": ties,
+        "aturan": "K dengan skor komposit tertinggi; bila seri, K terkecil (parsimoni)",
+    }
+    return rows, summary
 
 
 # ══════════════════════════════════════════════════════════════════════════════
