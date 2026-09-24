@@ -168,16 +168,16 @@ function renderKTab(r) {
     const ks = r.k_selection || {};
     const rows = (ks.candidates || []).map(c => ({
         k: c.k,
-        cells: [c.k, fmtNum(c.iidx, 3), fmtNum(c.dunn, 4), fmtNum(c.desc, 3), fmtNum(c.cdvm, 3),
-                fmtNum(c.size_entropy, 3), fmtNum(c.composite, 3)]
+        cells: [c.k, fmtNum(c.iidx, 3), fmtNum(c.dunn, 4), fmtNum(c.desc, 3), fmtNum(c.ketegasan_partisi, 3),
+                fmtNum(c.pesc, 6), fmtNum(c.size_entropy, 3), fmtNum(c.parsimoni, 3), fmtNum(c.composite, 3)]
     }));
     return section('Evaluasi Jumlah Klaster Optimal (Baseline)',
-        `Parameter SDWFCM: m = ${r.meta?.sdwfcm?.m}, α = ${r.meta?.sdwfcm?.alpha}, k-NN = ${r.meta?.sdwfcm?.knn}. K diuji pada rentang 2–10.`,
-        table(['K', 'I-Index ↑', 'Dunn ↑', 'DESC ↑', 'CDVM ↑', 'Size Entropy', 'Skor Komposit ↑'], rows,
-              { highlight: row => row.k === ks.k_selected }),
-        `K terpilih: <b>${ks.k_selected}</b> (skor komposit tertinggi: K = ${ks.k_composite_best}). Skor komposit = rata-rata peringkat
-         I-Index, Dunn, DESC, dan CDVM ditambah skor kesederhanaan linear 1 − (K − 2)/8. I-Index memakai pusat klaster fuzzy SDWFCM; CDVM = 1 − PE/ln K
-         pada keanggotaan ruang atribut; Dunn dihitung pada sampel 2.000 grid; DESC memakai blok spasial ketetanggaan queen.`);
+        `Parameter SDWFCM: m = ${r.meta?.sdwfcm?.m}, α = ${r.meta?.sdwfcm?.alpha}, k-NN = ${r.meta?.sdwfcm?.knn}; ${r.meta?.sdwfcm_n_init ?? 10} inisialisasi per K. K diuji pada rentang 2–10.`,
+        table(['K', 'I-Index ↑', 'Dunn ↑', 'DESC ↑', 'Ketegasan partisi ↑', 'PESC', 'Size Entropy', 'Parsimoni', 'Skor Komposit ↑'], rows,
+              { highlight: row => row.k === ks.k_terpilih }),
+        `K terpilih: <b>${ks.k_terpilih}</b> (skor ${fmtNum(ks.skor_terpilih, 3)}); runner-up K = ${ks.k_runner_up}
+         (skor ${fmtNum(ks.skor_runner_up, 3)}), selisih <b>${fmtNum(ks.selisih_skor, 3)}</b>. Skor komposit = rata-rata
+         percentile rank I-Index, Dunn, DESC, dan ketegasan partisi (1 − PE/ln K) ditambah parsimoni linear, bobot sama.`);
 }
 
 // ── Tab: Perbandingan Algoritma (Tabel 11) ───────────────────────────────────
@@ -185,16 +185,16 @@ function renderAlgoTab(r) {
     const rows = (r.algorithm_comparison || []).map(a => ({
         algo: a.algoritma,
         cells: [a.algoritma, fmtNum(a.silhouette, 3), fmtNum(a.calinski_harabasz, 1), fmtNum(a.davies_bouldin, 3),
-                fmtNum(a.moran_i, 3), fmtNum(a.size_entropy, 3), fmtNum(a.wcss, 1), `${fmtNum(a.time_sec, 2)} s`]
+                fmtNum(a.moran_i, 3), fmtNum(a.proporsi_tetangga_sama, 3), fmtNum(a.size_entropy, 3), fmtNum(a.wcss, 1), `${fmtNum(a.time_sec, 2)} s`]
     }));
     if (!rows.length) {
         return section('Perbandingan Algoritma', '', '<p class="muted">Perbandingan algoritma belum dijalankan. Jalankan <code>python -m scripts.thesis_analysis</code> tanpa opsi <code>--skip-comparison</code>.</p>');
     }
     return section('Perbandingan Kinerja Algoritma (Baseline, K = ' + r.k + ')',
         'SDWFCM dibandingkan dengan Spatial FCM, REDCAP, dan SKATER pada ruang fitur hasil PCA yang sama.',
-        table(['Algoritma', 'Silhouette ↑', 'Calinski-Harabasz ↑', 'Davies-Bouldin ↓', "Moran's I ↑", 'Size Entropy ↑', 'WCSS ↓', 'Waktu'], rows,
+        table(['Algoritma', 'Silhouette ↑', 'Calinski-Harabasz ↑', 'Davies-Bouldin ↓', "Moran's I ↑", 'Tetangga berlabel sama ↑', 'Size Entropy ↑', 'WCSS ↓', 'Waktu'], rows,
               { highlight: row => row.algo === 'SDWFCM' }),
-        "Moran's I dihitung pada label klaster (kontiguitas rook). Size Entropy rendah menandakan ukuran klaster yang timpang. Waktu SDWFCM = rata-rata per inisialisasi (SDWFCM dijalankan 10 kali, dipilih fungsi objektif terkecil).");
+        "Semua algoritma dinomori dengan aturan yang sama (urut rata-rata waktu tempuh minimum) sebelum Moran's I dihitung (kontiguitas rook). 'Tetangga berlabel sama' = proporsi pasangan tetangga rook dengan label sama (tidak bergantung penomoran). Waktu SDWFCM = rata-rata per inisialisasi.");
 }
 
 // ── Tab: Profil Klaster (Tabel 12–15) ────────────────────────────────────────
@@ -214,7 +214,7 @@ function renderProfileTab(r) {
     });
     return levelTabs(activeProfileLevel, 'switchProfileLevel')
         + section(`Profil Klaster Level ${levelLabel(activeProfileLevel)}`,
-            'Rata-rata nilai fitur asli per klaster. Penomoran klaster mengikuti Tabel 12–15 draft skripsi (label SDWFCM dipetakan ke profil referensi; keanggotaan grid tidak berubah).',
+            'Rata-rata nilai fitur asli per klaster. Baseline: klaster diurutkan dari waktu tempuh minimum tercepat (Klaster 0). Level lain: nomor diselaraskan ke pusat klaster Baseline (Hungarian); tipologi yang tidak berpadanan ditandai.',
             table(['Klaster', 'Grid', '%', 'Kerapatan Jalan', 'Indeks Bahaya', 'Pendidikan', 'Kesehatan', 'Pemerintahan',
                    'Ibadah', 'GOR', 'Waktu Min.', 'Opsi Rute', 'Terisolasi', 'Interpretasi'], rows, { leftLast: true }),
             'Kolom waktu dalam menit. "Terisolasi" = rata-rata proporsi kategori TES yang tidak terjangkau.');
@@ -314,13 +314,15 @@ function renderTransitionTab(r) {
 function renderTasTab(r) {
     const rows = LEVELS.map(l => {
         const s = r.levels?.[l.key]?.tas || {};
-        return { cells: [l.label, fmtInt(s.jumlah_tas), `${fmtNum(s.persen_tas)}%`, fmtNum(s.mean_di_tas), fmtNum(s.mean_di_non_tas),
-                         fmtNum(s.delta_di), fmtNum(s.p25_t_ideal), fmtNum(s.p75_di)] };
+        const sen = s.sensitivitas_di_absolut || {};
+        return { cells: [l.label, fmtInt(s.jumlah_tas), fmtInt(s.jumlah_non_tas), fmtInt(s.jumlah_terputus), `${fmtNum(s.persen_tas)}%`,
+                         fmtNum(s.mean_di_tas, 3), fmtNum(s.mean_di_non_tas, 3), fmtNum(s.delta_di, 3), fmtNum(s.p25_t_ideal), fmtNum(s.p75_di, 3),
+                         fmtInt(sen.jumlah_tas)] };
     });
     return section('Deteksi Titik Aman Semu (Detour Index)',
-        'DI = T<sub>aktual</sub> / T<sub>ideal</sub>. Grid diklasifikasikan sebagai TAS apabila T<sub>ideal</sub> ≤ persentil ke-25 (dekat secara euclidean dengan TES) namun DI ≥ persentil ke-75 (jalur jaringan jalan jauh memutar).',
-        table(['Level', 'Jumlah TAS', '% Grid', 'Rerata DI TAS', 'Rerata DI Non-TAS', 'Selisih DI', 'P25 T<sub>ideal</sub> (mnt)', 'P75 DI'], rows),
-        'Grid yang tidak dapat menjangkau TES diberi T<sub>aktual</sub> = waktu penalti, sehingga DI melonjak pada level Tinggi. Pilih tampilan peta "Titik Aman Semu" untuk melihat sebarannya.');
+        'DI = T<sub>aktual</sub> / T<sub>ideal</sub> (jarak Euclidean minimum 50 m). Pada grid yang terjangkau, TAS bila T<sub>ideal</sub> ≤ persentil ke-25 namun DI ≥ persentil ke-75. Grid dengan T<sub>aktual</sub> = waktu penalti digolongkan <b>Terputus</b> dan tidak ikut persentil maupun rata-rata DI.',
+        table(['Level', 'TAS', 'Non-TAS', 'Terputus', '% TAS', 'Rerata DI TAS', 'Rerata DI Non-TAS', 'Selisih DI', 'P25 T<sub>ideal</sub> (mnt)', 'P75 DI', 'TAS (DI ≥ 2)'], rows),
+        'Kolom terakhir: uji sensitivitas dengan ambang absolut DI ≥ 2. Pilih tampilan peta "Titik Aman Semu" untuk melihat sebarannya.');
 }
 
 // ── Tab: Waktu Tempuh (Gambar 18) ────────────────────────────────────────────

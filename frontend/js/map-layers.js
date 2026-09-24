@@ -610,9 +610,9 @@ function gridStyleFor(d) {
     if (clustersHidden) return { fillColor: NEUTRAL_FILL, fillOpacity: 0.25, stroke: false };
     const dim = activeCluster !== null && activeView === 'klaster' && d.cluster_sdwfcm !== activeCluster;
     if (activeView === 'tas') {
-        return d.titik_aman_semu === 1
-            ? { fillColor: TAS_COLOR, fillOpacity: 0.9, stroke: false }
-            : { fillColor: NEUTRAL_FILL, fillOpacity: 0.18, stroke: false };
+        if (d.status_tas === 1) return { fillColor: TAS_COLOR, fillOpacity: 0.9, stroke: false };
+        if (d.status_tas === 2) return { fillColor: TERPUTUS_COLOR, fillOpacity: 0.85, stroke: false };
+        return { fillColor: NEUTRAL_FILL, fillOpacity: 0.18, stroke: false };
     }
     if (activeView === 'terdampak') {
         return d.terdampak === 1

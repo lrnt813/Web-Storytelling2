@@ -1,11 +1,13 @@
-﻿const API_BASE = "/api";
+const API_BASE = "/api";
 const backendOriginOverride = window.__EVAC_API_ORIGIN || localStorage.getItem('evac_api_origin');
 const backendOrigin = backendOriginOverride || ((window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') && window.location.port !== '8000'
     ? `${window.location.protocol}//${window.location.hostname}:8000`
     : window.location.origin);
 const RESOLVED_API_BASE = `${backendOrigin}/api`;
 // Warna klaster: palet kategorikal tab10 (urutan tetap per nomor klaster)
-const clusterColors = { 0: "#1f77b4", 1: "#2ca02c", 2: "#9467bd", 3: "#e377c2", 4: "#bcbd22", 5: "#17becf", "-1": "#475569" };
+const clusterColors = { 0: "#1f77b4", 1: "#2ca02c", 2: "#9467bd", 3: "#e377c2", 4: "#bcbd22", 5: "#17becf",
+                        6: "#8c564b", 7: "#d62728", 8: "#7f7f7f", 9: "#ff7f0e", "-1": "#475569" };
+const TERPUTUS_COLOR = "#0f172a";
 const TAS_COLOR = "#a855f7";
 const TERDAMPAK_COLOR = "#ff7f0e";
 const NEUTRAL_FILL = "#475569";

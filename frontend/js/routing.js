@@ -239,7 +239,8 @@ function renderGridAttrPopup(g) {
         const v = g[`waktu_tes_${kat}`];
         return popupRow(meta.label, v === null || v === undefined ? '–' : `${fmtNum(v, 1)} mnt`);
     }).join('');
-    const isTas = g.titik_aman_semu === 1;
+    const isTas = g.status_tas === 1;
+    const isTerputus = g.status_tas === 2;
     const adm = typeof gridAdminName === 'function' ? gridAdminName(g.id_grid) : null;
     const lokasi = adm ? `<div class="popup-loc"><i class="fa fa-map-location-dot"></i> Kal. ${adm.desa.replace(/^Kelurahan\s+/i, '')}, Kap. ${adm.kecamatan}
         <a href="#" class="popup-link" onclick="event.preventDefault(); openRegionPanel('desa', ${JSON.stringify(adm.desa).replace(/"/g, '&quot;')})">Ringkasan kalurahan</a></div>` : '';
@@ -264,5 +265,6 @@ function renderGridAttrPopup(g) {
         ${popupRow('T<sub>aktual</sub> (jaringan)', `${fmtNum(g.t_aktual, 2)} mnt`)}
         ${popupRow('Detour Index', fmtNum(g.detour_index, 2))}
         ${isTas ? `<div class="popup-flag"><i class="fa fa-exclamation-triangle"></i> TITIK AMAN SEMU</div>` : ''}
+        ${isTerputus ? `<div class="popup-flag terputus"><i class="fa fa-link-slash"></i> TERPUTUS — tidak menjangkau TES</div>` : ''}
     </div>`;
 }

@@ -41,8 +41,9 @@ function buildLegendHtml(k) {
         html += `<div class="legend-foot">Klik klaster untuk menyorot. Transparansi = derajat keanggotaan.</div>`;
     } else if (activeView === 'tas') {
         html += `<div class="legend-static-item">${legendSwatch(TAS_COLOR, '#f5f3ff')} Titik Aman Semu <span class="legend-note">${fmtInt(countBy(d => d.titik_aman_semu === 1))}</span></div>
-                 <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Bukan TAS</div>
-                 <div class="legend-foot">TAS: T<sub>ideal</sub> ≤ P25 dan Detour Index ≥ P75</div>`;
+                 <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Non-TAS <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 0))}</span></div>
+                 <div class="legend-static-item">${legendSwatch(TERPUTUS_COLOR, '#94a3b8')} Terputus <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 2))}</span></div>
+                 <div class="legend-foot">TAS: T<sub>ideal</sub> ≤ P25 dan Detour Index ≥ P75 (grid terjangkau). Terputus: tidak menjangkau TES.</div>`;
     } else if (activeView === 'terdampak') {
         html += `<div class="legend-static-item">${legendSwatch(TERDAMPAK_COLOR)} Grid terdampak <span class="legend-note">${fmtInt(countBy(d => d.terdampak === 1))}</span></div>
                  <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Tidak terdampak</div>`;

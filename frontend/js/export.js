@@ -103,12 +103,14 @@ async function exportGridData() {
     const kat = Object.keys(tesCategories);
     const head = ['id_grid', 'Kalurahan', 'Kapanewon', 'Klaster SDWFCM', 'Interpretasi klaster', 'Derajat keanggotaan',
         'Indeks bahaya banjir', 'Terdampak (1=ya)', 'Kerapatan jalan', ...kat.map(k => `Waktu TES ${tesCategories[k].label} (menit)`),
-        'Waktu TES minimum (menit)', 'Jumlah opsi rute', 'Terisolasi (1=ya)', 'T ideal (menit)', 'T aktual (menit)', 'Detour Index', 'Titik Aman Semu (1=ya)'];
+        'Waktu TES minimum (menit)', 'Jumlah opsi rute', 'Terisolasi (1=ya)', 'T ideal (menit)', 'T aktual (menit)', 'Detour Index',
+        'Titik Aman Semu (1=ya)', 'Status TAS'];
     const rows = Object.values(gridLayer.lookup).sort((a, b) => a.id_grid - b.id_grid).map(d => {
         const adm = gridAdminName(d.id_grid) || {};
         return [d.id_grid, cleanDesaName(adm.desa), adm.kecamatan ?? null, d.cluster_sdwfcm, getClusterDesc(d.cluster_sdwfcm), d.membership_max,
             d.indeks_bahaya, d.terdampak, d.road_density, ...kat.map(k => d[`waktu_tes_${k}`]), d.waktu_tes_min, d.jumlah_opsi_rute,
-            d.is_isolated, d.t_ideal, d.t_aktual, d.detour_index, d.titik_aman_semu];
+            d.is_isolated, d.t_ideal, d.t_aktual, d.detour_index, d.titik_aman_semu,
+            ({ 0: 'Non-TAS', 1: 'TAS', 2: 'Terputus' })[d.status_tas] ?? null];
     });
     const sim = lastLevelResult?.simulated ? '_simulasi' : '';
     downloadWorkbook([{ name: `Grid ${levelLabel(activeLevel)}${sim ? ' (simulasi)' : ''}`, aoa: [head, ...rows] }],
