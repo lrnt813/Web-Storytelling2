@@ -1,11 +1,11 @@
 """Cek reproduksi: jalankan ulang analisis ke folder sementara lalu bandingkan dengan LOCK.json.
 
-    python -m scripts.cek_reproduksi            # jalankan ulang penuh (~25–30 menit)
+    python -m scripts.cek_reproduksi            # jalankan ulang penuh (± 2 jam)
     python -m scripts.cek_reproduksi --simpan   # sama, folder sementara tidak dihapus
 
 Yang dibandingkan:
   * fingerprint thesis_results.json tanpa field waktu dan meta.git;
-  * SHA-256 isi CSV grid (setelah dekompresi).
+  * SHA-256 isi CSV grid dan CSV data gabungan (setelah dekompresi).
 Data masukan (*.gpkg) disalin dari data/; folder data/ dan data/locked/ tidak disentuh.
 """
 import json
@@ -21,7 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.kunci_hasil import grid_content_sha256
-from scripts.thesis_analysis import GRID_FILE, LOCK_DIR, LOCK_FILE, RESULTS_FILE, results_fingerprint
+from scripts.thesis_analysis import GRID_FILE, LOCK_DIR, LOCK_FILE, POOLED_FILE, RESULTS_FILE, results_fingerprint
 
 
 def main(keep: bool = False) -> int:
@@ -37,12 +37,14 @@ def main(keep: bool = False) -> int:
                        cwd=PROJECT_ROOT, env=env, check=True)
         fp = results_fingerprint(tmp / RESULTS_FILE)
         grid = grid_content_sha256(tmp / GRID_FILE)
+        pooled = grid_content_sha256(tmp / POOLED_FILE)
     finally:
         if not keep:
             shutil.rmtree(tmp, ignore_errors=True)
 
     checks = [("fingerprint thesis_results.json", lock["fingerprint_hasil_tanpa_waktu"], fp),
-              ("isi CSV grid", lock.get("sha256_isi_grid_csv"), grid)]
+              ("isi CSV grid", lock.get("sha256_isi_grid_csv"), grid),
+              ("isi CSV data gabungan", lock.get("sha256_isi_pooled_csv"), pooled)]
     ok = True
     for name, expected, got in checks:
         same = expected == got

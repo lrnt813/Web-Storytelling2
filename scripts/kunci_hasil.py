@@ -23,11 +23,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.thesis_analysis import (GRID_FILE, LOCK_DIR, LOCK_FILE, RESULTS_FILE, file_sha256,
-                                     results_fingerprint)
+from scripts.thesis_analysis import (GRID_FILE, LOCK_DIR, LOCK_FILE, POOLED_FILE, RESULT_FILES,
+                                     RESULTS_FILE, file_sha256, results_fingerprint)
 
-RESULT_PATHS = ("data/thesis_results.json", "data/thesis_grid_results.csv.gz", "data/locked/",
-                "output_bab4/", "scratch/")
+RESULT_PATHS = ("data/thesis_results.json", "data/thesis_grid_results.csv.gz",
+                "data/thesis_pooled_results.csv.gz", "data/locked/", "output_bab4/", "scratch/")
 PIPELINE_FILES = ["backend/engine.py", "backend/thesis.py", "backend/config.py",
                   "scripts/thesis_analysis.py"]
 LIBRARIES = ["numpy", "pandas", "scipy", "scikit-learn", "geopandas", "networkx", "libpysal",
@@ -73,7 +73,6 @@ def lock(data_dir: Path = PROJECT_ROOT / "data") -> dict:
         raise SystemExit("DITOLAK: ada perubahan kode yang belum di-commit:\n  " + "\n  ".join(dirty))
 
     results_path = data_dir / RESULTS_FILE
-    grid_path = data_dir / GRID_FILE
     results = json.loads(results_path.read_text(encoding="utf-8"))
     git_meta = results.get("meta", {}).get("git") or {}
     if not git_meta.get("commit"):
@@ -88,8 +87,8 @@ def lock(data_dir: Path = PROJECT_ROOT / "data") -> dict:
 
     lock_dir = data_dir / LOCK_DIR
     lock_dir.mkdir(parents=True, exist_ok=True)
-    for src in (results_path, grid_path):
-        shutil.copy2(src, lock_dir / src.name)
+    for f in RESULT_FILES:
+        shutil.copy2(data_dir / f, lock_dir / f)
 
     meta = {
         "keterangan": "Hasil analisis terkunci. Jangan diedit manual. Semua angka skripsi berasal dari "
@@ -113,11 +112,12 @@ def lock(data_dir: Path = PROJECT_ROOT / "data") -> dict:
                  "moran_permutation_seed": _thesis_constants()["MORAN_PERMUTATION_SEED"],
                  "dunn_sample_seed": 42},
         "k_terpilih": results.get("k"),
-        "files": {f: file_sha256(lock_dir / f) for f in (RESULTS_FILE, GRID_FILE)},
+        "files": {f: file_sha256(lock_dir / f) for f in RESULT_FILES},
         "fingerprint_hasil_tanpa_waktu": results_fingerprint(lock_dir / RESULTS_FILE),
         "sha256_isi_grid_csv": grid_content_sha256(lock_dir / GRID_FILE),
+        "sha256_isi_pooled_csv": grid_content_sha256(lock_dir / POOLED_FILE),
         "catatan_fingerprint": "fingerprint = SHA-256 JSON kanonik thesis_results.json tanpa field waktu dan "
-                               "meta.git; sha256_isi_grid_csv = SHA-256 isi CSV setelah dekompresi (header gzip "
+                               "meta.git; sha256_isi_*_csv = SHA-256 isi CSV setelah dekompresi (header gzip "
                                "memuat stempel waktu). Keduanya dipakai scripts/cek_reproduksi.py.",
     }
     (lock_dir / LOCK_FILE).write_text(json.dumps(meta, ensure_ascii=False, indent=1, default=str),

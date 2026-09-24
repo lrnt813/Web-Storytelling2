@@ -1,8 +1,10 @@
 """Analisis offline penelitian (menghasilkan seluruh angka Bab IV).
 
 Menghasilkan:
-  data/thesis_results.json         — ringkasan seluruh tabel/metrik Bab IV
-  data/thesis_grid_results.csv.gz  — atribut per grid untuk setiap level
+  data/thesis_results.json           — ringkasan seluruh tabel/metrik Bab IV
+  data/thesis_grid_results.csv.gz    — atribut per grid untuk setiap level
+  data/thesis_pooled_results.csv.gz  — data gabungan (id_grid, id_grid_asli, level, fitur, PCA,
+                                       klaster, keanggotaan)
 
 Jalankan:  python -m scripts.thesis_analysis --force
            tambahkan --skip-comparison untuk melewati perbandingan algoritma.
@@ -34,6 +36,8 @@ logger = logging.getLogger("ThesisAnalysis")
 
 RESULTS_FILE = "thesis_results.json"
 GRID_FILE = "thesis_grid_results.csv.gz"
+POOLED_FILE = "thesis_pooled_results.csv.gz"     # data gabungan (grid × level non-Tergenang)
+RESULT_FILES = (RESULTS_FILE, GRID_FILE, POOLED_FILE)
 LOCK_DIR = "locked"
 LOCK_FILE = "LOCK.json"
 
@@ -48,7 +52,7 @@ def restore_locked(data_dir) -> bool:
     lock_dir = Path(data_dir) / LOCK_DIR
     if not (lock_dir / LOCK_FILE).exists():
         return False
-    for f in (RESULTS_FILE, GRID_FILE):
+    for f in RESULT_FILES:
         if (lock_dir / f).exists():
             shutil.copy2(lock_dir / f, Path(data_dir) / f)
     return all((Path(data_dir) / f).exists() for f in (RESULTS_FILE, GRID_FILE))
@@ -232,6 +236,13 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     results["cluster_profile"] = T.cluster_profile(pool, labels, k_final)
     results["cluster_names"] = {str(r["klaster"]): r["deskripsi"] for r in results["cluster_profile"]}
     membership_pool = U.max(axis=1)
+    pooled_out = pool[["id_grid", "id_grid_asli", "level"] + pre.params["features_in"]].copy()
+    for i in range(X.shape[1]):
+        pooled_out[f"pc{i + 1}"] = np.round(X[:, i], 6)
+    pooled_out["klaster"] = labels
+    pooled_out["keanggotaan_maks"] = np.round(membership_pool, 6)
+    for c in range(k_final):
+        pooled_out[f"u{c}"] = np.round(U[:, c], 6)
     t = _tick("model_final", t)
 
     # ── 5. State per level, transisi ─────────────────────────────────────────
@@ -283,6 +294,7 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     out_json = Path(data_dir) / RESULTS_FILE
     out_json.write_text(json.dumps(clean_json(results), ensure_ascii=False, indent=1), encoding="utf-8")
     pd.concat(grid_parts, axis=1).to_csv(Path(data_dir) / GRID_FILE, index=False, compression="gzip")
+    pooled_out.to_csv(Path(data_dir) / POOLED_FILE, index=False, compression="gzip")
     logger.info(f"Selesai {time.time() - t_start:.0f}s -> {out_json}")
     return results
 
