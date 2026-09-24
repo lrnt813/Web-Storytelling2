@@ -241,3 +241,23 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
   Keduanya ditetapkan sebelum melihat hasil model. — *DICATAT*
 - **P3-4. Stabilitas K dihitung ulang** (keputusan peneliti), berbeda dengan instruksi awal Putaran 3,
   karena data gabungan berubah. Keluaran lengkap tetap untuk K = 2 dan K = 3. — *DIPUTUSKAN*
+- **P3-5. Langkah 8 selesai.** Kode yatim (`run_all_clustering`, `_run`, `eval_one`, `evaluate_all`,
+  `_size_entropy`) dan parameter `Cfg` yang tidak dirujuk dihapus setelah diverifikasi dengan grep,
+  pytest, dan smoke test. `k_range` dan `sdwfcm_sigma` ikut dihapus karena hanya dirujuk kode yatim
+  (K_RANGE di thesis.py yang berlaku). — *SELESAI*
+- **P3-6. Kelas bahaya ruas dengan aturan maksimum** menaikkan kelas 2.477 ruas dibanding atribut
+  lama. Atribut lama tampaknya diambil dari satu titik per segmen. — *DICATAT*
+- **P3-7. `pengaturan_hasil.json`** menyimpan K utama (bawaan 3) untuk export dan dashboard. Berkas ini
+  bukan bagian dari hasil terkunci; mengubahnya tidak mengubah analisis, hanya susunan tabel utama
+  vs sensitivitas. — *DICATAT*
+
+## Status temuan Putaran 2 setelah Putaran 3
+
+| Temuan | Status | Keterangan |
+|---|---|---|
+| P2-A2 (kode yatim di engine) | **Selesai** | Dihapus di Langkah 8 (P3-5) |
+| P2-D2 (m SFCM berbeda) | **Selesai** | SFCM memakai m = 1,7 yang sama (`sfcm_m` dihapus) |
+| P2-F1 (K = 2 vs K = 3 setara) | **Ditangani** | Stabilitas dihitung ulang pada data v3; keluaran lengkap untuk K = 2 dan 3; model utama diputuskan peneliti (METODOLOGI §9) |
+| P2-F3 (PESC meledak) | **Ditangani** | PESC, DESC, I-Index, Dunn, dan komposit dipindah ke tabel lampiran L01 |
+| P2-F4 (semua TAS lolos DI ≥ 2) | **Selesai** | Aturan utama kini absolut (DI ≥ 2 dan T_ideal ≤ 5 menit); persentil menjadi sensitivitas |
+| P2-D1 (SKATER gagal) | Tetap | Dilaporkan gagal untuk kedua K, tanpa fallback |

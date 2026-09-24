@@ -16,7 +16,9 @@ cocok dengan angka tertentu.
    dashboard, log, atau draft lama.
 4. **Temuan yang janggal dicatat di `docs/CATATAN_TEMUAN.md`.** Jangan diperbaiki diam-diam.
    Perubahan metode harus diputuskan bersama pembimbing, lalu dikerjakan lewat alur di bawah.
-5. `docs/angka_draft_lama.json` hanya arsip pembanding. Berkas ini tidak boleh diimpor oleh
+5. **K model utama** ditulis di `pengaturan_hasil.json` (dibaca export dan dashboard). Ubah hanya atas
+   keputusan peneliti bersama pembimbing; tabel utama (T*) mengikuti K utama, K lain menjadi S*.
+6. `docs/angka_draft_lama.json` hanya arsip pembanding. Berkas ini tidak boleh diimpor oleh
    backend atau pipeline.
 
 ## Mengubah metode lalu memperbarui hasil
@@ -28,7 +30,7 @@ python -m pytest -q                                   # semua uji harus lulus
 git commit -am "Ubah ...: alasan"                     # 1. commit kode
 python -m scripts.thesis_analysis --force             # 2. jalankan (±1,7 jam; jangan biarkan laptop sleep)
 python -m scripts.kunci_hasil                         # 3. kunci (ditolak bila kode belum di-commit)
-python -m scripts.export_bab4                         # 4. bangun tabel Bab IV
+python -m scripts.export_bab4                         # 4. bangun tabel Bab IV (K utama: pengaturan_hasil.json)
 git add data/locked output_bab4 && git commit -m "Hasil terkunci: ..."   # 5. commit hasil
 git tag hasil-skripsi-vN && git push --follow-tags     # 6. tag versi hasil
 ```
