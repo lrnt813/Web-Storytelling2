@@ -17,7 +17,7 @@ function legendSwatch(color, border = null) {
 
 function legendTitle() {
     return `<h4 class="legend-title">${viewModes[activeView].toUpperCase()}</h4>
-            <div class="legend-sub">Banjir · Level ${levelLabel(activeLevel)}${lastLevelResult?.simulated ? ' · <span class="legend-sim">SIMULASI</span>' : ''}</div>`;
+            <div class="legend-sub">Banjir · ${levelFullLabel(activeLevel)}${lastLevelResult?.simulated ? ' · <span class="legend-sim">SIMULASI</span>' : ''}</div>`;
 }
 
 function countBy(fn) {
@@ -38,15 +38,18 @@ function buildLegendHtml(k) {
                         <div><div>${getClusterName(i)}</div>${desc ? `<div class="legend-desc">${desc}</div>` : ''}</div>
                      </div>`;
         }
-        html += `<div class="legend-foot">Klik klaster untuk menyorot. Transparansi = derajat keanggotaan.</div>`;
+        html += `<div class="legend-static-item">${legendSwatch(TERGENANG_COLOR)} Tergenang <span class="legend-note">${fmtInt(countBy(d => d.tergenang === 1))}</span></div>`;
+        html += `<div class="legend-foot">Klik klaster untuk menyorot. Transparansi = derajat keanggotaan. Grid Tergenang tidak diklasterkan.</div>`;
     } else if (activeView === 'tas') {
         html += `<div class="legend-static-item">${legendSwatch(TAS_COLOR, '#f5f3ff')} Titik Aman Semu <span class="legend-note">${fmtInt(countBy(d => d.titik_aman_semu === 1))}</span></div>
                  <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Non-TAS <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 0))}</span></div>
                  <div class="legend-static-item">${legendSwatch(TERPUTUS_COLOR, '#94a3b8')} Terputus <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 2))}</span></div>
-                 <div class="legend-foot">TAS: T<sub>ideal</sub> ≤ P25 dan Detour Index ≥ P75 (grid terjangkau). Terputus: tidak menjangkau TES.</div>`;
+                 <div class="legend-static-item">${legendSwatch(TERGENANG_COLOR)} Tergenang <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 3))}</span></div>
+                 <div class="legend-foot">TAS: T<sub>ideal</sub> ≤ P25 dan Detour Index ≥ P75 (grid non-Tergenang yang terjangkau). Terputus: tidak menjangkau TES.</div>`;
     } else if (activeView === 'terdampak') {
-        html += `<div class="legend-static-item">${legendSwatch(TERDAMPAK_COLOR)} Grid terdampak <span class="legend-note">${fmtInt(countBy(d => d.terdampak === 1))}</span></div>
-                 <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Tidak terdampak</div>`;
+        html += `<div class="legend-static-item">${legendSwatch(TERGENANG_COLOR)} Tergenang <span class="legend-note">${fmtInt(countBy(d => d.tergenang === 1))}</span></div>
+                 <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Tidak tergenang</div>
+                 <div class="legend-foot">${LEVELS.find(l => l.key === activeLevel)?.kelas || ''}</div>`;
     } else if (activeView === 'waktu') {
         waktuBins.forEach(b => { html += `<div class="legend-static-item">${legendSwatch(b.color)} ${b.label}</div>`; });
         html += `<div class="legend-foot">Kecepatan berjalan kaki 80 m/menit</div>`;

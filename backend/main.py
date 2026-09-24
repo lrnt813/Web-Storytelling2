@@ -247,12 +247,15 @@ def _level_payload(level: dict, summary: dict, records: List[dict], simulated: b
         "simulated": simulated,
         "n_cut_roads": n_cut,
         "elapsed_sec": round(elapsed, 2),
+        "level_label_lengkap": level["label_lengkap"],
+        "kelas_ditutup": level["kelas_ditutup"],
         "k_optimal": int(state.thesis_results["k"]),
-        "cluster_names": summary.get("cluster_names", {}),
-        "cluster_profile": summary.get("cluster_profile", []),
+        "cluster_names": state.thesis_results.get("cluster_names", {}),
+        "cluster_profile": state.thesis_results.get("cluster_profile", []),
+        "distribusi_tipologi": summary.get("distribusi_tipologi", []),
         "tas": summary.get("tas", {}),
         "n_titik_semu": int(summary.get("tas", {}).get("jumlah_tas", 0) or 0),
-        "n_grid_terdampak": summary.get("n_grid_terdampak"),
+        "n_grid_tergenang": summary.get("n_grid_tergenang"),
         "mean_waktu_min": summary.get("mean_waktu_min"),
         "n_grid": len(records),
         "data_klaster": records,
@@ -340,7 +343,8 @@ async def health_check():
 
 @app.get("/api/levels", tags=["System"], summary="Daftar level intensitas banjir")
 async def get_levels():
-    return {"status": "ok", "skenario": T.SKENARIO, "levels": T.LEVELS, "k": state.thesis_results.get("k")}
+    return {"status": "ok", "skenario": T.SKENARIO, "levels": T.LEVELS, "k": state.thesis_results.get("k"),
+            "tas_status": T.TAS_STATUS}
 
 
 @app.get("/api/thesis-results", tags=["Hasil"], summary="Ringkasan seluruh hasil Bab IV")
@@ -362,7 +366,7 @@ async def get_level(
 
 
 @app.post("/api/simulate", tags=["Clustering"],
-          summary="Simulasi blokir jalan pada suatu level + klasterisasi ulang SDWFCM")
+          summary="Simulasi blokir jalan pada suatu level (keanggotaan terhadap pusat klaster final)")
 async def post_simulate(body: SimulateRequest):
     _check_ready()
     lv = _resolve_level(body.level, body.intensity)
@@ -378,19 +382,17 @@ async def post_simulate(body: SimulateRequest):
                 G_cut = apply_road_cuts_to_graph(G, nl, tn, cuts, cfg)
                 prep = T.prepare_level(state.gdf_base, state.roads_raw, state.tes_raw,
                                        lv["intensity"], cfg, t_pen=state.t_pen,
-                                       graph_pack=(G_cut, nl, tn),
-                                       preprocessor=T.Preprocessor.from_dict(
-                                           state.thesis_results["preprocessing"]))
-                seed = state.thesis_results.get("levels", {}).get(lv["key"], {}).get("sdwfcm_seed")
-                cl = T.cluster_level(prep, state.gdf_base, cfg,
-                                     k=int(state.thesis_results["k"]), fast=False,
-                                     seeds=[int(seed)] if seed is not None else None,
-                                     baseline_centers=np.asarray(state.thesis_results["pusat_baseline_pca"]))
+                                       graph_pack=(G_cut, nl, tn))
+                # Keanggotaan terhadap pusat klaster final yang TETAP (bukan klasterisasi ulang)
+                sim = T.simulate_level(prep, T.Preprocessor.from_dict(state.thesis_results["preprocessing"]),
+                                       np.asarray(state.thesis_results["model_final"]["pusat_klaster_pca"]),
+                                       state.gdf_base, cfg)
                 grid = pd.concat([
                     state.thesis_grid[["id_grid", "id_grid_asli", "Road_Density_mean", T.SKENARIO]],
-                    T.level_grid_frame(lv["key"], prep["df"], cl, cfg),
+                    T.level_grid_frame(lv["key"], prep["df"], sim["labels"], sim["membership"], prep["tas"], cfg),
                 ], axis=1)
-                return T.level_summary(lv["key"], prep, cl, cfg), T.records_from_grid(grid, lv["key"], cfg)
+                k = int(state.thesis_results["k"])
+                return T.level_summary(lv["key"], prep, sim["states"], k, cfg), T.records_from_grid(grid, lv["key"], cfg)
 
             summary, records = await asyncio.get_event_loop().run_in_executor(None, _run)
         except Exception as e:

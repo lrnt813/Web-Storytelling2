@@ -8,6 +8,7 @@ const RESOLVED_API_BASE = `${backendOrigin}/api`;
 const clusterColors = { 0: "#1f77b4", 1: "#2ca02c", 2: "#9467bd", 3: "#e377c2", 4: "#bcbd22", 5: "#17becf",
                         6: "#8c564b", 7: "#d62728", 8: "#7f7f7f", 9: "#ff7f0e", "-1": "#475569" };
 const TERPUTUS_COLOR = "#0f172a";
+const TERGENANG_COLOR = "#38bdf8";   // grid tergenang (terdampak simulasi) — dikeluarkan dari klasterisasi & TAS
 const TAS_COLOR = "#a855f7";
 const TERDAMPAK_COLOR = "#ff7f0e";
 const NEUTRAL_FILL = "#475569";
@@ -23,7 +24,7 @@ const LEVELS = [
 const viewModes = {
     klaster:   'Tipologi Klaster SDWFCM',
     tas:       'Titik Aman Semu (TAS)',
-    terdampak: 'Grid Terdampak Banjir',
+    terdampak: 'Grid Tergenang',
     waktu:     'Waktu Tempuh Minimum ke TES',
     bahaya:    'Indeks Bahaya Banjir'
 };
@@ -80,7 +81,7 @@ let roadCuts = [], cutMarkers = [], routeLayers, contextRouteLayers, originMarke
 let routingAbortController = null, isCalculating = false, markerPopupOpen = false;
 let searchMarker = null, activeCluster = null, clustersHidden = false, searchBoundaryLayer = null;
 let isolatedOrigin = null; // Store { latlng, routes, gridAttr, recommendations }
-let lastK = 6; // diperbarui dari hasil API (k_optimal)
+let lastK = 4; // diperbarui dari hasil API (k_optimal)
 let activeLevel = localStorage.getItem('evac_level') || 'baseline';
 let activeView = 'klaster';
 let lastLevelResult = null;
@@ -240,7 +241,7 @@ function setClusterNames(names, skKey = null) {
 }
 
 function getClusterName(clusterId) {
-    return `Klaster ${clusterId}`;
+    return clusterId === -1 ? 'Tergenang' : `Klaster ${clusterId}`;
 }
 
 function getClusterDesc(clusterId) {

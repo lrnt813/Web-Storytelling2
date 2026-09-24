@@ -49,7 +49,9 @@ def test_level_endpoints(client, sample_grid, level):
     assert r.status_code == 200
     body = r.json()
     recs = body["data_klaster"]
-    assert {int(g["status_tas"]) for g in recs} <= {0, 1, 2}
+    assert {int(g["status_tas"]) for g in recs} <= {0, 1, 2, 3}
+    assert all((g["cluster_sdwfcm"] == -1) == (g["tergenang"] == 1) for g in recs)
+    assert all(g["status_tas"] == 3 for g in recs if g["tergenang"] == 1)
 
     assert client.get("/api/tes-layers", params={"level": level}).status_code == 200
     assert client.post("/api/roads", json={"level": level}).status_code == 200

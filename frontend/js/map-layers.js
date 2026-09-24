@@ -595,13 +595,13 @@ function renderLevelSummary(result) {
     if (banner) {
         banner.hidden = !result.simulated;
         const t = document.getElementById('sim-banner-text');
-        if (t && result.simulated) t.textContent = `level ${levelLabel(result.level)}, ${result.n_cut_roads} titik blokir jalan, klasterisasi ulang`;
+        if (t && result.simulated) t.textContent = `level ${levelLabel(result.level)}, ${result.n_cut_roads} titik blokir jalan, keanggotaan terhadap pusat klaster final`;
     }
     el.innerHTML = `
         <div class="summary-grid">
-            <div class="summary-tile"><span>Grid terdampak</span><b>${fmtInt(result.n_grid_terdampak)}</b></div>
+            <div class="summary-tile"><span>Grid Tergenang</span><b>${fmtInt(result.n_grid_tergenang)}</b></div>
             <div class="summary-tile"><span>Rata-rata waktu min.</span><b>${fmtNum(result.mean_waktu_min)} <small>mnt</small></b></div>
-            <div class="summary-tile"><span>Titik Aman Semu</span><b>${fmtInt(tas.jumlah_tas)} <small>(${fmtNum(tas.persen_tas)}%)</small></b></div>
+            <div class="summary-tile"><span>Titik Aman Semu</span><b>${fmtInt(tas.jumlah_tas)} <small>(${fmtNum(tas.persen_tas_non_tergenang)}%)</small></b></div>
             <div class="summary-tile"><span>Rerata DI TAS / Non-TAS</span><b>${fmtNum(tas.mean_di_tas)} / ${fmtNum(tas.mean_di_non_tas)}</b></div>
         </div>${sim}`;
 }
@@ -612,12 +612,16 @@ function gridStyleFor(d) {
     if (activeView === 'tas') {
         if (d.status_tas === 1) return { fillColor: TAS_COLOR, fillOpacity: 0.9, stroke: false };
         if (d.status_tas === 2) return { fillColor: TERPUTUS_COLOR, fillOpacity: 0.85, stroke: false };
+        if (d.status_tas === 3) return { fillColor: TERGENANG_COLOR, fillOpacity: 0.55, stroke: false };
         return { fillColor: NEUTRAL_FILL, fillOpacity: 0.18, stroke: false };
     }
     if (activeView === 'terdampak') {
-        return d.terdampak === 1
-            ? { fillColor: TERDAMPAK_COLOR, fillOpacity: 0.8, stroke: false }
+        return d.tergenang === 1
+            ? { fillColor: TERGENANG_COLOR, fillOpacity: 0.8, stroke: false }
             : { fillColor: NEUTRAL_FILL, fillOpacity: 0.18, stroke: false };
+    }
+    if (activeView === 'klaster' && d.cluster_sdwfcm === -1) {
+        return { fillColor: TERGENANG_COLOR, fillOpacity: activeCluster !== null ? 0.05 : 0.55, stroke: false };
     }
     if (activeView === 'waktu') return { fillColor: waktuColor(d.waktu_tes_min), fillOpacity: 0.8, stroke: false };
     if (activeView === 'bahaya') return { fillColor: bahayaColors[d.indeks_bahaya] || NEUTRAL_FILL, fillOpacity: 0.8, stroke: false };

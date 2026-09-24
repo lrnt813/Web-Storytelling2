@@ -129,17 +129,22 @@ function showVizTip(html, evt) {
 }
 function hideVizTip() { if (vizTip) vizTip.style.display = 'none'; }
 
-// ── Tab: Data & Statistik (Tabel 8, Tabel 9) ─────────────────────────────────
+// ── Tab: Data & Statistik ────────────────────────────────────────────────────
 function renderDataTab(r) {
     const ds = r.data_summary || {};
     const tc = ds.tes_counts || {};
+    const pre = r.preprocessing || {};
+    const pool = r.data_gabungan || {};
     const dataRows = [
         { cells: ['Grid analisis (100 × 100 m)', fmtInt(ds.n_grid)] },
         { cells: ['Segmen jaringan jalan', fmtInt(ds.n_road_segments)] },
         ...Object.entries(tesCategories).map(([k, m]) => ({ cells: [`TES ${m.label}`, fmtInt(tc[k])] })),
         { cells: ['Sistem koordinat', ds.crs || '–'] },
         { cells: ['Kecepatan berjalan kaki', `${fmtInt(r.meta?.walking_speed_m_per_min)} m/menit`] },
-        { cells: ['Waktu penalti (grid terisolasi)', `${fmtNum(r.t_pen)} menit`] }
+        { cells: ['Waktu penalti (grid tidak menjangkau TES)', `${fmtNum(r.t_pen)} menit`] },
+        { cells: ['Baris data gabungan (grid × level non-Tergenang)', fmtInt(pool.n_baris)] },
+        { cells: ['Fitur klasterisasi', `${(pre.features_kept || []).length} dari ${(pre.features_in || []).length}`] },
+        { cells: ['Komponen PCA (varians kumulatif)', `${fmtInt(pre.n_components)} (${fmtNum((pre.explained_variance || 0) * 100, 1)}%)`] }
     ];
     const statRows = (r.baseline_time_stats || []).map(s => ({
         cells: [VAR_LABELS[s.variabel] || s.variabel, fmtInt(s.jumlah), fmtNum(s.mean), fmtNum(s.std),
@@ -148,102 +153,111 @@ function renderDataTab(r) {
     const levelRows = LEVELS.map(l => {
         const s = r.levels?.[l.key] || {};
         const tesValid = Object.values(s.tes_valid || {}).reduce((a, b) => a + b, 0);
-        return { cells: [l.label, l.kelas, fmtInt(s.n_grid_terdampak), `${fmtNum(s.persen_grid_terdampak)}%`,
-                         fmtInt(s.n_roads_closed), fmtInt(tesValid), `${(s.preprocessing?.features_kept || []).length} / ${s.preprocessing?.n_features_in ?? '–'}`,
-                         fmtInt(s.preprocessing?.n_components),
-                         `${fmtNum((s.preprocessing?.explained_variance || 0) * 100, 1)}%`] };
+        return { cells: [l.label, l.kelas, fmtInt(s.n_grid_tergenang), `${fmtNum(s.persen_grid_tergenang)}%`,
+                         fmtInt(s.n_roads_closed), fmtInt(tesValid), fmtInt(pool.n_baris_per_level?.[l.key])] };
     });
     return section('Ringkasan Data Penelitian', 'Data spasial Kabupaten Kulon Progo yang digunakan dalam analisis.',
                    table(['Komponen', 'Nilai'], dataRows))
-        + section('Statistik Deskriptif Waktu Tempuh (Baseline)', 'Waktu tempuh berjalan kaki (menit) dari setiap grid ke TES terdekat per kategori.',
+        + section('Statistik Deskriptif Waktu Tempuh (Baseline)', 'Waktu tempuh berjalan kaki (menit) dari centroid grid ke titik TES terdekat per kategori, termasuk ruas snapping ke/dari jaringan jalan.',
                   table(['Variabel', 'n', 'Rata-rata', 'Std', 'Min', 'Q1', 'Median', 'Q3', 'Maks'], statRows),
-                  'Nilai maksimum sama dengan waktu penalti (3 × waktu tempuh maksimum tercapai) untuk grid yang tidak dapat menjangkau TES.')
-        + section('Kondisi Tiap Level Banjir', 'Dampak skenario banjir terhadap grid, jaringan jalan, dan TES, serta hasil pra-pemrosesan: IQR capping 3 × IQR → seleksi fitur → Yeo-Johnson → RobustScaler → PCA (varians kumulatif ≥ 80%).',
-                  table(['Level', 'Kelas ditutup', 'Grid terdampak', '% grid', 'Jalan terputus', 'TES valid', 'Fitur terpilih', 'Komponen PCA', 'Varians'], levelRows),
-                  'Penanda isolasi dan jumlah opsi rute tersaring pada level dengan < 25% grid terisolasi karena IQR-nya nol (nilainya konstan setelah capping).');
+                  'Nilai maksimum sama dengan waktu penalti (3 × waktu tempuh maksimum tercapai di Baseline) untuk grid yang tidak dapat menjangkau TES.')
+        + section('Kondisi Tiap Level Banjir', 'Level didefinisikan oleh kelas bahaya banjir InaRisk yang ditutup. Grid pada kelas tersebut berstatus <b>Tergenang</b> dan dikeluarkan dari klasterisasi serta TAS.',
+                  table(['Level', 'Kelas ditutup', 'Grid Tergenang', '% grid', 'Ruas ditutup', 'TES valid', 'Baris data gabungan'], levelRows));
 }
 
-// ── Tab: Pemilihan K (Tabel 10) ──────────────────────────────────────────────
+// ── Tab: Pemilihan K (stabilitas) ────────────────────────────────────────────
 function renderKTab(r) {
     const ks = r.k_selection || {};
     const rows = (ks.candidates || []).map(c => ({
         k: c.k,
-        cells: [c.k, fmtNum(c.iidx, 3), fmtNum(c.dunn, 4), fmtNum(c.desc, 3), fmtNum(c.ketegasan_partisi, 3),
-                fmtNum(c.pesc, 6), fmtNum(c.size_entropy, 3), fmtNum(c.parsimoni, 3), fmtNum(c.composite, 3)]
+        cells: [c.k, `${fmtNum(c.ari_subsampel_mean, 3)} ± ${fmtNum(c.ari_subsampel_sd, 3)}`,
+                `${fmtNum(c.ari_inisialisasi_mean, 3)} ± ${fmtNum(c.ari_inisialisasi_sd, 3)}`,
+                fmtNum(c.iidx, 3), `${fmtNum(c.dunn, 4)} ± ${fmtNum(c.dunn_sd, 4)}`, fmtNum(c.ketegasan_partisi, 3),
+                fmtNum(c.desc, 3), fmtNum(c.silhouette, 3), fmtNum(c.komposit_dengan_desc, 3), fmtNum(c.komposit_tanpa_desc, 3)]
     }));
-    return section('Evaluasi Jumlah Klaster Optimal (Baseline)',
-        `Parameter SDWFCM: m = ${r.meta?.sdwfcm?.m}, α = ${r.meta?.sdwfcm?.alpha}, k-NN = ${r.meta?.sdwfcm?.knn}; ${r.meta?.sdwfcm_n_init ?? 10} inisialisasi per K. K diuji pada rentang 2–10.`,
-        table(['K', 'I-Index ↑', 'Dunn ↑', 'DESC ↑', 'Ketegasan partisi ↑', 'PESC', 'Size Entropy', 'Parsimoni', 'Skor Komposit ↑'], rows,
+    return section('Pemilihan Jumlah Klaster Berbasis Stabilitas (data gabungan)',
+        `SDWFCM m = ${r.meta?.sdwfcm?.m}, α = ${r.meta?.sdwfcm?.alpha}, k-NN = ${r.meta?.sdwfcm?.knn}. ARI subsampel: ${ks.B} subsampel ${fmtNum((ks.fraksi_subsampel || 0) * 100, 0)}% id_grid
+         (${ks.n_init_subsampel} inisialisasi), dibandingkan dengan solusi data penuh. ARI inisialisasi: rerata ARI berpasangan 10 run (seed 42–51).`,
+        table(['K', 'ARI subsampel ↑', 'ARI inisialisasi ↑', 'I-Index', 'Dunn', 'Ketegasan', 'DESC', 'Silhouette', 'Komposit (+DESC)', 'Komposit (−DESC)'], rows,
               { highlight: row => row.k === ks.k_terpilih }),
-        `K terpilih: <b>${ks.k_terpilih}</b> (skor ${fmtNum(ks.skor_terpilih, 3)}); runner-up K = ${ks.k_runner_up}
-         (skor ${fmtNum(ks.skor_runner_up, 3)}), selisih <b>${fmtNum(ks.selisih_skor, 3)}</b>. Skor komposit = rata-rata
-         percentile rank I-Index, Dunn, DESC, dan ketegasan partisi (1 − PE/ln K) ditambah parsimoni linear, bobot sama.`);
+        `K terpilih: <b>${ks.k_terpilih}</b>. Aturan: K dengan rerata ARI subsampel tertinggi; bila beberapa K berselisih ≤ ${fmtNum(ks.toleransi, 2)}
+         dari nilai tertinggi (${fmtNum(ks.ari_subsampel_tertinggi, 3)}), dipilih K terkecil (kandidat: ${(ks.k_dalam_toleransi || []).join(', ')}).
+         Metrik pendukung dan skor komposit lama hanya dilaporkan (komposit +DESC memilih K = ${ks.k_komposit_dengan_desc}; −DESC memilih K = ${ks.k_komposit_tanpa_desc}).`);
 }
 
-// ── Tab: Perbandingan Algoritma (Tabel 11) ───────────────────────────────────
+// ── Tab: Perbandingan Algoritma ──────────────────────────────────────────────
 function renderAlgoTab(r) {
+    const status = a => a.status === 'ok' ? 'layak' : (a.status === 'degeneratif' ? '<b>degeneratif</b> (tidak layak dibandingkan)' : `<b>gagal</b>: ${a.galat || ''}`);
     const rows = (r.algorithm_comparison || []).map(a => ({
         algo: a.algoritma,
-        cells: [a.algoritma, fmtNum(a.silhouette, 3), fmtNum(a.calinski_harabasz, 1), fmtNum(a.davies_bouldin, 3),
-                fmtNum(a.moran_i, 3), fmtNum(a.proporsi_tetangga_sama, 3), fmtNum(a.size_entropy, 3), fmtNum(a.wcss, 1), `${fmtNum(a.time_sec, 2)} s`]
+        cells: [a.algoritma, status(a), fmtNum(a.silhouette, 3), fmtNum(a.calinski_harabasz, 1), fmtNum(a.davies_bouldin, 3),
+                fmtNum(a.moran_i, 3), fmtNum(a.proporsi_tetangga_sama, 3), fmtNum(a.size_entropy, 3),
+                a.klaster_terbesar_persen != null ? `${fmtNum(a.klaster_terbesar_persen, 1)}%` : '–', `${fmtNum(a.time_per_init_sec, 2)} s`]
     }));
     if (!rows.length) {
-        return section('Perbandingan Algoritma', '', '<p class="muted">Perbandingan algoritma belum dijalankan. Jalankan <code>python -m scripts.thesis_analysis</code> tanpa opsi <code>--skip-comparison</code>.</p>');
+        return section('Perbandingan Algoritma', '', '<p class="muted">Perbandingan algoritma belum dijalankan.</p>');
     }
     return section('Perbandingan Kinerja Algoritma (Baseline, K = ' + r.k + ')',
-        'SDWFCM dibandingkan dengan Spatial FCM, REDCAP, dan SKATER pada ruang fitur hasil PCA yang sama.',
-        table(['Algoritma', 'Silhouette ↑', 'Calinski-Harabasz ↑', 'Davies-Bouldin ↓', "Moran's I ↑", 'Tetangga berlabel sama ↑', 'Size Entropy ↑', 'WCSS ↓', 'Waktu'], rows,
-              { highlight: row => row.algo === 'SDWFCM' }),
-        "Semua algoritma dinomori dengan aturan yang sama (urut rata-rata waktu tempuh minimum) sebelum Moran's I dihitung (kontiguitas rook). 'Tetangga berlabel sama' = proporsi pasangan tetangga rook dengan label sama (tidak bergantung penomoran). Waktu SDWFCM = rata-rata per inisialisasi.");
+        'FCM (α = 0), SFCM, dan SDWFCM: praproses, K, 10 inisialisasi (J terkecil), dan aturan penomoran yang sama. REDCAP dan SKATER sebagai pembanding tambahan.',
+        table(['Algoritma', 'Status', 'Silhouette ↑', 'Calinski-Harabasz ↑', 'Davies-Bouldin ↓', "Moran's I", 'Tetangga berlabel sama', 'Size Entropy ↑', 'Klaster terbesar', 'Waktu / inisialisasi'], rows,
+              { highlight: row => row.algo === 'SDWFCM', leftLast: false }),
+        "Moran's I label memakai 999 permutasi (kontiguitas rook). Partisi dengan klaster terbesar > 90% grid ditandai degeneratif.");
 }
 
-// ── Tab: Profil Klaster (Tabel 12–15) ────────────────────────────────────────
+// ── Tab: Profil Klaster (data gabungan) + distribusi per level ───────────────
 function switchProfileLevel(key) { activeProfileLevel = key; renderResultsBody(); }
 
 function renderProfileTab(r) {
-    const lv = r.levels?.[activeProfileLevel] || {};
-    const rows = (lv.cluster_profile || []).map(p => {
+    const rows = (r.cluster_profile || []).map(p => {
         const iso = ['pendidikan', 'kesehatan', 'pemerintahan', 'ibadah', 'gor']
             .reduce((a, k) => a + (p[`is_isolated_${k}`] || 0), 0) / 5;
         return { cells: [
-            `${swatch(p.klaster)} Klaster ${p.klaster}`, fmtInt(p.jumlah_grid), `${fmtNum(p.persen_grid, 1)}%`,
+            `${swatch(p.klaster)} Klaster ${p.klaster}`, fmtInt(p.jumlah_baris), `${fmtNum(p.persen_baris, 1)}%`,
             fmtNum(p.Road_Density_mean), fmtNum(p.banjir), fmtNum(p.waktu_tes_pendidikan), fmtNum(p.waktu_tes_kesehatan),
             fmtNum(p.waktu_tes_pemerintahan), fmtNum(p.waktu_tes_ibadah), fmtNum(p.waktu_tes_gor), fmtNum(p.waktu_tes_min),
             fmtNum(p.jumlah_opsi_rute), `${fmtNum(iso * 100, 1)}%`, p.deskripsi || ''
         ] };
     });
-    return levelTabs(activeProfileLevel, 'switchProfileLevel')
-        + section(`Profil Klaster Level ${levelLabel(activeProfileLevel)}`,
-            'Rata-rata nilai fitur asli per klaster. Baseline: klaster diurutkan dari waktu tempuh minimum tercepat (Klaster 0). Level lain: nomor diselaraskan ke pusat klaster Baseline (Hungarian); tipologi yang tidak berpadanan ditandai.',
-            table(['Klaster', 'Grid', '%', 'Kerapatan Jalan', 'Indeks Bahaya', 'Pendidikan', 'Kesehatan', 'Pemerintahan',
+    const k = r.k;
+    const distRows = LEVELS.map(l => {
+        const d = r.levels?.[l.key]?.distribusi_tipologi || [];
+        return { cells: [l.label, ...d.map(x => `${fmtInt(x.jumlah_grid)} <span class="muted">(${fmtNum(x.persen_semua_grid, 1)}%)</span>`)] };
+    });
+    return section('Profil Tipologi (data gabungan keempat level)',
+            'Rata-rata nilai fitur asli per klaster pada seluruh pasangan grid–level non-Tergenang. Klaster diurutkan dari rata-rata waktu tempuh minimum tercepat (Klaster 0 = akses terbaik). Indeks bahaya hanya deskriptif (bukan fitur klasterisasi).',
+            table(['Klaster', 'Baris', '%', 'Kerapatan Jalan', 'Indeks Bahaya', 'Pendidikan', 'Kesehatan', 'Pemerintahan',
                    'Ibadah', 'GOR', 'Waktu Min.', 'Opsi Rute', 'Terisolasi', 'Interpretasi'], rows, { leftLast: true }),
-            'Kolom waktu dalam menit. "Terisolasi" = rata-rata proporsi kategori TES yang tidak terjangkau.');
+            'Kolom waktu dalam menit. "Terisolasi" = rata-rata proporsi kategori TES yang tidak terjangkau.')
+        + section('Distribusi Tipologi per Level', 'Jumlah grid per tipologi dan Tergenang pada setiap level (persentase dari seluruh grid).',
+            table(['Level', ...Array.from({ length: k }, (_, j) => `${swatch(j)} Klaster ${j}`), `<i class="legend-swatch" style="background:${TERGENANG_COLOR}"></i> Tergenang`], distRows));
 }
 
-// ── Tab: Transisi (Sankey, stabilitas, ARI, CDVM) ────────────────────────────
+// ── Tab: Transisi (Sankey, stabilitas, ARI, CDVM) dengan state Tergenang ─────
 function switchMatrixPair(i) { activeMatrixPair = i; renderResultsBody(); }
 
-function buildSankey(r) {
-    const k = r.k;
-    const levels = LEVELS.map(l => l.key);
-    const counts = levels.map(key => (r.levels[key]?.cluster_profile || []).map(p => p.jumlah_grid));
-    const total = counts[0].reduce((a, b) => a + b, 0);
-    const W = 880, H = 440, padT = 28, padB = 10, nodeW = 14, gap = 8;
-    const padL = 70, padR = 70;
-    const colX = levels.map((_, i) => padL + i * (W - padL - padR - nodeW) / (levels.length - 1));
-    const scale = (H - padT - padB - gap * (k - 1)) / total;
+function stateColor(s, k) { return s === k ? TERGENANG_COLOR : clusterColors[s]; }
+function stateName(s, k) { return s === k ? 'Tergenang' : `Klaster ${s}`; }
 
+function buildSankey(r) {
+    const k = r.k, S = k + 1;
+    const levels = LEVELS.map(l => l.key);
+    const counts = levels.map(key => (r.levels[key]?.distribusi_tipologi || []).map(p => p.jumlah_grid));
+    const total = counts[0].reduce((a, b) => a + b, 0);
+    const W = 880, H = 460, padT = 28, padB = 10, nodeW = 14, gap = 8;
+    const padL = 90, padR = 90;
+    const colX = levels.map((_, i) => padL + i * (W - padL - padR - nodeW) / (levels.length - 1));
+    const scale = (H - padT - padB - gap * (S - 1)) / total;
     const nodes = counts.map((cs, ci) => {
         let y = padT;
         return cs.map((c, j) => { const n = { x: colX[ci], y, h: c * scale, c, k: j }; y += c * scale + gap; return n; });
     });
-
     let links = '';
-    r.transitions.forEach((t, ti) => {
+    const seq = r.transitions.filter(t => levels.indexOf(t.to_level) === levels.indexOf(t.from_level) + 1);
+    seq.forEach((t, ti) => {
         const src = nodes[ti], dst = nodes[ti + 1];
         const outOff = src.map(n => n.y), inOff = dst.map(n => n.y);
-        for (let i = 0; i < k; i++) {
-            for (let j = 0; j < k; j++) {
+        for (let i = 0; i < S; i++) {
+            for (let j = 0; j < S; j++) {
                 const v = t.matrix[i][j];
                 if (!v) continue;
                 const h = v * scale;
@@ -252,27 +266,26 @@ function buildSankey(r) {
                 outOff[i] += h; inOff[j] += h;
                 const xm = (x0 + x1) / 2;
                 const d = `M${x0},${y0} C${xm},${y0} ${xm},${y1} ${x1},${y1} L${x1},${y1 + h} C${xm},${y1 + h} ${xm},${y0 + h} ${x0},${y0 + h} Z`;
-                const tip = `${levelLabel(t.from_level)} Klaster ${i} → ${levelLabel(t.to_level)} Klaster ${j}<br><b>${fmtInt(v)}</b> grid (${fmtNum(v / src[i].c * 100, 1)}% dari asal)`;
-                links += `<path class="sk-link" d="${d}" fill="${clusterColors[i]}" data-tip="${tip.replace(/"/g, '&quot;')}"></path>`;
+                const tip = `${levelLabel(t.from_level)} ${stateName(i, k)} → ${levelLabel(t.to_level)} ${stateName(j, k)}<br><b>${fmtInt(v)}</b> grid (${fmtNum(v / src[i].c * 100, 1)}% dari asal)`;
+                links += `<path class="sk-link" d="${d}" fill="${stateColor(j === k ? k : i, k)}" data-tip="${tip.replace(/"/g, '&quot;')}"></path>`;
             }
         }
     });
-
     let nodeSvg = '';
     nodes.forEach((col, ci) => {
         col.forEach(n => {
-            const tip = `${levelLabel(levels[ci])} · Klaster ${n.k}<br><b>${fmtInt(n.c)}</b> grid`;
-            nodeSvg += `<rect class="sk-node" x="${n.x}" y="${n.y}" width="${nodeW}" height="${Math.max(1, n.h)}" rx="2" fill="${clusterColors[n.k]}" data-tip="${tip}"></rect>`;
+            if (!n.c) return;
+            const tip = `${levelLabel(levels[ci])} · ${stateName(n.k, k)}<br><b>${fmtInt(n.c)}</b> grid`;
+            nodeSvg += `<rect class="sk-node" x="${n.x}" y="${n.y}" width="${nodeW}" height="${Math.max(1, n.h)}" rx="2" fill="${stateColor(n.k, k)}" data-tip="${tip}"></rect>`;
             if (n.h >= 11) {
                 const left = ci === 0;
-                const tx = left ? n.x - 6 : (ci === levels.length - 1 ? n.x + nodeW + 6 : n.x + nodeW + 4);
-                const anchor = left ? 'end' : 'start';
-                nodeSvg += `<text class="sk-label" x="${tx}" y="${n.y + n.h / 2 + 4}" text-anchor="${anchor}">K${n.k}</text>`;
+                const tx = left ? n.x - 6 : n.x + nodeW + 4;
+                nodeSvg += `<text class="sk-label" x="${tx}" y="${n.y + n.h / 2 + 4}" text-anchor="${left ? 'end' : 'start'}">${n.k === k ? 'Tergenang' : 'K' + n.k}</text>`;
             }
         });
         nodeSvg += `<text class="sk-col" x="${colX[ci] + nodeW / 2}" y="16" text-anchor="middle">${levelLabel(levels[ci])}</text>`;
     });
-    return `<div class="chart-wrap"><svg viewBox="0 0 ${W} ${H}" class="sankey" role="img" aria-label="Diagram Sankey transisi klaster antar level">${links}${nodeSvg}</svg></div>`;
+    return `<div class="chart-wrap"><svg viewBox="0 0 ${W} ${H}" class="sankey" role="img" aria-label="Diagram Sankey transisi tipologi dan Tergenang antar level">${links}${nodeSvg}</svg></div>`;
 }
 
 function bindSankeyHover() {
@@ -284,45 +297,51 @@ function bindSankeyHover() {
 
 function renderTransitionTab(r) {
     if (!r.transitions?.length) return '<p class="muted">Data transisi tidak tersedia.</p>';
-    const rows = r.transitions.map(t => ({ cells: [
-        `${levelLabel(t.from_level)} → ${levelLabel(t.to_level)}`, `${fmtNum(t.stability_rate, 1)}%`, fmtNum(t.ari, 3),
-        fmtInt(t.n_moved), `Klaster ${t.dominant_transition.from} → ${t.dominant_transition.to} (${fmtInt(t.dominant_transition.count)})`,
-        `${t.active_edges} / ${r.k * (r.k - 1)}`, fmtNum(r.cdvm_vs_baseline?.[t.to_level], 3)
-    ] }));
+    const k = r.k, S = k + 1;
+    const rows = r.transitions.map(t => {
+        const d = t.dominant_transition;
+        return { cells: [
+            `${levelLabel(t.from_level)} → ${levelLabel(t.to_level)}`,
+            `${fmtInt(t.masuk_tergenang)} (${fmtNum(t.persen_masuk_tergenang_semua_grid, 1)}%)`,
+            t.stability_rate != null ? `${fmtNum(t.stability_rate, 1)}%` : '–', fmtNum(t.ari, 3),
+            d ? `${stateName(d.from, k)} → ${stateName(d.to, k)} (${fmtInt(d.count)}; ${d.menuju})` : '–',
+            `${t.active_edges} / ${S * (S - 1)}`, fmtNum(t.cdvm, 3)
+        ] };
+    });
     const t = r.transitions[activeMatrixPair];
-    const k = r.k;
     const pairTabs = `<div class="sub-tabs">${r.transitions.map((p, i) =>
         `<button class="sub-tab ${i === activeMatrixPair ? 'active' : ''}" onclick="switchMatrixPair(${i})">${levelLabel(p.from_level)} → ${levelLabel(p.to_level)}</button>`).join('')}</div>`;
     const maxV = Math.max(...t.matrix.flat());
+    const sw = s => `<i class="legend-swatch" style="background:${stateColor(s, k)}"></i>`;
     const mRows = t.matrix.map((row, i) => ({ cells: [
-        `${swatch(i)} Klaster ${i}`,
+        `${sw(i)} ${stateName(i, k)}`,
         ...row.map((v, j) => {
             const a = v ? 0.12 + 0.6 * v / maxV : 0;
             return `<span class="cell-val${i === j ? ' diag' : ''}" style="background:rgba(59,130,246,${a.toFixed(2)})">${fmtInt(v)}</span>`;
         })
     ] }));
-    return section('Alur Perpindahan Grid Antar Level', 'Setiap pita menunjukkan jumlah grid yang berpindah dari satu klaster ke klaster lain ketika level banjir naik. Arahkan kursor untuk detail.',
+    return section('Alur Perpindahan Grid Antar Level', 'Setiap pita menunjukkan jumlah grid yang berpindah tipologi atau menjadi Tergenang ketika level banjir naik. Arahkan kursor untuk detail.',
                    buildSankey(r))
-        + section('Stabilitas Transisi', 'Stability rate = proporsi grid yang tetap pada nomor klaster yang sama; ARI = Adjusted Rand Index antara partisi dua level berurutan.',
-                  table(['Transisi', 'Stability Rate', 'ARI', 'Grid berpindah', 'Transisi dominan', 'Edge aktif', 'CDVM vs Baseline'], rows),
-                  'CDVM vs Baseline = ½ Σ |p<sub>k</sub>(level) − p<sub>k</sub>(Baseline)|, yaitu besarnya perubahan distribusi ukuran klaster relatif terhadap Baseline.')
-        + section('Matriks Transisi', 'Baris = klaster asal, kolom = klaster tujuan. Diagonal = grid yang tetap.',
-                  pairTabs + table(['Asal \\ Tujuan', ...Array.from({ length: k }, (_, j) => `Klaster ${j}`)], mRows));
+        + section('Ringkasan Transisi', 'Stability rate dan ARI dihitung hanya pada grid yang non-Tergenang di kedua level. CDVM = ½ Σ |p<sub>s</sub>(tujuan) − p<sub>s</sub>(asal)| atas state tipologi + Tergenang.',
+                  table(['Transisi', 'Masuk Tergenang', 'Stability Rate', 'ARI', 'Transisi dominan (di luar diagonal)', 'Edge aktif', 'CDVM'], rows))
+        + section('Matriks Transisi', 'Baris = state asal, kolom = state tujuan. Diagonal = grid yang tetap.',
+                  pairTabs + table(['Asal \\ Tujuan', ...Array.from({ length: S }, (_, j) => stateName(j, k))], mRows));
 }
 
-// ── Tab: Titik Aman Semu (Tabel 16) ──────────────────────────────────────────
+// ── Tab: Titik Aman Semu (4 kategori) ────────────────────────────────────────
 function renderTasTab(r) {
     const rows = LEVELS.map(l => {
         const s = r.levels?.[l.key]?.tas || {};
         const sen = s.sensitivitas_di_absolut || {};
-        return { cells: [l.label, fmtInt(s.jumlah_tas), fmtInt(s.jumlah_non_tas), fmtInt(s.jumlah_terputus), `${fmtNum(s.persen_tas)}%`,
-                         fmtNum(s.mean_di_tas, 3), fmtNum(s.mean_di_non_tas, 3), fmtNum(s.delta_di, 3), fmtNum(s.p25_t_ideal), fmtNum(s.p75_di, 3),
-                         fmtInt(sen.jumlah_tas)] };
+        return { cells: [l.label, fmtInt(s.jumlah_tas), fmtInt(s.jumlah_non_tas), fmtInt(s.jumlah_terputus), fmtInt(s.jumlah_tergenang),
+                         `${fmtNum(s.persen_tas_non_tergenang)}%`, fmtNum(s.mean_di_tas, 3), fmtNum(s.mean_di_non_tas, 3),
+                         fmtNum(s.p25_t_ideal), fmtNum(s.p75_di, 3), fmtInt(sen.jumlah_tas),
+                         sen.persen_tas_juga_lolos_absolut != null ? `${fmtNum(sen.persen_tas_juga_lolos_absolut, 1)}%` : '–'] };
     });
     return section('Deteksi Titik Aman Semu (Detour Index)',
-        'DI = T<sub>aktual</sub> / T<sub>ideal</sub> (jarak Euclidean minimum 50 m). Pada grid yang terjangkau, TAS bila T<sub>ideal</sub> ≤ persentil ke-25 namun DI ≥ persentil ke-75. Grid dengan T<sub>aktual</sub> = waktu penalti digolongkan <b>Terputus</b> dan tidak ikut persentil maupun rata-rata DI.',
-        table(['Level', 'TAS', 'Non-TAS', 'Terputus', '% TAS', 'Rerata DI TAS', 'Rerata DI Non-TAS', 'Selisih DI', 'P25 T<sub>ideal</sub> (mnt)', 'P75 DI', 'TAS (DI ≥ 2)'], rows),
-        'Kolom terakhir: uji sensitivitas dengan ambang absolut DI ≥ 2. Pilih tampilan peta "Titik Aman Semu" untuk melihat sebarannya.');
+        'DI = T<sub>aktual</sub> / T<sub>ideal</sub>; keduanya mengukur perjalanan centroid → titik TES (batas minimum 50 m). Grid <b>Tergenang</b> dikeluarkan; grid non-Tergenang yang tidak menjangkau TES = <b>Terputus</b>. Pada sisanya, TAS bila T<sub>ideal</sub> ≤ P25 dan DI ≥ P75.',
+        table(['Level', 'TAS', 'Non-TAS', 'Terputus', 'Tergenang', '% TAS (non-Tergenang)', 'Rerata DI TAS', 'Rerata DI Non-TAS', 'P25 T<sub>ideal</sub> (mnt)', 'P75 DI', 'TAS (DI ≥ 2)', 'TAS yang juga DI ≥ 2'], rows),
+        'Uji sensitivitas: ambang absolut DI ≥ 2. Pilih tampilan peta "Titik Aman Semu" untuk melihat sebarannya.');
 }
 
 // ── Tab: Waktu Tempuh (Gambar 18) ────────────────────────────────────────────
@@ -368,8 +387,8 @@ function renderWaktuTab(r) {
         return { cells: [l.label, ...Object.keys(tesCategories).map(k => fmtNum(s.mean_waktu?.[k])),
                          fmtNum(s.mean_waktu_min), fmtNum(s.median_waktu_min)] };
     });
-    return section('Rata-rata Waktu Tempuh Minimum ke TES', 'Rata-rata waktu tempuh minimum (menit) seluruh grid pada setiap level banjir.',
+    return section('Rata-rata Waktu Tempuh Minimum ke TES', 'Rata-rata waktu tempuh minimum (menit) grid non-Tergenang pada setiap level banjir (termasuk ruas snapping).',
                    buildBarChart(items, 'menit'))
-        + section('Rata-rata Waktu Tempuh per Kategori TES', 'Satuan menit. Grid yang tidak menjangkau TES diberi waktu penalti.',
+        + section('Rata-rata Waktu Tempuh per Kategori TES', 'Satuan menit, grid non-Tergenang. Grid yang tidak menjangkau TES diberi waktu penalti.',
                   table(['Level', ...Object.values(tesCategories).map(m => m.label), 'Minimum', 'Median Min.'], rows));
 }

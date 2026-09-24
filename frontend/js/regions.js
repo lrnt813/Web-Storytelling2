@@ -11,7 +11,7 @@ let lastRegionRows = [];
 const REGION_SORTS = {
     isolated_pct: { label: '% grid terisolasi', desc: true },
     tas:          { label: 'Jumlah Titik Aman Semu', desc: true },
-    terdampak_pct:{ label: '% grid terdampak banjir', desc: true },
+    terdampak_pct:{ label: '% grid tergenang', desc: true },
     waktu:        { label: 'Rata-rata waktu minimum', desc: true },
     critical_pct: { label: '% grid klaster akses terburuk (Klaster 5)', desc: true },
     name:         { label: 'Nama wilayah (A–Z)', desc: false }
@@ -22,7 +22,7 @@ function cleanDesaName(n) { return String(n || '').replace(/^Kelurahan\s+/i, '')
 function computeRegionStats(kind = regionKind) {
     const lookup = gridLayer?.lookup;
     if (!lookup || !gridAdmin) return [];
-    const K = lastK || 6;
+    const K = lastK || 4;
     const acc = new Map();
     for (const d of Object.values(lookup)) {
         const adm = gridAdminName(d.id_grid);
@@ -37,7 +37,7 @@ function computeRegionStats(kind = regionKind) {
         r.n += 1;
         if (d.cluster_sdwfcm >= 0 && d.cluster_sdwfcm < K) r.clusters[d.cluster_sdwfcm] += 1;
         if (d.titik_aman_semu === 1) r.tas += 1;
-        if (d.terdampak === 1) r.terdampak += 1;
+        if (d.tergenang === 1) r.terdampak += 1;
         if (d.is_isolated === 1 || d.jumlah_opsi_rute === 0) r.isolated += 1;
         if (Number.isFinite(d.waktu_tes_min)) { r.waktuSum += d.waktu_tes_min; r.waktuN += 1; }
     }
@@ -149,7 +149,7 @@ function regionDetailCard(r, kindLabel) {
                 <div class="summary-tile"><span>Rata-rata waktu min.</span><b>${fmtNum(r.waktu, 1)} <small>mnt</small></b></div>
                 <div class="summary-tile"><span>Grid terisolasi</span><b>${fmtInt(r.isolated)} <small>(${fmtNum(r.isolated_pct, 1)}%)</small></b></div>
                 <div class="summary-tile"><span>Titik Aman Semu</span><b>${fmtInt(r.tas)} <small>(${fmtNum(r.tas_pct, 1)}%)</small></b></div>
-                <div class="summary-tile"><span>Grid terdampak</span><b>${fmtInt(r.terdampak)} <small>(${fmtNum(r.terdampak_pct, 1)}%)</small></b></div>
+                <div class="summary-tile"><span>Grid Tergenang</span><b>${fmtInt(r.terdampak)} <small>(${fmtNum(r.terdampak_pct, 1)}%)</small></b></div>
                 <div class="summary-tile"><span>Klaster dominan</span><b>${swatch(r.dominant)} Klaster ${r.dominant}</b></div>
             </div>
             <div class="rd-bars">${bars}</div>
@@ -187,9 +187,9 @@ function selectRegion(name, fly = true) {
 
 function regionSummaryRowsForExport() {
     const kindLabel = regionKind === 'desa' ? 'Kalurahan' : 'Kapanewon';
-    const K = lastK || 6;
+    const K = lastK || 4;
     const head = ['Peringkat', kindLabel, ...(regionKind === 'desa' ? ['Kapanewon'] : []), 'Jumlah grid', 'Grid terisolasi', '% terisolasi',
-        'Titik Aman Semu', '% TAS', 'Grid terdampak', '% terdampak', 'Rata-rata waktu min (menit)', 'Klaster dominan',
+        'Titik Aman Semu', '% TAS', 'Grid Tergenang', '% Tergenang', 'Rata-rata waktu min (menit)', 'Klaster dominan',
         ...Array.from({ length: K }, (_, i) => `Grid Klaster ${i}`)];
     const body = lastRegionRows.map((r, i) => [i + 1, r.display, ...(regionKind === 'desa' ? [r.kecamatan] : []), r.n, r.isolated,
         +r.isolated_pct.toFixed(2), r.tas, +r.tas_pct.toFixed(2), r.terdampak, +r.terdampak_pct.toFixed(2),

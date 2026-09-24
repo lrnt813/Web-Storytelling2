@@ -233,7 +233,7 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
 
 
 function renderGridAttrPopup(g) {
-    const clr = clusterColors[g.cluster_sdwfcm] || NEUTRAL_FILL;
+    const clr = g.tergenang === 1 ? TERGENANG_COLOR : (clusterColors[g.cluster_sdwfcm] || NEUTRAL_FILL);
     const desc = getClusterDesc(g.cluster_sdwfcm);
     const waktuRows = Object.entries(tesCategories).map(([kat, meta]) => {
         const v = g[`waktu_tes_${kat}`];
@@ -241,15 +241,16 @@ function renderGridAttrPopup(g) {
     }).join('');
     const isTas = g.status_tas === 1;
     const isTerputus = g.status_tas === 2;
+    const isTergenang = g.tergenang === 1;
     const adm = typeof gridAdminName === 'function' ? gridAdminName(g.id_grid) : null;
     const lokasi = adm ? `<div class="popup-loc"><i class="fa fa-map-location-dot"></i> Kal. ${adm.desa.replace(/^Kelurahan\s+/i, '')}, Kap. ${adm.kecamatan}
         <a href="#" class="popup-link" onclick="event.preventDefault(); openRegionPanel('desa', ${JSON.stringify(adm.desa).replace(/"/g, '&quot;')})">Ringkasan kalurahan</a></div>` : '';
     return `${lokasi}<div class="popup-card">
         <div class="popup-row"><span>TIPOLOGI (${levelLabel(activeLevel)})</span><b style="color:${clr}">${getClusterName(g.cluster_sdwfcm)}</b></div>
         ${desc ? `<div class="popup-desc">${desc}</div>` : ''}
-        ${popupRow('Derajat keanggotaan', `${fmtNum((g.membership_max || 0) * 100, 1)}%`)}
+        ${isTergenang ? '' : popupRow('Derajat keanggotaan', `${fmtNum((g.membership_max || 0) * 100, 1)}%`)}
         ${popupRow('Indeks bahaya banjir', g.indeks_bahaya ?? '–')}
-        ${popupRow('Terdampak banjir', g.terdampak === 1 ? 'Ya' : 'Tidak', g.terdampak === 1 ? TERDAMPAK_COLOR : null)}
+        ${popupRow('Tergenang', isTergenang ? 'Ya' : 'Tidak', isTergenang ? TERGENANG_COLOR : null)}
         ${popupRow('Kerapatan jalan', fmtNum(g.road_density, 3))}
         ${popupRow('ID grid', g.id_grid_asli != null ? `${g.id_grid_asli} (indeks ${g.id_grid})` : g.id_grid)}
     </div>
@@ -267,5 +268,6 @@ function renderGridAttrPopup(g) {
         ${popupRow('Detour Index', fmtNum(g.detour_index, 2))}
         ${isTas ? `<div class="popup-flag"><i class="fa fa-exclamation-triangle"></i> TITIK AMAN SEMU</div>` : ''}
         ${isTerputus ? `<div class="popup-flag terputus"><i class="fa fa-link-slash"></i> TERPUTUS — tidak menjangkau TES</div>` : ''}
+        ${isTergenang ? `<div class="popup-flag tergenang"><i class="fa fa-water"></i> TERGENANG — dikeluarkan dari klasterisasi & TAS; waktu tempuh hanya informasi</div>` : ''}
     </div>`;
 }
