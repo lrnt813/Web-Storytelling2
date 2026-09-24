@@ -261,3 +261,33 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
 | P2-F3 (PESC meledak) | **Ditangani** | PESC, DESC, I-Index, Dunn, dan komposit dipindah ke tabel lampiran L01 |
 | P2-F4 (semua TAS lolos DI ≥ 2) | **Selesai** | Aturan utama kini absolut (DI ≥ 2 dan T_ideal ≤ 5 menit); persentil menjadi sensitivitas |
 | P2-D1 (SKATER gagal) | Tetap | Dilaporkan gagal untuk kedua K, tanpa fallback |
+
+## P3-H. Pengamatan dari hasil v3 (untuk dibahas dengan pembimbing)
+
+- **P3-8. Pada data v3, K = 3 TIDAK lagi setara secara stabilitas dengan K = 2.** Rerata ARI subsampel:
+  K = 2 0,957 ± 0,004; K = 4 0,949 ± 0,003 (setara, selisih 0,008); K = 3 0,940 ± 0,006 (selisih 0,017 >
+  0,01). Aturan stabilitas tetap memilih K = 2. Premis "K = 2 dan K = 3 tidak terbedakan" hanya
+  berlaku untuk data v2. Silhouette K = 3 (0,156) juga lebih rendah daripada K = 2 (0,243) dan K = 4
+  (0,203). — *PERLU DIPUTUSKAN (K utama)*
+- **P3-9. Label interpretasi kurang membedakan.** Dengan aturan median, kedua klaster K = 2 berlabel
+  "Akses Baik" (median waktu minimum 3,7 dan 8,9 menit). Pada K = 3, K0 dan K1 "Akses Baik" (3,3 dan
+  5,8 menit), sedangkan K2 "Akses Sedang" (11,9 menit). Rerata dan median sangat berbeda pada klaster
+  terburuk (K = 3 K2: rerata 36,6 vs median 11,9), karena 6% barisnya bernilai penalti. Ambang label
+  ditetapkan sebelum hasil dan tidak diubah. — *DICATAT*
+- **P3-10. Aturan TAS absolut menghasilkan jauh lebih banyak TAS**: ±25% grid non-Tergenang (Baseline
+  5.758 vs aturan persentil 1.842). Semua TAS aturan persentil juga termasuk TAS aturan absolut. Median
+  T_ideal TAS 2,3 menit (± 190 m) vs T_aktual 7,0 menit. DI ≥ 2 mudah tercapai pada jarak pendek
+  karena ruas snapping dan pola jaringan lokal. Ambang ini mungkin terlalu longgar untuk disebut "semu".
+  — *PERLU DIPUTUSKAN*
+- **P3-11. Level Rendah hampir identik dengan Baseline** (39 grid Tergenang, 710 ruas ditutup, TES valid
+  tetap 1.434; SR K = 2 99,8%, ARI 0,991), karena raster hanya memuat 8,7 km² kelas 3 dan hanya 39 grid
+  yang mayoritas pikselnya kelas 3. — *DICATAT*
+- **P3-12. TAS per kategori TES terdekat** didominasi Tempat Ibadah (Baseline 3.403 dari 5.758 = 59%)
+  dan Pendidikan (31%), sesuai sebaran TES terbanyak. — *DICATAT*
+- **P3-13. Perbandingan algoritma v3.** Untuk kedua K, SDWFCM punya Moran's I dan proporsi tetangga
+  berlabel sama tertinggi di antara algoritma fuzzy. Pada K = 3, SDWFCM juga unggul Silhouette (0,209)
+  dan DB (1,498). Pada K = 2, FCM sedikit lebih tinggi pada Silhouette/CH (0,303 vs 0,296). REDCAP
+  degeneratif (95,8% dan 98,2%), dan SKATER gagal untuk kedua K. — *DICATAT*
+- **P3-14. Waktu komputasi.** Dua run bersamaan tanpa jeda sleep (dicegah `SetThreadExecutionState`
+  selama run). Run A 7.743 detik (pemilihan K 7.505 detik), run B 7.800 detik. Fingerprint identik.
+  — *DICATAT*

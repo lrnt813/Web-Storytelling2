@@ -181,6 +181,10 @@ peneliti, karena data gabungan berubah.
 - **(b) K = 2 dan K = 3 tidak dapat dibedakan secara stabilitas.** Pada v2, rerata ARI subsampel
   K = 2 0,964 ± 0,006 dan K = 3 0,963 ± 0,003. Selisih 0,001 lebih kecil dari simpangan baku kedua K,
   jadi pilihan K = 2 hanya ditentukan pemecah seri.
+  **Pada data v3** (kelas bahaya dari raster), evaluasi ulang memberi K = 2 0,957 ± 0,004, K = 4
+  0,949 ± 0,003 (setara, selisih ≤ 0,01), dan K = 3 0,940 ± 0,006 (tidak setara, selisih 0,017).
+  Aturan tetap memilih K = 2. Kesetaraan K = 2 dan K = 3 yang menjadi alasan membandingkan keduanya
+  hanya berlaku untuk data v2.
 - **(c) Model utama ditetapkan kemudian.** Keputusan model utama (K = 2 atau K = 3) diambil peneliti
   bersama pembimbing **setelah** hasil v2 terlihat, berdasarkan metrik pendukung dan interpretasi
   tipologi. Keputusan ini bukan bagian dari rencana awal. Karena itu v3 menghasilkan keluaran lengkap

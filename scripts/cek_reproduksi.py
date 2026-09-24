@@ -1,6 +1,6 @@
 """Cek reproduksi: jalankan ulang analisis ke folder sementara lalu bandingkan dengan LOCK.json.
 
-    python -m scripts.cek_reproduksi            # jalankan ulang penuh (± 2 jam)
+    python -m scripts.cek_reproduksi            # jalankan ulang penuh (± 2,1 jam)
     python -m scripts.cek_reproduksi --simpan   # sama, folder sementara tidak dihapus
 
 Yang dibandingkan:
@@ -29,7 +29,7 @@ def main(keep: bool = False) -> int:
     lock = json.loads((data / LOCK_DIR / LOCK_FILE).read_text(encoding="utf-8"))
     tmp = Path(tempfile.mkdtemp(prefix="cek_reproduksi_"))
     try:
-        for f in data.glob("*.gpkg"):
+        for f in list(data.glob("*.gpkg")) + list(data.glob("*.tif")):
             shutil.copy2(f, tmp / f.name)
         env = dict(os.environ, SDWFCM_DATA_DIR=str(tmp))
         print(f"Menjalankan ulang analisis di {tmp} ...", flush=True)
