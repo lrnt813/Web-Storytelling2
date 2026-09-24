@@ -1,10 +1,11 @@
-# Metodologi — sebagaimana diimplementasikan (desain v2)
+# Metodologi — sebagaimana diimplementasikan (desain v3)
 
 Dokumen ini menjelaskan pipeline analisis **persis seperti kode** di `backend/engine.py`,
-`backend/thesis.py`, dan `scripts/thesis_analysis.py` (tag `hasil-skripsi-v2`). Nilai parameter
-yang dipakai pada run final tercatat di `data/locked/LOCK.json`. Hal yang masih perlu diputuskan
-tercatat di `docs/CATATAN_TEMUAN.md`. Desain v1 (model per level + penyelarasan Hungarian)
-diarsipkan di `data/locked/arsip_v1/` dan `output_bab4/arsip_v1/`.
+`backend/hazard_raster.py`, `backend/thesis.py`, dan `scripts/thesis_analysis.py` (tag
+`hasil-skripsi-v3`). Nilai parameter yang dipakai pada run final tercatat di `data/locked/LOCK.json`.
+Hal yang masih perlu diputuskan tercatat di `docs/CATATAN_TEMUAN.md`. Versi sebelumnya diarsipkan:
+v1 di `data/locked/arsip_v1/` (model per level + Hungarian) dan v2 di `data/locked/arsip_v2/`
+(kelas bahaya grid dari atribut GPKG, aturan TAS persentil, keluaran K = 2 saja).
 
 ## 1. Unit analisis dan data
 
@@ -12,10 +13,20 @@ diarsipkan di `data/locked/arsip_v1/` dan `output_bab4/arsip_v1/`.
   adalah centroid-nya \(c_i\). Setiap grid membawa `id_grid` (0..N−1, urutan baris GPKG, kunci JOIN
   dashboard) dan `id_grid_asli` (kolom `Id` GPKG; bila tidak unik/lengkap diganti ID centroid
   `E{cx}_N{cy}`).
-- Atribut grid: kepadatan jaringan jalan `Road_Density_mean` dan kelas bahaya banjir InaRisk
-  \(h_i \in \{0,1,2,3\}\).
-- Jaringan jalan: 162.608 segmen, masing-masing berkelas bahaya \(c_e \in \{0,1,2,3\}\).
+- Atribut grid: kepadatan jaringan jalan `Road_Density_mean`.
+- Jaringan jalan: 162.608 segmen OSM.
 - TES: lima kategori (pendidikan, kesehatan, pemerintahan, ibadah, GOR/gedung serbaguna).
+- **Kelas bahaya banjir** \(h \in \{0,1,2,3\}\) untuk grid, ruas, dan TES diturunkan dari **satu
+  sumber**, yaitu raster InaRisk `data/Kulonprogo_Banjir.tif` (EPSG:32749, piksel 29,71 m; 1 = rendah,
+  2 = sedang, 3 = tinggi; nodata = 0):
+  - grid \(h_i\): kelas **mayoritas** piksel yang pusatnya berada di dalam grid (kelas 0 ikut
+    dihitung; seri → kelas terendah; grid tanpa pusat piksel → piksel di centroid);
+  - ruas \(c_e\): kelas **maksimum** piksel sepanjang segmen (sampel titik tiap ≤ 5 m, termasuk
+    kedua ujung);
+  - TES: nilai piksel di titik TES.
+
+  Atribut `banjir` bawaan GPKG diganti hasil turunan ini saat data dimuat, dan disimpan sebagai
+  `banjir_atribut_lama`. Alasan dan uji asal-usul: `docs/DIAGNOSTIK_JALAN_GRID.md`.
 
 ## 2. Level banjir berdasarkan kelas bahaya yang ditutup
 
@@ -146,39 +157,49 @@ monoton (CATATAN B2).
 
 ## 9. Pemilihan K berbasis stabilitas
 
-Aturan ini ditetapkan sebelum melihat hasil. Untuk setiap \(K = 2, \dots, 10\) pada data gabungan:
+Untuk setiap \(K = 2, \dots, 10\) pada data gabungan:
 
 - **(a) Stabilitas inisialisasi.** 10 run SDWFCM (seed 42–51). \(\overline{\mathrm{ARI}}_{\text{init}}(K)\)
   = rerata ARI dari 45 pasangan run. Solusi data penuh \(\hat L_K\) = run dengan \(J\) terkecil.
 - **(b) Stabilitas subsampel.** \(B = 10\) subsampel. Subsampel ke-\(b\) memilih 80% `id_grid` unik
   tanpa pengembalian (seed \(20240 + b\)), dan semua baris (level) dari grid terpilih ikut masuk.
   \(W\) blok-diagonal dihitung ulang pada subsampel. SDWFCM dijalankan 3 inisialisasi (seed 42–44),
-  lalu diambil \(J\) terkecil, \(L^{(b)}_K\). Untuk tiap \(b\), \(\mathrm{ARI}_b(K) = \mathrm{ARI}(\hat L_K|_{S_b}, L^{(b)}_K)\)
-  dihitung pada baris yang beririsan. Yang dilaporkan: rerata \(\overline{\mathrm{ARI}}_{\text{sub}}(K)\)
-  dan simpangan bakunya.
+  lalu diambil \(J\) terkecil. Untuk tiap \(b\) dihitung ARI terhadap \(\hat L_K\) pada baris yang
+  beririsan. Yang dilaporkan: rerata \(\overline{\mathrm{ARI}}_{\text{sub}}(K)\) dan simpangan bakunya.
 
-**Aturan keputusan:**
-\[
-K^\ast = \min\Big\{K : \overline{\mathrm{ARI}}_{\text{sub}}(K) \ge \max_{K'} \overline{\mathrm{ARI}}_{\text{sub}}(K') - 0{,}01\Big\}.
-\]
-(Bila estimasi waktu satu run melebihi 3 jam, \(B\) diturunkan ke 5. Estimasi pada run final
-±2 jam, jadi \(B = 10\); lihat CATATAN P2-C.)
+Pada putaran 3, evaluasi ini **dihitung ulang** pada data v3 (kelas bahaya dari raster) atas keputusan
+peneliti, karena data gabungan berubah.
 
-**Metrik pendukung** (dilaporkan, tidak dipakai memilih), dihitung pada \(\hat L_K\):
+**Riwayat keputusan (ditulis apa adanya):**
 
-- **I-Index** (\(p = 2\)) dengan pusat fuzzy \(c_k\):
-  \(I(K) = \left(\frac1K \cdot \frac{E_1}{E_K} \cdot D_K\right)^2\).
-- **Dunn** titik-ke-titik pada 5 sampel acak 2.000 baris (seed 42–46), dilaporkan rerata dan
-  simpangan baku.
-- **Ketegasan partisi** \(1 - \mathrm{PE}/\ln K\) pada keanggotaan FCM yang dihitung ulang di ruang
-  atribut.
-- **DESC/PESC** dengan blok = komponen terhubung baris berlabel sama pada ketetanggaan **rook**
-  (§12) yang dibatasi pada level yang sama. \(\mathrm{DESC} = \sum_{b,|b|\ge 2} V_b^2/\delta_b^2\),
-  \(\mathrm{PESC} = \sum_k \sum_{b<b'} V_b V_{b'} / (S_{bb'} \Delta_{bb'} B_k)\), dengan \(S\) dalam km.
-- **Silhouette** pada sampel 10.000 baris (seed 42).
-- **Analisis sensitivitas:** skor komposit lama \(\tfrac15[\mathrm{PR}(I) + \mathrm{PR}(\mathrm{Dunn})
-  + \mathrm{PR}(\mathrm{DESC}) + \mathrm{PR}(\mathrm{Ketegasan}) + P(K)]\), dan versi tanpa DESC
-  (rerata empat suku). \(P(K) = 1 - (K - 2)/8\).
+- **(a) Aturan stabilitas.** Aturan ini ditetapkan di Putaran 2 sebelum hasil v2 terlihat:
+  \[
+  K^\ast = \min\Big\{K : \overline{\mathrm{ARI}}_{\text{sub}}(K) \ge \max_{K'} \overline{\mathrm{ARI}}_{\text{sub}}(K') - 0{,}01\Big\}.
+  \]
+  Artinya, K dengan rerata ARI subsampel tertinggi dipilih, dengan pemecah seri "K terkecil" bila
+  beberapa K berselisih ≤ 0,01. Pada hasil v2, aturan ini memilih **K = 2**.
+- **(b) K = 2 dan K = 3 tidak dapat dibedakan secara stabilitas.** Pada v2, rerata ARI subsampel
+  K = 2 0,964 ± 0,006 dan K = 3 0,963 ± 0,003. Selisih 0,001 lebih kecil dari simpangan baku kedua K,
+  jadi pilihan K = 2 hanya ditentukan pemecah seri.
+- **(c) Model utama ditetapkan kemudian.** Keputusan model utama (K = 2 atau K = 3) diambil peneliti
+  bersama pembimbing **setelah** hasil v2 terlihat, berdasarkan metrik pendukung dan interpretasi
+  tipologi. Keputusan ini bukan bagian dari rencana awal. Karena itu v3 menghasilkan keluaran lengkap
+  dengan struktur identik untuk **K = 2 dan K = 3**. K utama dicatat di `pengaturan_hasil.json`
+  (dibaca `scripts/export_bab4.py` dan dashboard); K lainnya dilaporkan sebagai sensitivitas. Tabel
+  stabilitas v3 memuat kolom "setara secara stabilitas dengan K terbaik" (selisih rerata ARI subsampel
+  ≤ 0,01).
+
+**Metrik pendukung** pada \(\hat L_K\), ditampilkan di tabel utama: Silhouette (sampel 10.000 baris,
+seed 42), ketegasan partisi \(1 - \mathrm{PE}/\ln K\) (keanggotaan FCM dihitung ulang di ruang
+atribut), *size entropy*, dan ukuran klaster terbesar (%).
+
+**Lampiran** (dilaporkan, tidak dipakai memilih):
+
+- I-Index (\(p = 2\)) dengan pusat fuzzy;
+- Dunn pada 5 sampel 2.000 baris (seed 42–46), rerata dan simpangan baku;
+- DESC/PESC dengan blok rook yang dibatasi pada level yang sama;
+- skor komposit lama \(\tfrac15[\mathrm{PR}(I) + \mathrm{PR}(\mathrm{Dunn}) + \mathrm{PR}(\mathrm{DESC}) +
+  \mathrm{PR}(\mathrm{Ketegasan}) + P(K)]\) dan versi tanpa DESC, dengan \(P(K) = 1 - (K-2)/8\).
 
 ## 10. Penomoran dan status per level
 
@@ -191,8 +212,31 @@ Status grid \(i\) pada level \(s\):
 z_{i,s} = \begin{cases} \text{label}(i,s) \in \{0,\dots,K-1\} & \text{bila } \text{Tergenang}_{i,s} = 0 \\
 K\ (\text{Tergenang}) & \text{bila } \text{Tergenang}_{i,s} = 1 \end{cases}.
 \]
-Profil klaster = rata-rata variabel asli per klaster atas seluruh baris data gabungan. Distribusi
-tipologi per level = jumlah grid per state \(z_{\cdot,s}\).
+**Profil klaster** (untuk setiap K keluaran), dihitung atas seluruh baris data gabungan:
+
+- rerata semua variabel;
+- untuk setiap variabel waktu (lima kategori dan waktu minimum): median, P25, dan P75;
+- jumlah dan persentase baris bernilai penalti \(t = T_{\text{pen}}\), per kategori dan untuk waktu
+  minimum;
+- proporsi grid terisolasi (`is_isolated`).
+
+Kelas bahaya banjir hanya dilaporkan sebagai variabel deskriptif.
+
+**Label interpretasi otomatis** (aturan ditetapkan di Putaran 3 sebelum melihat hasil). Dengan
+\(\pi_k\) = proporsi baris klaster \(k\) yang waktu minimumnya = penalti, dan \(\tilde t_k\) = median
+waktu minimum klaster \(k\):
+\[
+\text{label}_k = \begin{cases}
+\text{Terisolasi} & \pi_k > 0{,}5 \\
+\text{Akses Baik} & \pi_k \le 0{,}5 \wedge \tilde t_k \le 10\ \text{menit} \\
+\text{Akses Sedang} & \pi_k \le 0{,}5 \wedge 10 < \tilde t_k \le 30 \\
+\text{Akses Kritis} & \pi_k \le 0{,}5 \wedge \tilde t_k > 30
+\end{cases}
+\]
+
+Distribusi tipologi per level = jumlah grid per state \(z_{\cdot,s}\). Untuk K = 2 dan K = 3
+juga disusun tabulasi silang label pada baris data gabungan, yang menunjukkan bagaimana klaster
+K = 3 memecah klaster K = 2.
 
 ## 11. Titik Aman Semu (Detour Index)
 
@@ -210,14 +254,20 @@ Kategori per level:
 
 - **Tergenang**: \(\text{Tergenang}_{i,s} = 1\), dikeluarkan dari seluruh perhitungan TAS.
 - **Terputus**: non-Tergenang dengan \(T^{\text{aktual}} = T_{\text{pen}}\).
-- Untuk himpunan \(R\) = grid non-Tergenang yang terjangkau:
+- **Aturan utama (Putaran 3, absolut).** Untuk \(R\) = grid non-Tergenang yang terjangkau:
 \[
-\mathrm{TAS}_i \iff T_i^{\text{ideal}} \le P_{25}\big(T^{\text{ideal}}_R\big) \;\wedge\;
-\mathrm{DI}_i \ge P_{75}\big(\mathrm{DI}_R\big),
+\mathrm{TAS}_i \iff \mathrm{DI}_i \ge 2 \;\wedge\; T_i^{\text{ideal}} \le 5\ \text{menit}
+\quad (\text{jarak garis lurus} \le 400\ \text{m pada } 80\ \text{m/menit}),
 \]
-  selebihnya **Non-TAS**.
-- **Uji sensitivitas:** \(T_i^{\text{ideal}} \le P_{25} \wedge \mathrm{DI}_i \ge 2\). Dilaporkan
-  juga persentase TAS yang juga lolos ambang absolut ini.
+  selebihnya **Non-TAS**. Batas minimum 50 m tetap berlaku pada kedua jarak.
+- **Sensitivitas (aturan persentil, aturan utama v2):**
+  \(T_i^{\text{ideal}} \le P_{25}(T^{\text{ideal}}_R) \wedge \mathrm{DI}_i \ge P_{75}(\mathrm{DI}_R)\).
+  Dilaporkan jumlah TAS menurut aturan ini dan irisannya dengan aturan utama.
+- **Yang dilaporkan:** jumlah TAS, Non-TAS, Terputus, dan Tergenang per level; sebaran DI (median,
+  P25, P75, P90) pada TAS dan Non-TAS; median \(T^{\text{ideal}}\) dan \(T^{\text{aktual}}\) TAS;
+  jumlah TAS per kategori TES terdekat (\(e(i)\)); dan peta TAS per level.
+- **Batasan interpretasi.** Perbedaan DI antara TAS dan Non-TAS mengikuti langsung dari definisi
+  aturan, sehingga tidak dipakai sebagai bukti keberhasilan deteksi. Tabel TAS tidak bergantung pada K.
 
 ## 12. Analisis transisi dengan state Tergenang
 
@@ -236,11 +286,12 @@ Untuk pasangan Baseline→Rendah, Rendah→Sedang, Sedang→Tinggi, dan Baseline
 
 ## 13. Perbandingan algoritma (Baseline, \(K^\ast\))
 
-Data: baris Baseline dari data gabungan (semua grid; ruang PCA dan praproses yang sama). Algoritma
-fuzzy memakai \(K^\ast\), 10 inisialisasi (seed 42–51, \(J\) terkecil), dan aturan penomoran §10:
+Data: baris Baseline dari data gabungan (semua grid; ruang PCA dan praproses yang sama). Perbandingan
+dijalankan untuk **K = 2 dan K = 3**. Algoritma fuzzy memakai \(m = 1{,}7\) yang sama, 10 inisialisasi
+(seed 42–51, \(J\) terkecil), dan aturan penomoran §10:
 
 - **FCM**: SDWFCM dengan \(\alpha = 0\) (\(m = 1{,}7\)).
-- **SFCM**: \(m = 2\), \(\alpha = 0{,}5\). \(d^s_{ik}\) = (rata-rata \(d^a\) tetangga rook) ×
+- **SFCM**: \(m = 1{,}7\) (sama dengan FCM dan SDWFCM; pada v2 \(m = 2\)), \(\alpha = 0{,}5\). \(d^s_{ik}\) = (rata-rata \(d^a\) tetangga rook) ×
   (rata-rata \(u_k\) tetangga rook); grid tanpa tetangga memakai \(d^s = d^a\). Seleksi inisialisasi
   memakai \(J_{\text{SFCM}} = \sum u^m d^t\). Implementasi tervektorisasi dengan operator rata-rata
   tetangga, identik dengan rumus per grid (`tests/test_gabungan.py`).
@@ -253,7 +304,9 @@ fuzzy memakai \(K^\ast\), 10 inisialisasi (seed 42–51, \(J\) terkecil), dan at
 Partisi dengan klaster terbesar \(> 90\%\) grid ditandai **degeneratif (tidak layak dibandingkan)**.
 Metrik: Silhouette, Calinski–Harabasz, Davies–Bouldin (ruang PCA), Moran's I label (999 permutasi,
 seed permutasi 42, kontiguitas rook), proporsi pasangan tetangga rook berlabel sama, *size entropy*,
-ukuran klaster terbesar (%), dan waktu per inisialisasi.
+ukuran klaster terbesar (%), dan waktu per inisialisasi. Untuk algoritma fuzzy juga dilaporkan
+koefisien partisi \(\mathrm{PC} = \frac1N \sum_i \sum_k u_{ik}^2\) dan entropi partisi
+\(\mathrm{PE} = -\frac1N \sum_i \sum_k u_{ik} \ln u_{ik}\) dari keanggotaan akhir.
 
 Ketetanggaan rook (`build_weights`): rook (fallback queen), grid tanpa tetangga diberi 2 tetangga
 terdekat, dan komponen terputus disambungkan melalui pasangan grid terdekat.
@@ -264,7 +317,8 @@ Dashboard menghitung ulang aksesibilitas level terpilih dengan ruas yang dibloki
 menerapkan praproses data gabungan (parameter tersimpan). Keanggotaan dihitung terhadap **pusat
 klaster final yang tetap**: iterasi \(U\) dengan \(d^t\) pada §8 dan \(W\) KNN-Gaussian level
 tersebut, sedangkan pusat tidak diperbarui. Model tidak di-fit ulang, sehingga nomor klaster tetap
-bermakna sama.
+bermakna sama. Dashboard menampilkan K utama (`pengaturan_hasil.json`) secara bawaan dan menyediakan
+pilihan untuk beralih ke K lainnya.
 
 ## 15. Reproduksibilitas
 
