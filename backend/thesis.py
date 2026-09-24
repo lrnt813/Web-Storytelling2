@@ -74,6 +74,7 @@ IINDEX_P = 2
 SDWFCM_N_INIT = 10        # jumlah inisialisasi acak SDWFCM
 SDWFCM_SEED = 42          # seed awal; inisialisasi ke-i memakai SDWFCM_SEED + i
 DUNN_SAMPLE = 2000        # sampel grid untuk Dunn titik-ke-titik (O(n²))
+MORAN_PERMUTATION_SEED = 42   # esda.Moran tidak punya parameter seed → seed global di-set sebelum dipanggil
 TAS_MIN_EUCLID_M = 50.0   # jarak Euclidean minimum (setengah lebar grid 100 m) untuk T_ideal
 TAS_DI_ABSOLUTE = 2.0     # ambang absolut DI_t pada uji sensitivitas TAS
 TAS_STATUS = {0: "Non-TAS", 1: "TAS", 2: "Terputus"}
@@ -548,7 +549,9 @@ def size_entropy(labels) -> float:
 
 
 def moran_labels(labels, w) -> Tuple[Optional[float], Optional[float]]:
+    """Moran's I pada label klaster (99 permutasi; p-value pseudo dengan seed tetap)."""
     try:
+        np.random.seed(MORAN_PERMUTATION_SEED)
         mi = Moran(labels.astype(float), w, permutations=99)
         return float(mi.I), float(mi.p_sim)
     except Exception as e:

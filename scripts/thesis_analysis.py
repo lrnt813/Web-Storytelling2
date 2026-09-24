@@ -7,9 +7,15 @@ Menghasilkan:
 Jalankan:  python -m scripts.thesis_analysis   (± 10–15 menit, SFCM paling lama)
            tambahkan --skip-comparison untuk melewati perbandingan algoritma.
 """
+import os
+
+# Determinisme: satu thread BLAS/OpenMP (harus di-set sebelum numpy dimuat).
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+    os.environ.setdefault(_v, "1")
+
+import hashlib
 import json
 import logging
-import os
 import sys
 import time
 from pathlib import Path
@@ -46,6 +52,32 @@ def restore_locked(data_dir) -> bool:
         if (lock_dir / f).exists():
             shutil.copy2(lock_dir / f, Path(data_dir) / f)
     return all((Path(data_dir) / f).exists() for f in (RESULTS_FILE, GRID_FILE))
+
+
+TIME_KEYS = {"elapsed_sec", "time_sec", "sdwfcm_time_sec"}   # dibuang sebelum hashing
+
+
+def _strip_time(obj):
+    if isinstance(obj, dict):
+        return {k: _strip_time(v) for k, v in obj.items() if k not in TIME_KEYS}
+    if isinstance(obj, list):
+        return [_strip_time(v) for v in obj]
+    return obj
+
+
+def results_fingerprint(path) -> str:
+    """SHA-256 thesis_results.json setelah field waktu dibuang (JSON kanonik, kunci terurut)."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    canon = json.dumps(_strip_time(data), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(canon.encode("utf-8")).hexdigest()
+
+
+def file_sha256(path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 UNROUNDED_KEYS = {"pesc"}   # nilai sangat kecil: disimpan tanpa pembulatan
