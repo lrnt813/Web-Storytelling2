@@ -1,0 +1,5 @@
+﻿Level,TAS aturan utama,TAS aturan persentil,P25 T_ideal (menit),P75 DI,TAS kedua aturan,Hanya aturan utama,Hanya aturan persentil
+Baseline,5758,1842,1.971725,2.248928,1842,3916,0
+Rendah,5757,1811,1.968657,2.260549,1811,3946,0
+Sedang,5092,1485,1.828664,2.294721,1485,3607,0
+Tinggi,3685,1047,2.002411,2.319418,1047,2638,0

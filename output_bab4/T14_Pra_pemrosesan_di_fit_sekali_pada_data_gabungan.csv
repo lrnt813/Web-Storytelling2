@@ -1,10 +1,9 @@
 ﻿Tahap,Nilai
-Data fit,"data gabungan, 72.275 baris"
+Data fit,"data gabungan, 80.103 baris"
 Fitur masukan,"Road_Density_mean, waktu_tes_pendidikan, waktu_tes_kesehatan, waktu_tes_pemerintahan, waktu_tes_ibadah, waktu_tes_gor, waktu_tes_min, jumlah_opsi_rute, is_isolated"
 Fitur terpilih,"Road_Density_mean, waktu_tes_pendidikan, waktu_tes_kesehatan, waktu_tes_pemerintahan, waktu_tes_ibadah, waktu_tes_gor, waktu_tes_min, jumlah_opsi_rute, is_isolated"
 Fitur dibuang,–
-Capping 3 × IQR,"Road_Density_mean: [-0,252; 1,759]"
-Komponen PCA,4
-Varians kumulatif PCA,"81,00 %"
+Capping 3 × IQR,"Road_Density_mean: [-0,290; 1,815]"
+Komponen PCA,5
+Varians kumulatif PCA,"85,58 %"
 σ kernel Gaussian per level (m),"Baseline 141,42; Rendah 141,42; Sedang 141,42; Tinggi 141,42"
-Model final,"seed 49, J = 259.439,908"
