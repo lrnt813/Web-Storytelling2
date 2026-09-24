@@ -11,11 +11,12 @@ Keluaran:
   Tabel_Bab4.docx          semua tabel, format angka Indonesia (koma desimal, titik ribuan;
                            waktu 2 desimal, metrik 3 desimal)
   ringkasan_angka_bab4.md  angka kunci kedua K (K utama di atas)
-  perbandingan_v3_vs_v4.md angka kunci v3 (data/locked/arsip_v3/) vs v4 dan penyebab perubahan
+  temuan_kunci.md          angka temuan kunci Bab IV beserta tabel sumbernya
+  perbandingan_v4_vs_v5.md angka kunci v4 (data/locked/arsip_v4/) vs v5 dan penyebab perubahan
   peta/                    peta tipologi per level per K, TAS per level, TAS baru/hilang (Sedang,
                            Tinggi), dan kategori akses (Baseline, Sedang, Tinggi) (PNG)
 
-Skrip ini hanya membaca data/locked/ (termasuk arsip_v3/ untuk perbandingan), pengaturan_hasil.json,
+Skrip ini hanya membaca data/locked/ (termasuk arsip_v4/ untuk perbandingan), pengaturan_hasil.json,
 dan geometri statis grid (frontend/static_grid_kulonprogo.geojson) untuk peta.
 Folder arsip di output_bab4/ tidak disentuh.
 """
@@ -30,7 +31,9 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOCKED = PROJECT_ROOT / "data" / "locked"
-ARSIP_V3 = LOCKED / "arsip_v3" / "thesis_results.json"
+ARSIP_V4 = LOCKED / "arsip_v4" / "thesis_results.json"
+TES_TT = "TES terdekat tidak terjangkau"   # status TAS 2 (berbeda dengan kategori akses "Terputus")
+NYARIS_DEGENERATIF = 0.85   # catatan penyajian: klaster terbesar ≥ 85% (batas degeneratif tetap 90%)
 AKSES = ["Terjangkau", "Jauh", "Terputus", "Tergenang"]
 OUT = PROJECT_ROOT / "output_bab4"
 PENGATURAN = PROJECT_ROOT / "pengaturan_hasil.json"
@@ -182,7 +185,7 @@ def tables_common(R):
         s = lv[key]["tas"]
         sp = s["sensitivitas_persentil"]
         rows.append({"Level": LEVEL_LABEL[key], "TAS": s["jumlah_tas"], "Non-TAS": s["jumlah_non_tas"],
-                     "Terputus": s["jumlah_terputus"], "Tergenang": s["jumlah_tergenang"],
+                     TES_TT: s["jumlah_tes_terdekat_tidak_terjangkau"], "Tergenang": s["jumlah_tergenang"],
                      "% TAS (semua grid)": s["persen_tas"], "% TAS (non-Tergenang)": s["persen_tas_non_tergenang"],
                      "Median T_ideal TAS (menit)": s["median_t_ideal_tas"],
                      "Median T_aktual TAS (menit)": s["median_t_aktual_tas"]})
@@ -200,12 +203,13 @@ def tables_common(R):
         rows_k.append({"Level": LEVEL_LABEL[key], **{KAT_LABEL[c]: s["tas_per_kategori_tes_terdekat"].get(c, 0) for c in KAT}})
     df = pd.DataFrame(rows)
     T.append(Table("T11", "Titik Aman Semu per level (aturan utama: DI ≥ 2, T_ideal ≤ 5 menit, T_aktual ≥ 30 menit)", df,
-                   {c: 0 for c in ("TAS", "Non-TAS", "Terputus", "Tergenang")}
+                   {c: 0 for c in ("TAS", "Non-TAS", TES_TT, "Tergenang")}
                    | {"% TAS (semua grid)": 2, "% TAS (non-Tergenang)": 2, "Median T_ideal TAS (menit)": 2,
                       "Median T_aktual TAS (menit)": 2},
                    "Grid non-Tergenang yang terjangkau: TAS bila DI_t ≥ 2, T_ideal ≤ 5 menit (garis lurus ≤ 400 m), dan "
                    "T_aktual ≥ 30 menit (batas waktu evakuasi; Li dkk., 2026). Batas minimum 50 m pada T_ideal dan "
-                   "T_aktual. Terputus = non-Tergenang tidak menjangkau TES."))
+                   "T_aktual. TES terdekat tidak terjangkau = non-Tergenang yang TES terdekatnya secara garis lurus "
+                   "tidak dapat dicapai lewat jaringan (T_aktual = penalti); berbeda dengan kategori akses Terputus (T18)."))
     df = pd.DataFrame(rows_s)
     T.append(Table("T11b", "Sensitivitas TAS: ambang T_aktual 20/40 menit, aturan absolut v3, aturan persentil", df,
                    {c: 0 for c in df.columns if c.startswith("TAS") and "(%)" not in c}
@@ -218,10 +222,10 @@ def tables_common(R):
         c = lv[key]["tas_perubahan_vs_baseline"]
         rows_c.append({"Level": LEVEL_LABEL[key], "TAS baru akibat banjir": c["tas_baru"],
                        "dari Non-TAS Baseline": c["tas_baru_dari_status_baseline"]["Non-TAS"],
-                       "dari Terputus Baseline": c["tas_baru_dari_status_baseline"]["Terputus"],
+                       f"dari {TES_TT} (Baseline)": c["tas_baru_dari_status_baseline"][TES_TT],
                        "TAS tetap": c["tas_tetap"], "TAS hilang": c["tas_hilang"],
                        "hilang: jadi Tergenang": c["tas_hilang_jadi_tergenang"],
-                       "hilang: jadi Terputus": c["tas_hilang_jadi_terputus"],
+                       f"hilang: jadi {TES_TT}": c["tas_hilang_jadi_tes_terdekat_tidak_terjangkau"],
                        "hilang: lainnya (Non-TAS)": c["tas_hilang_lainnya"]})
     df = pd.DataFrame(rows_c)
     T.append(Table("T11e", "Perubahan TAS terhadap Baseline (aturan utama)", df,
@@ -258,6 +262,24 @@ def tables_common(R):
                        f"{LEVEL_LABEL[t['to_level']]} (batas 30 menit; jumlah grid)", mat,
                        {c: 0 for c in mat.columns if c != "Dari"}))
 
+    return T
+
+
+def tables_access_extra(grid):
+    """T19e: transisi kategori akses Baseline → Sedang (dari kolom akses_* grid terkunci)."""
+    a, b = grid["akses_baseline"].values, grid["akses_sedang"].values
+    M = np.zeros((4, 4), dtype=int)
+    np.add.at(M, (a, b), 1)
+    mat = pd.DataFrame(M, columns=[f"ke {c}" for c in AKSES])
+    mat.insert(0, "Dari", AKSES)
+    return [Table("T19e", "Transisi kategori akses Baseline → Sedang (batas 30 menit; jumlah grid)", mat,
+                  {c: 0 for c in mat.columns if c != "Dari"},
+                  "Dihitung dari kolom akses_baseline dan akses_sedang pada thesis_grid_results.csv.gz terkunci.")]
+
+
+def tables_common_tail(R):
+    T = []
+    lv, pool = R["levels"], R["data_gabungan"]
     rows = []
     for key in LEVEL_ORDER:
         d = lv[key]["diagnostik"]
@@ -300,6 +322,18 @@ def tables_common(R):
 
 
 # ── tabel bergantung K ──────────────────────────────────────────────────────
+def algo_note(a) -> str:
+    """Catatan penyajian pada tabel perbandingan algoritma (batas degeneratif 90% tidak berubah)."""
+    big = a.get("klaster_terbesar_persen")
+    if a["status"] == "gagal":
+        return "gagal dijalankan; tidak layak dibandingkan"
+    if a["status"] == "degeneratif":
+        return f"degeneratif (klaster terbesar {id_num(big, 1)}%; batas 90%)"
+    if big is not None and big >= NYARIS_DEGENERATIF * 100:
+        return f"nyaris degeneratif (klaster terbesar {id_num(big, 1)}%; batas 90%)"
+    return ""
+
+
 def tables_for_k(R, k, prefix):
     T = []
     M = R["model"][str(k)]
@@ -317,7 +351,8 @@ def tables_for_k(R, k, prefix):
                          "p (Moran)": a.get("moran_p"), "Proporsi tetangga sama": a.get("proporsi_tetangga_sama"),
                          "PC": a.get("pc"), "PE": a.get("pe"),
                          "Size entropy": a.get("size_entropy"), "Klaster terbesar (%)": a.get("klaster_terbesar_persen"),
-                         "Waktu per inisialisasi (detik)": a["time_per_init_sec"], "Galat": a.get("galat", "")})
+                         "Waktu per inisialisasi (detik)": a["time_per_init_sec"], "Galat": a.get("galat", ""),
+                         "Catatan": algo_note(a)})
         df = pd.DataFrame(rows)
         T.append(Table(f"{prefix}06", f"Perbandingan algoritma pada Baseline {sfx}", df,
                        {"m": 1, "Inisialisasi": 0, "Jumlah klaster": 0, "Silhouette": 3, "Calinski-Harabasz": 3,
@@ -516,7 +551,7 @@ def write_maps(R, grid, out_dir):
         cls = np.select([(b0 != 1) & (st == 1), (b0 == 1) & (st == 3), (b0 == 1) & (st == 2), (b0 == 1) & (st == 0),
                          (b0 == 1) & (st == 1)], [1, 2, 3, 4, 5], default=0)
         pal2 = {0: "#e5e7eb", 1: "#dc2626", 2: TERGENANG_COLOR, 3: "#0f172a", 4: "#f59e0b", 5: "#a855f7"}
-        lab2 = {1: "TAS baru akibat banjir", 2: "TAS hilang: jadi Tergenang", 3: "TAS hilang: jadi Terputus",
+        lab2 = {1: "TAS baru akibat banjir", 2: "TAS hilang: jadi Tergenang", 3: f"TAS hilang: jadi {TES_TT}",
                 4: "TAS hilang: lainnya", 5: "TAS tetap", 0: "lainnya"}
         fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
         g.plot(ax=ax, color=[pal2[int(v)] for v in cls], linewidth=0)
@@ -529,7 +564,7 @@ def write_maps(R, grid, out_dir):
         plt.close(fig)
 
     pal = {0: "#e5e7eb", 1: "#a855f7", 2: "#0f172a", 3: TERGENANG_COLOR}
-    lab = {0: "Non-TAS", 1: "TAS", 2: "Terputus", 3: "Tergenang"}
+    lab = {0: "Non-TAS", 1: "TAS", 2: TES_TT, 3: "Tergenang"}
     for key in LEVEL_ORDER:
         st = g[f"tas_status_{key}"].values
         fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
@@ -652,15 +687,17 @@ def write_summary(R, lock, k_utama, grid, out_dir):
                  f"TAS ≥ 20 / ≥ 40 menit {id_num(t['sensitivitas_ambang_waktu']['20']['jumlah_tas'], 0)} / "
                  f"{id_num(t['sensitivitas_ambang_waktu']['40']['jumlah_tas'], 0)}; absolut v3 "
                  f"{id_num(t['sensitivitas_absolut_v3']['jumlah_tas'], 0)}; persentil "
-                 f"{id_num(t['sensitivitas_persentil']['jumlah_tas'], 0)}; Terputus {id_num(t['jumlah_terputus'], 0)}")
+                 f"{id_num(t['sensitivitas_persentil']['jumlah_tas'], 0)}; {TES_TT} "
+                 f"{id_num(t['jumlah_tes_terdekat_tidak_terjangkau'], 0)}")
         a = s["kategori_akses"]["30"]
         L.append("  - Kategori akses (30 menit): " + "; ".join(
             f"{c} {id_num(a[c]['jumlah_grid'], 0)} ({id_num(a[c]['persen'], 2)} %)" for c in AKSES))
         if key != "baseline":
             c = s["tas_perubahan_vs_baseline"]
             L.append(f"  - TAS baru akibat banjir {id_num(c['tas_baru'], 0)}; TAS hilang {id_num(c['tas_hilang'], 0)} "
-                     f"(jadi Tergenang {id_num(c['tas_hilang_jadi_tergenang'], 0)}, jadi Terputus "
-                     f"{id_num(c['tas_hilang_jadi_terputus'], 0)}, lainnya {id_num(c['tas_hilang_lainnya'], 0)})")
+                     f"(jadi Tergenang {id_num(c['tas_hilang_jadi_tergenang'], 0)}, jadi {TES_TT} "
+                     f"{id_num(c['tas_hilang_jadi_tes_terdekat_tidak_terjangkau'], 0)}, lainnya "
+                     f"{id_num(c['tas_hilang_lainnya'], 0)})")
     L += ["", "## Pemilihan K", ""]
     for c in ks["candidates"]:
         if c["k"] in order:
@@ -674,55 +711,93 @@ def write_summary(R, lock, k_utama, grid, out_dir):
     (out_dir / "ringkasan_angka_bab4.md").write_text("\n".join(L) + "\n", encoding="utf-8")
 
 
-def write_v3_v4(R, grid, out_dir):
-    if not ARSIP_V3.exists():
+def write_v4_v5(R, out_dir):
+    if not ARSIP_V4.exists():
         return
-    V3 = json.loads(ARSIP_V3.read_text(encoding="utf-8"))
-    l3, l4 = V3["levels"], R["levels"]
+    V4 = json.loads(ARSIP_V4.read_text(encoding="utf-8"))
     rows = []
-
-    def add(nama, a, b, dec, sebab):
-        rows.append(f"| {nama} | {id_num(a, dec)} | {id_num(b, dec)} | {sebab} |")
-
     for key in LEVEL_ORDER:
-        add(f"Grid Tergenang — {LEVEL_LABEL[key]}", l3[key]["n_grid_tergenang"], l4[key]["n_grid_tergenang"], 0,
-            "Tidak berubah (data dan level sama)")
-    for key in LEVEL_ORDER:
-        add(f"Rerata waktu minimum non-Tergenang — {LEVEL_LABEL[key]}", l3[key]["mean_waktu_min"], l4[key]["mean_waktu_min"], 2,
-            "Tidak berubah")
-    add("Baris data gabungan", V3["data_gabungan"]["n_baris"], R["data_gabungan"]["n_baris"], 0,
-        "Tidak berubah (diverifikasi identik)")
-    add("K menurut aturan stabilitas", V3["k_terpilih_aturan"], R["k_terpilih_aturan"], 0,
-        "Pemilihan K tidak dijalankan ulang (tabel v3)")
-    for key in LEVEL_ORDER:
-        t3, t4 = l3[key]["tas"], l4[key]["tas"]
-        add(f"TAS aturan utama — {LEVEL_LABEL[key]}", t3["jumlah_tas"], t4["jumlah_tas"], 0,
-            "Aturan utama v4 menambah syarat T_aktual ≥ 30 menit (v3: DI ≥ 2 dan T_ideal ≤ 5 menit)")
-        add(f"TAS aturan absolut v3 — {LEVEL_LABEL[key]}", t3["jumlah_tas"], t4["sensitivitas_absolut_v3"]["jumlah_tas"], 0,
-            "Sama (aturan v3 menjadi sensitivitas di v4)")
-        add(f"TAS aturan persentil — {LEVEL_LABEL[key]}", t3["sensitivitas_persentil"]["jumlah_tas"],
-            t4["sensitivitas_persentil"]["jumlah_tas"], 0, "Sama")
-    for k in (2, 3):
-        m3, m4 = V3["model"][str(k)], R["model"][str(k)]
+        t4, t5 = V4["levels"][key]["tas"], R["levels"][key]["tas"]
+        rows.append(f"| TAS utama — {LEVEL_LABEL[key]} | {id_num(t4['jumlah_tas'], 0)} | {id_num(t5['jumlah_tas'], 0)} | "
+                    "Tidak berubah |")
+        rows.append(f"| Status TAS 2 — {LEVEL_LABEL[key]} | Terputus: {id_num(t4['jumlah_terputus'], 0)} | "
+                    f"{TES_TT}: {id_num(t5['jumlah_tes_terdekat_tidak_terjangkau'], 0)} | Ganti nama (P4-10); angka sama |")
+        rows.append(f"| Grid Tergenang — {LEVEL_LABEL[key]} | {id_num(V4['levels'][key]['n_grid_tergenang'], 0)} | "
+                    f"{id_num(R['levels'][key]['n_grid_tergenang'], 0)} | Tidak berubah |")
+    for k in (2, 3, 4):
         for c in range(k):
-            add(f"Baris klaster {c} K = {k}", m3["cluster_profile"][c]["jumlah_baris"],
-                m4["cluster_profile"][c]["jumlah_baris"], 0, "Model sama (label diverifikasi identik)")
-        rows.append(f"| Label K = {k} | {', '.join(p['deskripsi'] for p in m3['cluster_profile'])} | "
-                    f"{', '.join(p['deskripsi'] for p in m4['cluster_profile'])} | Label peringkat menggantikan label ambang median (P3-9) |")
-        s3 = {a["algoritma"]: a for a in m3.get("algorithm_comparison", [])}
-        for a in m4.get("algorithm_comparison", []):
-            b = s3.get(a["algoritma"])
-            add(f"Silhouette {a['algoritma']} (K = {k})", b.get("silhouette") if b else None, a.get("silhouette"), 3,
-                "Sama (perbandingan dijalankan ulang dengan pengaturan sama)")
-    rows.append("| Model K = 4 | – | tersedia | Baru di v4 (keluaran lengkap) |")
-    rows.append("| Kategori akses (Tergenang/Terputus/Jauh/Terjangkau) | – | tersedia | Baru di v4 (Li dkk., 2026) |")
-    rows.append("| TAS baru/hilang terhadap Baseline | – | tersedia | Baru di v4 |")
-    L = ["# Perbandingan angka kunci v3 vs v4", "",
-         "v3 = `data/locked/arsip_v3/` (tag `hasil-skripsi-v3`); v4 = `data/locked/` (tag `hasil-skripsi-v4`). "
-         "**Angka v4 yang berlaku.** Data gabungan, praproses, dan pemilihan K tidak dijalankan ulang; "
-         "perbedaan hanya dari perubahan penyajian dan aturan TAS.", "",
-         "| Angka | v3 | v4 | Perubahan metode penyebab |", "|---|---:|---:|---|", *rows]
-    (out_dir / "perbandingan_v3_vs_v4.md").write_text("\n".join(L) + "\n", encoding="utf-8")
+            a = V4["model"][str(k)]["cluster_profile"][c]["jumlah_baris"]
+            b = R["model"][str(k)]["cluster_profile"][c]["jumlah_baris"]
+            rows.append(f"| Baris klaster {c} K = {k} | {id_num(a, 0)} | {id_num(b, 0)} | Tidak berubah |")
+    L = ["# Perbandingan angka kunci v4 vs v5", "",
+         "v4 = `data/locked/arsip_v4/` (tag `hasil-skripsi-v4`); v5 = `data/locked/` (tag `hasil-skripsi-v5`). "
+         "Putaran 5 hanya mengubah penyajian: model, K, data, dan semua ambang sama. Perubahan: K utama = 4 "
+         "(penyajian); status TAS 2 berganti nama menjadi \"TES terdekat tidak terjangkau\"; kolom Catatan pada "
+         "tabel algoritma; T19e; temuan_kunci.md; lembar validasi TAS.", "",
+         "| Angka | v4 | v5 | Keterangan |", "|---|---:|---:|---|", *rows]
+    (out_dir / "perbandingan_v4_vs_v5.md").write_text("\n".join(L) + "\n", encoding="utf-8")
+
+
+def write_temuan_kunci(R, grid, tables, k_utama, out_dir):
+    """Ringkasan temuan kunci Bab IV; setiap angka disertai tabel sumber."""
+    code = {t.code: t for t in tables}
+    src = lambda c: f"`{c}` ({code[c].title})" if c in code else f"`{c}`"
+    lv = R["levels"]
+    M = R["model"][str(k_utama)]
+    L = ["# Temuan kunci Bab IV", "",
+         f"Sumber: `data/locked/` (hasil-skripsi-v5). K utama = {k_utama}. Setiap angka menyebut tabel sumbernya "
+         "di `output_bab4/`. Format angka Indonesia.", "",
+         "## (a) Kategori akses per level, batas 30 menit", "", f"Sumber: {src('T18')}.", "",
+         "| Level | Terjangkau | Jauh | Terputus | Tergenang |", "|---|---:|---:|---:|---:|"]
+    for key in LEVEL_ORDER:
+        a = lv[key]["kategori_akses"]["30"]
+        L.append(f"| {LEVEL_LABEL[key]} | " + " | ".join(
+            f"{id_num(a[c]['jumlah_grid'], 0)} ({id_num(a[c]['persen'], 2)} %)" for c in AKSES) + " |")
+    ba, bs, bt = grid["akses_baseline"].values, grid["akses_sedang"].values, grid["akses_tinggi"].values
+    n_s, n_t = int(((ba == 0) & (bs == 2)).sum()), int(((ba == 0) & (bt == 2)).sum())
+    L += ["", "## (b) Grid Terjangkau di Baseline yang menjadi Terputus tanpa tergenang", "",
+          f"- Baseline → Sedang: **{id_num(n_s, 0)} grid** (sumber: {src('T19e')}, sel Terjangkau → Terputus).",
+          f"- Baseline → Tinggi: **{id_num(n_t, 0)} grid** (sumber: {src('T19d')}, sel Terjangkau → Terputus).",
+          "- Kategori Terputus = non-Tergenang yang tidak mencapai TES mana pun; grid ini sendiri tidak tergenang, "
+          "tetapi aksesnya terputus karena ruas jalan tertutup.", "",
+          f"## (c) Profil tipologi K = {k_utama}", "", f"Sumber: {src('T07')} dan {src('T07b')}.", "",
+          "| Tipologi | Baris (%) | Median / P75 / P90 waktu min. (menit) | > 30 menit | Terputus | Terisolasi | Kepadatan jalan | Kelas bahaya |",
+          "|---|---:|---|---:|---:|---:|---:|---:|"]
+    for p in M["cluster_profile"]:
+        L.append(f"| {p['deskripsi']} | {id_num(p['jumlah_baris'], 0)} ({id_num(p['persen_baris'], 1)} %) | "
+                 f"{id_num(p['waktu_tes_min_median'], 2)} / {id_num(p['waktu_tes_min_p75'], 2)} / {id_num(p['waktu_tes_min_p90'], 2)} | "
+                 f"{id_num(p['proporsi_waktu_min_lebih_batas'] * 100, 2)} % | {id_num(p['proporsi_terputus'] * 100, 2)} % | "
+                 f"{id_num(p['proporsi_terisolasi'], 3)} | {id_num(p['Road_Density_mean'], 3)} | {id_num(p['banjir'], 3)} |")
+    if k_utama >= 2:
+        p1, p2 = M["cluster_profile"][0], M["cluster_profile"][1]
+        L += ["", f"**Pembeda Tipologi 1 vs Tipologi 2** (sumber: {src('T07')}): waktu tempuh minimum hampir sama "
+              f"(median {id_num(p1['waktu_tes_min_median'], 2)} vs {id_num(p2['waktu_tes_min_median'], 2)} menit). "
+              f"Pembedanya kepadatan jalan (rerata {id_num(p1['Road_Density_mean'], 3)} vs "
+              f"{id_num(p2['Road_Density_mean'], 3)}) dan kelas bahaya deskriptif (rerata {id_num(p1['banjir'], 3)} vs "
+              f"{id_num(p2['banjir'], 3)}; bukan fitur klasterisasi). Pada kategori TES tertentu (sumber: {src('T07b')}) "
+              f"median waktu ke TES kesehatan {id_num(p1['waktu_tes_kesehatan_median'], 2)} vs "
+              f"{id_num(p2['waktu_tes_kesehatan_median'], 2)} menit, dan ke GOR {id_num(p1['waktu_tes_gor_median'], 2)} vs "
+              f"{id_num(p2['waktu_tes_gor_median'], 2)} menit."]
+    L += ["", "## (d) Titik Aman Semu (aturan utama: DI ≥ 2, T_ideal ≤ 5 menit, T_aktual ≥ 30 menit)", "",
+          f"Sumber: {src('T11')}, {src('T11b')}, {src('T11e')}.", "",
+          f"| Level | TAS | % non-Tergenang | TAS baru akibat banjir | TAS hilang (jadi Tergenang / {TES_TT} / lainnya) |",
+          "|---|---:|---:|---:|---|"]
+    for key in LEVEL_ORDER:
+        t = lv[key]["tas"]
+        c = lv[key]["tas_perubahan_vs_baseline"]
+        new = "–" if key == "baseline" else id_num(c["tas_baru"], 0)
+        lost = "–" if key == "baseline" else (f"{id_num(c['tas_hilang'], 0)} ({id_num(c['tas_hilang_jadi_tergenang'], 0)} / "
+                                              f"{id_num(c['tas_hilang_jadi_tes_terdekat_tidak_terjangkau'], 0)} / "
+                                              f"{id_num(c['tas_hilang_lainnya'], 0)})")
+        L.append(f"| {LEVEL_LABEL[key]} | {id_num(t['jumlah_tas'], 0)} | {id_num(t['persen_tas_non_tergenang'], 2)} % | {new} | {lost} |")
+    L += ["", f"## (e) Perbandingan algoritma di Baseline (K = {k_utama})", "", f"Sumber: {src('T06')}.", "",
+          "| Algoritma | Status | Silhouette | CH | DB | Moran's I | PC | PE | Klaster terbesar | Catatan |",
+          "|---|---|---:|---:|---:|---:|---:|---:|---:|---|"]
+    for a in M.get("algorithm_comparison", []):
+        L.append(f"| {a['algoritma']} | {a['status']} | {id_num(a.get('silhouette'), 3)} | {id_num(a.get('calinski_harabasz'), 1)} | "
+                 f"{id_num(a.get('davies_bouldin'), 3)} | {id_num(a.get('moran_i'), 3)} | {id_num(a.get('pc'), 3)} | "
+                 f"{id_num(a.get('pe'), 3)} | {id_num(a.get('klaster_terbesar_persen'), 1)} % | {algo_note(a)} |")
+    (out_dir / "temuan_kunci.md").write_text("\n".join(L) + "\n", encoding="utf-8")
 
 
 def main(argv=None):
@@ -737,9 +812,10 @@ def main(argv=None):
         raise SystemExit(f"K utama {k_utama} tidak ada dalam keluaran {ks}")
     out_dir = args.keluaran or OUT
     out_dir.mkdir(parents=True, exist_ok=True)
-    for old in ("perbandingan_v1_vs_v2.md", "perbandingan_v2_vs_v3.md"):   # laporan versi lama tersimpan di arsip
+    for old in ("perbandingan_v1_vs_v2.md", "perbandingan_v2_vs_v3.md", "perbandingan_v3_vs_v4.md"):   # di arsip
         (out_dir / old).unlink(missing_ok=True)
-    tables = tables_common(R) + tables_for_k(R, k_utama, "T") + tables_k_compare(R, grid)
+    tables = (tables_common(R) + tables_access_extra(grid) + tables_common_tail(R) + tables_for_k(R, k_utama, "T")
+              + tables_k_compare(R, grid))
     for k in ks:
         if k != k_utama:
             tables += tables_for_k(R, k, "S")
@@ -748,7 +824,8 @@ def main(argv=None):
     write_csv(tables, out_dir)
     write_docx(tables, lock, k_utama, out_dir)
     write_summary(R, lock, k_utama, grid, out_dir)
-    write_v3_v4(R, grid, out_dir)
+    write_v4_v5(R, out_dir)
+    write_temuan_kunci(R, grid, tables, k_utama, out_dir)
     write_maps(R, grid, out_dir)
     print(f"{len(tables)} tabel diekspor ke {out_dir} (K utama = {k_utama})")
 
