@@ -128,3 +128,61 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
   karena batas minimum 50 m hanya dipasang pada T_ideal. **Keputusan pengguna:** batas 50 m dipasang
   pada kedua jarak, `T_aktual = max(jarak rute, 50 m)/80`. Akibatnya grid tersebut mendapat DI = 1.
   Test `tests/test_waktu_snapping.py` memeriksa T_aktual ≥ T_ideal pada data asli. — *SELESAI*
+
+## P2-C. Desain gabungan dan pemilihan K (Langkah 4–7)
+
+- **P2-C1. Langkah 5 (opsional) dijalankan.** Kelas bahaya banjir dikeluarkan dari fitur (9
+  variabel). Keputusan diambil sebelum melihat hasil. Alasannya: setelah grid Tergenang dikeluarkan,
+  kelas bahaya grid yang tersisa hampir hanya menandai level (pada Tinggi semua grid non-Tergenang
+  berkelas 0). Bila pembimbing ingin mempertahankan 10 variabel, cukup kembalikan `SKENARIO` ke
+  `feature_columns` lalu jalankan ulang. — *DIPUTUSKAN, perlu dikonfirmasi*
+- **P2-C2. σ kernel Gaussian dihitung per blok level** (median jarak 8 tetangga di dalam level
+  tersebut), karena W dibangun hanya di antara grid non-Tergenang pada level yang sama. Instruksi
+  tidak menyebut apakah σ global atau per level. Nilai σ per level tercatat di hasil. — *DICATAT*
+- **P2-C3. B = 10 dipertahankan.** Estimasi waktu dibuat sebelum run dan hanya dari pengukuran waktu:
+  satu fit data penuh ≈ 3,6·K detik, satu fit subsampel ≈ 2,9·K detik. Total pemilihan K ≈
+  10·3,6·54 + 30·2,9·54 ≈ 6.600 detik, sehingga satu run ≈ 2 jam (< 3 jam). — *DICATAT*
+- **P2-C4. Rincian pelaksanaan subsampel yang tidak ditentukan instruksi** (ditetapkan sebelum
+  melihat hasil): seed pemilihan subsampel ke-b = 20240 + b; tiga inisialisasi subsampel memakai seed
+  42–44; W blok-diagonal dihitung ulang pada tiap subsampel; praproses TIDAK di-fit ulang (fit sekali
+  pada data gabungan penuh); solusi data penuh pembanding = run dengan J terkecil di antara seed
+  42–51 (sama dengan model final). — *DICATAT*
+- **P2-C5. Simulasi blokir jalan di dashboard** kini menghitung keanggotaan terhadap pusat klaster
+  final yang tetap (tidak di-fit ulang), karena model gabungan tidak dapat di-fit ulang untuk satu
+  level saja tanpa mengubah makna nomor klaster. Ini hanya fitur dashboard, bukan hasil skripsi. — *DICATAT*
+
+## P2-D. Perbandingan algoritma dan metrik (Langkah 8–9)
+
+- **P2-D1. SKATER tetap gagal walau argumen sudah benar (`floor`).** Signature di spopt 0.7.0:
+  `Skater(gdf, w, attrs_name, n_clusters=5, floor=-inf, trace=False, islands='increase', ...)`.
+  Penyebab kegagalan: spopt menghitung kernel ketidakmiripan padat N × N, mengalikannya dengan W,
+  lalu **membuang sisi berbobot 0**, yaitu pasangan tetangga dengan fitur identik. Graf pun terpecah
+  menjadi "pulau" kecil, dan spopt menolak bila ada pulau yang lebih kecil dari `floor` (galat
+  "Islands must be larger than the quorum"). Sesuai instruksi, fallback manual dihapus, SKATER
+  dilaporkan gagal dan tidak layak dibandingkan, dan tidak diganti metode lain. Solusi teknis yang
+  mungkin (tidak dilakukan): menambahkan konstanta kecil pada ketidakmiripan, atau menghapus pulau
+  sebelum SKATER. — *DILAPORKAN, perlu diputuskan*
+- **P2-D2. SFCM tetap memakai m = 2,0** (parameter bawaan `Cfg.sfcm_m`), sedangkan FCM dan SDWFCM
+  memakai m = 1,7. Instruksi menyeragamkan praproses, K, inisialisasi, dan penomoran, tetapi tidak
+  menyebut m. — *DICATAT*
+- **P2-D3. Kriteria pemilihan inisialisasi SFCM** = J_SFCM = Σ u^m·d_t pada keanggotaan akhir.
+  SFCM sebelumnya tidak punya fungsi objektif; kriteria ini ditambahkan agar "10 inisialisasi,
+  J terkecil" berlaku seragam. Loop per grid SFCM divektorisasi (matematika identik, diuji) agar
+  10 inisialisasi layak dijalankan. — *DICATAT*
+- **P2-D4. Silhouette pada perbandingan algoritma dihitung penuh** (22.673 grid Baseline), sedangkan
+  pada pemilihan K memakai sampel 10.000 (data gabungan ± 72 ribu baris). — *DICATAT*
+
+## P2-E. Status temuan lama setelah putaran 2
+
+| Temuan | Status | Keterangan |
+|---|---|---|
+| A1 (DESC blok queen) | **Selesai** | Blok DESC/PESC kini rook, sama dengan W Moran (Langkah 9) |
+| A4 (Dunn satu sampel) | **Selesai** | 5 sampel (seed 42–46), rerata dan sd (Langkah 9) |
+| A5 (T_aktual tanpa ruas snapping) | **Selesai** | Ruas snapping masuk di waktu tempuh dan T_aktual (Langkah 3; P2-B) |
+| A6 (level ← intensitas hasil kalibrasi) | **Selesai** | Level didefinisikan dengan kelas ditutup; ekuivalensi diuji (Langkah 2) |
+| C1 (fallback SKATER) | **Selesai, masalah baru** | Fallback dihapus; spopt tetap gagal (P2-D1) |
+| C3 (kode lama) | **Selesai** | Bagian lama dihapus; sisa yatim dicatat di P2-A2 |
+| C5 (id_grid ditimpa) | **Selesai** | `id_grid_asli` dari kolom `Id` (P2-A3) |
+| D1 (selisih skor K tipis) | **Diganti** | Aturan K berbasis stabilitas; skor komposit hanya sensitivitas (Langkah 7) |
+| D2 (tipologi baru antarlevel) | **Tidak relevan lagi** | Satu model gabungan untuk semua level; Hungarian dihapus (Langkah 6) |
+| B5 (ω hanya di pembilang d_s) | **Tidak berpengaruh** | ω = 1,0 (nonaktif) pada desain gabungan |
