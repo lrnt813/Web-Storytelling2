@@ -1,0 +1,265 @@
+{
+ "diagnostik": {
+  "graf_sama_dengan_engine": true,
+  "jumlah_komponen": 56,
+  "simpul": 156751,
+  "km_total": 3780.122465143643,
+  "komponen_terbesar_persen_simpul": 99.41116803082596,
+  "komponen_terbesar_persen_km": 99.52554311686134,
+  "ujung_buntu": 4703,
+  "near_miss": {
+   "0.5": 0,
+   "1": 2,
+   "2": 4,
+   "5": 17
+  },
+  "perpotongan_tanpa_simpul": {
+   "total": 33,
+   "non_khusus": 0,
+   "melibatkan_jembatan_terowongan_layer": 33
+  },
+  "segmen_khusus": 1263,
+  "dirapikan_1m": {
+   "jumlah_komponen": 55,
+   "simpul": 156751,
+   "km_total": 3780.123391696394,
+   "komponen_terbesar_persen_simpul": 99.44816938966896,
+   "komponen_terbesar_persen_km": 99.56003277273648,
+   "ujung_buntu": 4701,
+   "sambungan": 2,
+   "perpotongan_disambung": 0
+  },
+  "dirapikan_2m": {
+   "jumlah_komponen": 54,
+   "simpul": 156751,
+   "km_total": 3780.125386289085,
+   "komponen_terbesar_persen_simpul": 99.46539416016485,
+   "komponen_terbesar_persen_km": 99.56855009855235,
+   "ujung_buntu": 4699,
+   "sambungan": 4,
+   "perpotongan_disambung": 0
+  },
+  "reproduksi_v5_graf_mentah": {
+   "baseline": {
+    "tas_sama": true,
+    "waktu_min_sama": true
+   },
+   "rendah": {
+    "tas_sama": true,
+    "waktu_min_sama": true
+   },
+   "sedang": {
+    "tas_sama": true,
+    "waktu_min_sama": true
+   },
+   "tinggi": {
+    "tas_sama": true,
+    "waktu_min_sama": true
+   }
+  }
+ },
+ "ringkasan": {
+  "mentah": {
+   "baseline": {
+    "tas": 62,
+    "median_waktu_min": 5.810452209441573,
+    "p90_waktu_min": 13.609013802149061,
+    "median_waktu_min_terjangkau": 5.78155731961713,
+    "p90_waktu_min_terjangkau": 13.329179109190363,
+    "terputus_30": 111,
+    "jauh_30": 205,
+    "terjangkau_30": 22357,
+    "terputus_20": 111,
+    "jauh_20": 722,
+    "terjangkau_20": 21840,
+    "terputus_40": 111,
+    "jauh_40": 33,
+    "terjangkau_40": 22529
+   },
+   "rendah": {
+    "tas": 70,
+    "median_waktu_min": 5.802583910644234,
+    "p90_waktu_min": 13.635382151289795,
+    "median_waktu_min_terjangkau": 5.772792435836532,
+    "p90_waktu_min_terjangkau": 13.30376729819023,
+    "terputus_30": 126,
+    "jauh_30": 254,
+    "terjangkau_30": 22254,
+    "terputus_20": 126,
+    "jauh_20": 753,
+    "terjangkau_20": 21755,
+    "terputus_40": 126,
+    "jauh_40": 29,
+    "terjangkau_40": 22479
+   },
+   "sedang": {
+    "tas": 77,
+    "median_waktu_min": 5.483637653833181,
+    "p90_waktu_min": 12.804444038863268,
+    "median_waktu_min_terjangkau": 5.356726393475425,
+    "p90_waktu_min_terjangkau": 11.723913081904556,
+    "terputus_30": 502,
+    "jauh_30": 64,
+    "terjangkau_30": 18732,
+    "terputus_20": 502,
+    "jauh_20": 286,
+    "terjangkau_20": 18510,
+    "terputus_40": 502,
+    "jauh_40": 4,
+    "terjangkau_40": 18792
+   },
+   "tinggi": {
+    "tas": 44,
+    "median_waktu_min": 6.2853738621668835,
+    "p90_waktu_min": 17.682722968093916,
+    "median_waktu_min_terjangkau": 6.031726492343089,
+    "p90_waktu_min_terjangkau": 14.582681667890778,
+    "terputus_30": 651,
+    "jauh_30": 318,
+    "terjangkau_30": 14529,
+    "terputus_20": 651,
+    "jauh_20": 658,
+    "terjangkau_20": 14189,
+    "terputus_40": 651,
+    "jauh_40": 171,
+    "terjangkau_40": 14676
+   }
+  },
+  "dirapikan_1m": {
+   "baseline": {
+    "tas": 62,
+    "median_waktu_min": 5.810452209441573,
+    "p90_waktu_min": 13.609013802149061,
+    "median_waktu_min_terjangkau": 5.781673623964613,
+    "p90_waktu_min_terjangkau": 13.329890245099678,
+    "terputus_30": 110,
+    "jauh_30": 205,
+    "terjangkau_30": 22358,
+    "terputus_20": 110,
+    "jauh_20": 722,
+    "terjangkau_20": 21841,
+    "terputus_40": 110,
+    "jauh_40": 33,
+    "terjangkau_40": 22530
+   },
+   "rendah": {
+    "tas": 70,
+    "median_waktu_min": 5.802583910644234,
+    "p90_waktu_min": 13.635382151289795,
+    "median_waktu_min_terjangkau": 5.772957442500394,
+    "p90_waktu_min_terjangkau": 13.30530301437517,
+    "terputus_30": 125,
+    "jauh_30": 254,
+    "terjangkau_30": 22255,
+    "terputus_20": 125,
+    "jauh_20": 753,
+    "terjangkau_20": 21756,
+    "terputus_40": 125,
+    "jauh_40": 29,
+    "terjangkau_40": 22480
+   },
+   "sedang": {
+    "tas": 77,
+    "median_waktu_min": 5.483637653833181,
+    "p90_waktu_min": 12.804444038863268,
+    "median_waktu_min_terjangkau": 5.356828221260162,
+    "p90_waktu_min_terjangkau": 11.725697485858758,
+    "terputus_30": 501,
+    "jauh_30": 64,
+    "terjangkau_30": 18733,
+    "terputus_20": 501,
+    "jauh_20": 286,
+    "terjangkau_20": 18511,
+    "terputus_40": 501,
+    "jauh_40": 4,
+    "terjangkau_40": 18793
+   },
+   "tinggi": {
+    "tas": 44,
+    "median_waktu_min": 6.2853738621668835,
+    "p90_waktu_min": 17.682722968093916,
+    "median_waktu_min_terjangkau": 6.03233934859521,
+    "p90_waktu_min_terjangkau": 14.583719774175897,
+    "terputus_30": 650,
+    "jauh_30": 318,
+    "terjangkau_30": 14530,
+    "terputus_20": 650,
+    "jauh_20": 658,
+    "terjangkau_20": 14190,
+    "terputus_40": 650,
+    "jauh_40": 171,
+    "terjangkau_40": 14677
+   }
+  },
+  "dirapikan_2m": {
+   "baseline": {
+    "tas": 62,
+    "median_waktu_min": 5.810452209441573,
+    "p90_waktu_min": 13.609013802149061,
+    "median_waktu_min_terjangkau": 5.781673623964613,
+    "p90_waktu_min_terjangkau": 13.329890245099678,
+    "terputus_30": 110,
+    "jauh_30": 205,
+    "terjangkau_30": 22358,
+    "terputus_20": 110,
+    "jauh_20": 722,
+    "terjangkau_20": 21841,
+    "terputus_40": 110,
+    "jauh_40": 33,
+    "terjangkau_40": 22530
+   },
+   "rendah": {
+    "tas": 70,
+    "median_waktu_min": 5.802583910644234,
+    "p90_waktu_min": 13.635382151289795,
+    "median_waktu_min_terjangkau": 5.772957442500394,
+    "p90_waktu_min_terjangkau": 13.30530301437517,
+    "terputus_30": 125,
+    "jauh_30": 254,
+    "terjangkau_30": 22255,
+    "terputus_20": 125,
+    "jauh_20": 753,
+    "terjangkau_20": 21756,
+    "terputus_40": 125,
+    "jauh_40": 29,
+    "terjangkau_40": 22480
+   },
+   "sedang": {
+    "tas": 77,
+    "median_waktu_min": 5.483637653833181,
+    "p90_waktu_min": 12.804444038863268,
+    "median_waktu_min_terjangkau": 5.356828221260162,
+    "p90_waktu_min_terjangkau": 11.725697485858758,
+    "terputus_30": 501,
+    "jauh_30": 64,
+    "terjangkau_30": 18733,
+    "terputus_20": 501,
+    "jauh_20": 286,
+    "terjangkau_20": 18511,
+    "terputus_40": 501,
+    "jauh_40": 4,
+    "terjangkau_40": 18793
+   },
+   "tinggi": {
+    "tas": 44,
+    "median_waktu_min": 6.2853738621668835,
+    "p90_waktu_min": 17.682722968093916,
+    "median_waktu_min_terjangkau": 6.03233934859521,
+    "p90_waktu_min_terjangkau": 14.583719774175897,
+    "terputus_30": 650,
+    "jauh_30": 318,
+    "terjangkau_30": 14530,
+    "terputus_20": 650,
+    "jauh_20": 658,
+    "terjangkau_20": 14190,
+    "terputus_40": 650,
+    "jauh_40": 171,
+    "terjangkau_40": 14677
+   }
+  }
+ },
+ "per_TAS_klasifikasi": {
+  "tidak terdeteksi artefak": 139
+ },
+ "per_TAS_komponen_sama": 139
+}

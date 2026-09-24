@@ -396,3 +396,9 @@ Model, K, data, dan semua ambang tidak diubah; putaran ini hanya penyajian, vali
   dengan T_pen v5 (403,87 menit) dan aturan yang sama. Klasterisasi tidak di-fit ulang. "Tipologi 4 v5
   menjadi terjangkau" = baris data gabungan K = 4 berlabel 3 yang waktu minimumnya < T_pen pada
   jaringan dirapikan.
+
+**Hasil (setelah dijalankan):** hipotesis artefak topologi tidak didukung. Terdapat 0 perpotongan
+non-khusus dan 2/4 near-miss pada toleransi 1/2 m; 0 dari 139 TAS terklasifikasi "kemungkinan artefak
+topologi". Jaringan dirapikan 1 m dan 2 m menghasilkan TAS identik (62/70/77/44), Jauh identik, dan
+Terputus −1 per level. Jaringan utama tidak diganti. Rincian dan penilaian: `docs/DIAGNOSTIK_TOPOLOGI.md`.
+Keputusan untuk pengguna/pembimbing: apakah hasil diagnostik ini dilaporkan di Bab 4 atau Keterbatasan.
