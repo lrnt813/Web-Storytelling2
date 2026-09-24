@@ -31,7 +31,7 @@ RESULT_PATHS = ("data/thesis_results.json", "data/thesis_grid_results.csv.gz",
 PIPELINE_FILES = ["backend/engine.py", "backend/thesis.py", "backend/config.py",
                   "scripts/thesis_analysis.py"]
 LIBRARIES = ["numpy", "pandas", "scipy", "scikit-learn", "geopandas", "networkx", "libpysal",
-             "esda", "shapely", "pyproj", "pyogrio", "spopt", "numba"]
+             "esda", "shapely", "pyproj", "pyogrio", "spopt", "numba", "rasterio"]
 
 
 def _git(*args) -> str:

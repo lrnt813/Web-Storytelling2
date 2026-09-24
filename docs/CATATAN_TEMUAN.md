@@ -229,5 +229,15 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
 - **P3-1. Kelas bahaya ruas jalan dan TES berasal dari sumber berbeda dengan kelas grid.** Rincian,
   besaran dampak, dan opsi ada di `docs/DIAGNOSTIK_JALAN_GRID.md`. Kesesuaian kelas ruas vs grid yang
   dilalui hanya 61% (panjang). Level Rendah praktis tidak menutup jalan di area penelitian (3,6 km).
-  Sebanyak 161 km ruas tertutup di Level Tinggi melintasi grid kelas 0. Menunggu keputusan pengguna
-  (titik berhenti Langkah 1). — *MENUNGGU KEPUTUSAN*
+  Sebanyak 161 km ruas tertutup di Level Tinggi melintasi grid kelas 0. Setelah raster tersedia,
+  kesimpulan dikoreksi (P3-2). — *DIPUTUSKAN: opsi 3 (turunkan ulang dari raster)*
+- **P3-2. Raster sumber menunjukkan bahwa kelas GRID-lah yang tidak berasal dari raster** (kecocokan
+  64–65%), sedangkan ruas (98,7%) dan TES (100%) berasal dari raster. Keputusan peneliti: semua kelas
+  diturunkan dari `data/Kulonprogo_Banjir.tif` (grid mayoritas, ruas maksimum, TES titik; nodata = 0).
+  Grid Tergenang berubah menjadi Rendah 39 / Sedang 3.375 / Tinggi 7.175 (lama 2.531 / 7.845 / 8.041).
+  Level Rendah kini hampir tanpa grid Tergenang. — *SELESAI (kode); dampak dibahas di laporan*
+- **P3-3. Aturan seri mayoritas dan grid tanpa pusat piksel.** Seri → kelas terendah (sesuai angka
+  yang diperlihatkan saat keputusan); 65 grid tepi tanpa pusat piksel memakai piksel di centroid.
+  Keduanya ditetapkan sebelum melihat hasil model. — *DICATAT*
+- **P3-4. Stabilitas K dihitung ulang** (keputusan peneliti), berbeda dengan instruksi awal Putaran 3,
+  karena data gabungan berubah. Keluaran lengkap tetap untuk K = 2 dan K = 3. — *DIPUTUSKAN*

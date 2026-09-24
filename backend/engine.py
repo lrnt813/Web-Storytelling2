@@ -163,6 +163,11 @@ class Cfg:
     def __post_init__(self):
         b = self.base_dir
         self.input_file  = f"{b}/Kulonprogo_Ready4.gpkg"
+        # Sumber tunggal kelas bahaya banjir untuk grid, ruas jalan, dan TES (Putaran 3):
+        # raster InaRisk (1 rendah, 2 sedang, 3 tinggi; nodata = 0). Atribut `banjir` di GPKG
+        # diganti turunan raster (lihat backend/hazard_raster.py); nilai lama disimpan sebagai
+        # `banjir_atribut_lama`.
+        self.hazard_raster_file = f"{b}/Kulonprogo_Banjir.tif"
         self.roads_file  = f"{b}/Kulonprogo_Jalan.gpkg"
         self.tes_files   = {
             "pendidikan":   f"{b}/Kulonprogo_Pendidikan.gpkg",
@@ -241,6 +246,7 @@ def load_data(cfg: Cfg) -> gpd.GeoDataFrame:
     gdf["id_grid"] = range(len(gdf))
     gdf["id_grid"] = gdf["id_grid"].astype("int32")
     gdf["id_grid_asli"] = original_grid_ids(gdf)
+    _apply_hazard_raster(cfg, gdf=gdf)
 
     # ── BARU: Precompute centroid untuk mempercepat routing ──
     logger.info("[load_data] Precomputing centroids...")
@@ -280,7 +286,21 @@ def load_road_network(cfg: Cfg) -> Tuple[Optional[gpd.GeoDataFrame], Dict[str, g
             logger.info(f"[load_road_network] TES {kat}: {len(t)} titik")
         else:
             logger.warning(f"[load_road_network] TES tidak ada: {fp}")
+    _apply_hazard_raster(cfg, roads=roads, tes=tes)
     return roads, tes
+
+
+def _apply_hazard_raster(cfg: Cfg, gdf=None, roads=None, tes=None) -> None:
+    """Kelas bahaya banjir grid/ruas/TES diturunkan dari raster InaRisk (wajib ada)."""
+    import os
+    from .hazard_raster import apply_raster_classes, load_hazard_raster
+    if not os.path.exists(cfg.hazard_raster_file):
+        raise FileNotFoundError(f"Raster bahaya banjir tidak ditemukan: {cfg.hazard_raster_file}")
+    col = cfg.hazard_col_map["banjir"]
+    apply_raster_classes(gdf=gdf, roads=roads, tes=tes, raster=load_hazard_raster(cfg.hazard_raster_file), col=col)
+    logger.info("[hazard_raster] kelas banjir diturunkan dari raster: "
+                + ("grid " if gdf is not None else "") + ("ruas " if roads is not None else "")
+                + ("TES" if tes else ""))
 
 
 # ══════════════════════════════════════════════════════════════════════════════

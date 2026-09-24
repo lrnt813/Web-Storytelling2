@@ -128,3 +128,40 @@ diperbaiki**. Keputusan ada di peneliti dan pembimbing.
    - Konsekuensi: paling konsisten dan paling mudah dipertahankan saat sidang. Namun raster sumber
      tidak ada di repositori dan harus disediakan. Semua angka berubah, dan metode penurunan kelas
      harus didokumentasikan.
+
+## 7. Pembaruan setelah raster sumber tersedia (keputusan: opsi 3)
+
+Pengguna menyediakan `data/Kulonprogo_Banjir.tif`: raster InaRisk, EPSG:32749, resolusi 29,71 m,
+1.002 × 1.278 piksel, nilai 1 = rendah, 2 = sedang, 3 = tinggi, nodata 15. Hasil uji asal-usul:
+
+| Objek | Metode uji | Kecocokan dengan atribut lama |
+|---|---|---:|
+| TES | nilai piksel di titik | **100%** (1.647 / 1.647) |
+| Ruas jalan | nilai piksel di titik tengah segmen | **98,7%** |
+| Grid | mayoritas / maksimum / piksel centroid | **64–65%** |
+
+**Koreksi kesimpulan §5.** Kelas ruas dan TES memang berasal dari raster ini. Yang berasal dari sumber
+atau metode lain adalah **kelas grid**. Distribusi grid lama [0: 14.632; 1: 196; 2: 5.314; 3: 2.531]
+tidak dapat direproduksi dari raster dengan metode apa pun. Contohnya, raster hanya memuat 8,7 km²
+kelas 3, sedangkan grid lama kelas 3 berjumlah 25,3 km².
+
+**Keputusan peneliti.** Semua kelas diturunkan dari raster dengan metode berikut:
+
+- grid: kelas mayoritas piksel yang pusatnya di dalam grid (kelas 0 ikut dihitung), seri → kelas
+  terendah, grid tanpa pusat piksel → piksel di centroid;
+- ruas: kelas maksimum piksel sepanjang segmen (sampel tiap ≤ 5 m);
+- TES: piksel di titik.
+
+Nilai nodata dianggap kelas 0. Implementasi ada di `backend/hazard_raster.py`, diterapkan saat data
+dimuat (`load_data`, `load_road_network`). Atribut lama disimpan sebagai `banjir_atribut_lama`.
+
+Hasil turunan raster:
+
+- grid [0: 15.498; 1: 3.800; 2: 3.336; 3: 39], sehingga grid Tergenang Rendah 39, Sedang 3.375,
+  Tinggi 7.175 (lama: 2.531 / 7.845 / 8.041);
+- ruas [0: 118.512; 1: 23.133; 2: 20.253; 3: 710] (98,5% sama dengan atribut lama, 2.477 ruas naik
+  kelas karena aturan maksimum);
+- TES identik dengan atribut lama.
+
+Dengan grid mayoritas dan ruas maksimum, ruas tertutup masih dapat melintasi grid yang mayoritasnya
+kering. Konsekuensi ini sudah diterima peneliti saat memilih metode.
