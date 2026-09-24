@@ -1,0 +1,5 @@
+﻿Klaster,Jumlah grid,% grid,Kepadatan jalan,Indeks bahaya,Waktu Pendidikan,Waktu Kesehatan,Waktu Pemerintahan,Waktu Tempat Ibadah,Waktu GOR/Gedung Serbaguna,Waktu minimum,Opsi rute,Proporsi kategori terisolasi,Interpretasi
+0,4774,21.055881,0.9164,0.857562,5.791308,20.140196,9.629121,5.382908,32.992463,3.502472,4.990574,0.001885,Akses Baik · Bahaya Sedang
+1,5742,25.325277,0.660456,0.409091,8.968016,45.348594,28.416235,5.709668,42.726701,4.251728,4.9845,0.0030998,Akses Baik · Bahaya Rendah
+2,6563,28.946324,0.91935,1.152522,11.009435,35.443672,18.421367,9.448075,26.135082,7.565429,4.998476,0.000305,Akses Sedang · Bahaya Tinggi
+3,5594,24.672518,0.624835,0.788345,26.883787,56.9222,44.599753,22.900637,68.850988,21.420178,4.881123,0.0237756,Akses Rendah · Bahaya Sedang

@@ -1,0 +1,5 @@
+﻿Level,Grid terisolasi,Terisolasi & terdampak,Terisolasi & tidak terdampak,Grid terdampak,Ruas ditutup,Kelas bahaya grid terdampak,Kelas bahaya ruas ditutup,Aturan = data
+Baseline,111,0,111,0,0,–,–,True
+Rendah,126,17,109,2531,702,3,3,True
+Sedang,2412,1709,703,7845,20871,"2, 3","2, 3",True
+Tinggi,5606,4286,1320,8041,41619,"1, 2, 3","1, 2, 3",True
