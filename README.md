@@ -19,8 +19,34 @@ python start_dashboard.py --publik   # + alamat publik https://….trycloudflare
 
 Di Windows cukup klik dua kali `Jalankan Dashboard.bat` atau `Jalankan Dashboard Publik.bat`.
 
-Hasil analisis sudah tersedia dan dikunci di `data/locked/`. Untuk menghitung ulang:
-`python -m scripts.thesis_analysis --force` (perlu paket opsional di `requirements.txt`).
+Hasil analisis sudah tersedia dan dikunci di `data/locked/` (lihat bagian berikut).
+
+## Reproduksi Hasil Skripsi
+
+Lingkungan: Python 3.14.7 (`.python-version`) dan pustaka dengan versi persis di
+`requirements.txt`. Versi yang dipakai saat penguncian juga tercatat di `data/locked/LOCK.json`.
+
+```bash
+pip install -r requirements.txt
+python -m pytest -q                        # uji unit (±1 menit)
+python -m scripts.cek_reproduksi           # jalankan ulang ke folder sementara + bandingkan hash (±15–20 menit)
+python -m scripts.export_bab4              # bangun ulang output_bab4/ dari data/locked/ (beberapa detik)
+```
+
+Hash yang diharapkan (hasil `hasil-skripsi-v1`, K = 4):
+
+| Besaran | SHA-256 |
+|---|---|
+| Fingerprint `thesis_results.json` tanpa field waktu dan `meta.git` | `7123e860b310a00e0ea7fd1ea5cedf9c829174096f9232e625009e7a2b13feca` |
+| Isi `thesis_grid_results.csv` (setelah dekompresi) | `fa437881a7c68036fa3ed6e4c0294da7b4b809800c66845f859eac5d528c79fb` |
+
+Hash berkas mentah di `LOCK.json` memuat stempel waktu (JSON: `elapsed_sec`/`time_sec`; gzip: header),
+sehingga yang dibandingkan saat reproduksi adalah dua hash di atas. Satu run penuh
+(`python -m scripts.thesis_analysis --force`) memakan waktu ±15–16 menit pada laptop pengembangan.
+Determinisme diperiksa dengan dua run berturut-turut yang menghasilkan hash identik.
+
+Menjalankan ulang analisis dan mengunci hasil baru mengikuti `docs/ALUR_KERJA.md`. Semua angka
+skripsi diambil dari `output_bab4/` (tabel CSV, `Tabel_Bab4.docx`, `ringkasan_angka_bab4.md`).
 
 ## Membagikan secara online
 
