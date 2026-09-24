@@ -1,0 +1,5 @@
+﻿Level,TAS utama (T_aktual ≥ 30),TAS T_aktual ≥ 20,TAS T_aktual ≥ 40,TAS utama tetap TAS pada 20 (%),TAS utama tetap TAS pada 40 (%),TAS absolut v3 (tanpa syarat T_aktual),TAS aturan persentil,P25 T_ideal (menit),P75 DI
+Baseline,62,254,34,100.0,54.838699999999996,5758,1842,1.971725,2.248928
+Rendah,70,258,36,100.0,51.4286,5757,1811,1.968657,2.260549
+Sedang,77,218,37,100.0,48.051899999999996,5092,1485,1.828664,2.294721
+Tinggi,44,209,16,100.0,36.3636,3685,1047,2.002411,2.319418
