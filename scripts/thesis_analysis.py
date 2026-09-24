@@ -1,4 +1,4 @@
-"""Analisis offline sesuai draft skripsi (Bab IV).
+"""Analisis offline penelitian (menghasilkan seluruh angka Bab IV).
 
 Menghasilkan:
   data/thesis_results.json         — ringkasan seluruh tabel/metrik Bab IV
@@ -78,7 +78,7 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     w = build_weights(gdf)
     A = T.queen_adjacency(gdf)   # blok spasial DESC/PESC
     xy = np.column_stack([gdf["cx"].values, gdf["cy"].values])
-    k_final = T.K_THESIS
+    k_final = None   # ditentukan dari skor komposit pada Baseline
 
     results = {
         "meta": {
@@ -98,7 +98,6 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
             "tes_counts": {k: int(len(v)) for k, v in tes.items()},
         },
         "levels": {},
-        "k": k_final,
     }
     grid_parts = [pd.DataFrame({
         "id_grid": gdf["id_grid"].values,
@@ -120,6 +119,8 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
             results["baseline_time_stats"] = T.describe_times(df, cfg)
             logger.info("Evaluasi kandidat K (2–10) pada Baseline...")
             k_rows, k_best = T.evaluate_k_candidates(X, gdf, prep["mask"], A, xy, cfg)
+            k_final = k_best
+            results["k"] = k_final
             results["k_selection"] = {
                 "candidates": k_rows,
                 "k_composite_best": k_best,

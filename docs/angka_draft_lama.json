@@ -1,0 +1,92 @@
+{
+  "_keterangan": "Angka dari DRAFT SKRIPSI LAMA (sebelum rekonstruksi). HANYA untuk skrip perbandingan scripts/export_bab4.py (perbandingan_draft_vs_final.md). Tidak boleh di-import oleh backend/ maupun pipeline analisis. Sumber: teks PDF draft (Bab IV).",
+  "tabel_8_ringkasan_data": {
+    "n_grid": 22673,
+    "n_segmen_jalan": 162608,
+    "tes": {"pendidikan": 548, "kesehatan": 29, "pemerintahan": 238, "ibadah": 791, "gor": 41}
+  },
+  "tabel_9_statistik_waktu_baseline": {
+    "_kolom": ["mean", "std", "min", "q25", "median", "q75", "max"],
+    "waktu_tes_pendidikan":   [11.56, 28.51, 0.00, 4.89, 8.35, 12.77, 402.26],
+    "waktu_tes_kesehatan":    [34.74, 36.23, 0.00, 19.12, 30.22, 42.82, 402.26],
+    "waktu_tes_pemerintahan": [21.64, 35.11, 0.00, 9.80, 17.05, 25.85, 402.26],
+    "waktu_tes_ibadah":       [9.78, 28.21, 0.00, 3.74, 6.56, 10.42, 402.26],
+    "waktu_tes_gor":          [39.06, 38.60, 0.00, 19.22, 33.35, 49.57, 402.26],
+    "waktu_tes_min":          [8.16, 28.19, 0.00, 2.68, 4.96, 8.19, 402.26]
+  },
+  "tabel_10_kandidat_k": {
+    "_kolom": ["iidx", "cdvm", "dunn", "desc", "pesc"],
+    "_catatan": "Kolom 'cdvm' pada draft = metrik 1 - PE/ln K (kini bernama ketegasan_partisi).",
+    "k_terpilih": 6,
+    "2":  [1.723, 0.610, 0.023, 0.153, 0],
+    "3":  [1.726, 0.632, 0.014, 0.648, 0],
+    "4":  [2.015, 0.663, 0.005, 0.352, 0],
+    "5":  [1.708, 0.678, 0.006, 0.851, 0],
+    "6":  [1.737, 0.694, 0.014, 28.987, 0],
+    "7":  [1.465, 0.698, 0.012, 35.006, 0],
+    "8":  [1.339, 0.706, 0.001, 45.825, 0],
+    "9":  [1.226, 0.710, 0.007, 48.911, 0],
+    "10": [1.099, 0.714, 0.011, 100.109, 0]
+  },
+  "tabel_11_perbandingan_algoritma": {
+    "_kolom": ["silhouette", "calinski_harabasz", "davies_bouldin", "moran_i", "size_entropy", "wcss", "waktu_s"],
+    "SDWFCM": [0.210, 6894.0, 1.334, 0.782, 1.710, 31102.917, 9.45],
+    "SFCM":   [0.198, 6788.0, 1.421, 0.758, 1.727, 31265.781, 283.0],
+    "REDCAP": [-0.113, 154.2, 7.592, 1.000, 0.726, 75510.865, 19.3],
+    "SKATER": [0.035, 140.7, 2.106, 0.973, 0.352, 75729.606, 23.7]
+  },
+  "tabel_12_15_profil_klaster": {
+    "_kolom": ["Road_Density_mean", "banjir", "waktu_tes_pendidikan", "waktu_tes_kesehatan", "waktu_tes_pemerintahan",
+               "waktu_tes_ibadah", "waktu_tes_gor", "jumlah_opsi_rute", "is_isolated_pendidikan", "is_isolated_kesehatan",
+               "is_isolated_pemerintahan", "is_isolated_ibadah", "is_isolated_gor", "jumlah_grid"],
+    "_catatan": "Nomor klaster draft bersifat arbitrer dan tidak dapat dipadankan satu-satu dengan nomor klaster hasil final.",
+    "baseline": [
+      [0.68, 0.53, 7.19, 40.82, 21.01, 3.42, 33.59, 5.00, 0, 0, 0, 0, 0, 4362],
+      [1.12, 1.34, 4.74, 17.98, 7.63, 4.32, 13.66, 5.00, 0, 0, 0, 0, 0, 3060],
+      [0.72, 0.62, 5.43, 15.34, 9.95, 5.35, 51.66, 5.00, 0, 0, 0, 0, 0, 3037],
+      [0.92, 1.20, 10.54, 27.09, 16.00, 8.88, 26.32, 5.00, 0, 0, 0, 0, 0, 5377],
+      [0.64, 0.46, 11.94, 44.70, 27.96, 10.23, 44.89, 4.99, 0, 0, 0, 0, 0, 5480],
+      [0.50, 0.86, 57.28, 86.40, 78.34, 54.26, 112.68, 4.51, 0.08, 0.11, 0.11, 0.08, 0.11, 1357]
+    ],
+    "rendah": [
+      [0.72, 0.44, 7.28, 46.29, 27.17, 4.04, 36.19, 5.00, 0, 0, 0, 0, 0, 4402],
+      [1.10, 1.19, 5.60, 28.30, 9.63, 5.01, 14.09, 5.00, 0, 0, 0, 0, 0, 3043],
+      [0.71, 0.53, 6.56, 16.26, 10.90, 5.59, 49.33, 5.00, 0, 0, 0, 0, 0, 3678],
+      [0.64, 0.48, 12.64, 50.47, 35.74, 10.06, 48.72, 4.98, 0, 0.01, 0.01, 0, 0.01, 5236],
+      [0.93, 1.46, 13.38, 34.62, 18.66, 11.38, 28.39, 5.00, 0, 0, 0, 0, 0, 4640],
+      [0.54, 0.99, 59.92, 79.46, 69.82, 53.47, 112.96, 4.60, 0.08, 0.08, 0.08, 0.08, 0.08, 1674]
+    ],
+    "sedang": [
+      [0.73, 0.33, 6.17, 34.43, 12.67, 5.96, 39.79, 5.00, 0, 0, 0, 0, 0, 4423],
+      [0.81, 0.21, 9.30, 88.94, 41.77, 5.19, 55.93, 4.99, 0, 0, 0, 0, 0, 4369],
+      [0.66, 0.63, 14.01, 65.44, 37.41, 12.92, 57.36, 5.00, 0, 0, 0, 0, 0, 6528],
+      [1.07, 1.69, 24.95, 117.57, 45.49, 24.11, 45.97, 4.98, 0, 0, 0, 0, 0, 3311],
+      [0.46, 0.99, 218.08, 356.04, 249.55, 218.26, 288.06, 2.50, 0.45, 0.51, 0.51, 0.51, 0.51, 1569],
+      [0.97, 1.94, 344.96, 395.34, 386.94, 324.69, 389.28, 0.50, 0.84, 0.95, 0.95, 0.80, 0.95, 2473]
+    ],
+    "tinggi": [
+      [0.73, 0.11, 7.12, 56.27, 22.78, 6.17, 70.22, 4.99, 0, 0, 0, 0, 0.01, 4591],
+      [0.79, 0.37, 19.65, 383.22, 98.90, 13.14, 80.30, 3.92, 0.02, 0.93, 0.05, 0.01, 0.08, 4274],
+      [0.52, 0.45, 13.16, 70.30, 36.74, 11.51, 72.29, 4.97, 0, 0.02, 0, 0, 0, 3858],
+      [1.02, 1.13, 19.72, 96.69, 53.64, 17.97, 160.47, 4.70, 0.01, 0.06, 0.01, 0.01, 0.21, 3455],
+      [0.53, 1.25, 385.78, 401.75, 401.59, 305.76, 401.70, 0.30, 0.96, 1, 1, 0.74, 1, 2468],
+      [1.03, 1.90, 392.71, 402.19, 400.58, 390.31, 399.75, 0.07, 0.98, 1, 0.99, 0.97, 0.99, 4027]
+    ]
+  },
+  "transisi": {
+    "_catatan": "Angka dari narasi draft ('sekitar').",
+    "stability_rate_persen": {"baseline-rendah": 47, "rendah-sedang": 11, "sedang-tinggi": 52},
+    "ari": {"baseline-rendah": 0.57, "rendah-sedang": 0.27, "sedang-tinggi": 0.22}
+  },
+  "tabel_16_tas": {
+    "_kolom": ["jumlah_tas", "persen_tas", "mean_di_tas", "mean_di_non_tas"],
+    "baseline": [1460, 6.44, 4.99, 2.05],
+    "rendah":   [1486, 6.55, 5.09, 2.04],
+    "sedang":   [726, 3.20, 11.01, 5.79],
+    "tinggi":   [265, 1.17, 200.20, 11.34]
+  },
+  "gambar_18_rata_waktu_min": {
+    "_catatan": "Hanya Baseline tertulis di teks (Tabel 9); level lain tidak tercantum sebagai angka di draft.",
+    "baseline": 8.16
+  }
+}

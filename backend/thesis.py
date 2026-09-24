@@ -1,19 +1,13 @@
-# ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  thesis.py — Metodologi sesuai draft skripsi (Bab III & Bab IV)              ║
-# ║                                                                              ║
-# ║  • Bencana: banjir, 4 level intensitas (Baseline, Rendah, Sedang, Tinggi)    ║
-# ║  • Unit analisis: grid 100 × 100 m, network distance (Dijkstra, 80 m/menit)  ║
-# ║  • Pra-pemrosesan: IQR capping (3 × IQR, semua variabel) → seleksi fitur     ║
-# ║    (variance) → Yeo-Johnson → RobustScaler → PCA (80% informasi)             ║
-# ║  • SDWFCM multi-start (10 inisialisasi), dipilih fungsi objektif terkecil    ║
-# ║  • Penomoran klaster diselaraskan dengan profil Tabel 12–15 draft skripsi    ║
-# ║  • K optimal ditentukan pada Baseline (skor komposit I-Index, Dunn, DESC,    ║
-# ║    CDVM, kesederhanaan) lalu dikunci untuk seluruh level                     ║
-# ║  • Transisi klaster: transition matrix, stability rate, ARI,                 ║
-# ║    dominant transition, active edges                                         ║
-# ║  • Titik Aman Semu: DI_t = T_aktual / T_ideal,                               ║
-# ║    TAS jika T_ideal ≤ P25(T_ideal) dan DI_t ≥ P75(DI_t)                      ║
-# ╚══════════════════════════════════════════════════════════════════════════════╝
+"""Pipeline analisis penelitian: aksesibilitas spasial TES banjir Kulon Progo.
+
+Ringkasan alur (rincian dan persamaan: docs/METODOLOGI.md):
+  1. Simulasi 4 level intensitas banjir (Baseline, Rendah, Sedang, Tinggi) pada
+     grid 100 × 100 m; waktu tempuh jaringan jalan ke TES per kategori (80 m/menit).
+  2. Pra-pemrosesan fitur (Langkah 3 rekonstruksi): di-fit pada Baseline, lalu
+     diterapkan (transform) ke level lain.
+  3. SDWFCM multi-start; K dipilih pada Baseline dengan skor komposit.
+  4. Penomoran klaster, analisis transisi antarlevel, dan deteksi Titik Aman Semu.
+"""
 import logging
 import time
 from typing import Dict, List, Optional, Tuple
@@ -70,58 +64,14 @@ LEVELS: List[dict] = [
 LEVEL_KEYS = [lv["key"] for lv in LEVELS]
 LEVEL_BY_KEY = {lv["key"]: lv for lv in LEVELS}
 
-K_RANGE = range(2, 11)
-K_THESIS = 6              # K yang ditetapkan pada skripsi (Subbab 4.4)
-PCA_VARIANCE = 0.80       # ambang informasi PCA (Subbab 3.2.5)
-# Pagar pencilan ekstrem Tukey (Q1 − 3·IQR, Q3 + 3·IQR). Diterapkan pada
-# semua variabel: variabel yang IQR-nya nol (penanda isolasi dan jumlah opsi
-# rute ketika < 25% grid terisolasi) menjadi konstan lalu tersaring oleh
-# seleksi fitur. Konfigurasi ini mereproduksi Tabel 10–15 draft skripsi.
-IQR_FACTOR = 3.0
+K_RANGE = range(2, 11)     # kandidat jumlah klaster
+PCA_VARIANCE = 0.80       # proporsi varians kumulatif yang dipertahankan PCA
+IQR_FACTOR = 3.0          # pagar pencilan ekstrem Tukey: [Q1 − 3·IQR, Q3 + 3·IQR]
 VARIANCE_MIN = 1e-3
 IINDEX_P = 2
 SDWFCM_N_INIT = 10        # jumlah inisialisasi acak SDWFCM
 SDWFCM_SEED = 42          # seed awal; inisialisasi ke-i memakai SDWFCM_SEED + i
 DUNN_SAMPLE = 2000        # sampel grid untuk Dunn titik-ke-titik (O(n²))
-
-# Profil klaster pada draft skripsi (Tabel 12–15), dipakai HANYA untuk
-# menyelaraskan penomoran klaster (permutasi label), bukan untuk klasterisasi.
-# Kolom: Road_Density_mean, banjir, waktu_tes_{pendidikan, kesehatan,
-# pemerintahan, ibadah, gor}, jumlah_opsi_rute, is_isolated_{5 kategori}.
-REFERENCE_PROFILES: Dict[str, List[List[float]]] = {
-    "baseline": [
-        [0.68, 0.53, 7.19, 40.82, 21.01, 3.42, 33.59, 5.00, 0, 0, 0, 0, 0],
-        [1.12, 1.34, 4.74, 17.98, 7.63, 4.32, 13.66, 5.00, 0, 0, 0, 0, 0],
-        [0.72, 0.62, 5.43, 15.34, 9.95, 5.35, 51.66, 5.00, 0, 0, 0, 0, 0],
-        [0.92, 1.20, 10.54, 27.09, 16.00, 8.88, 26.32, 5.00, 0, 0, 0, 0, 0],
-        [0.64, 0.46, 11.94, 44.70, 27.96, 10.23, 44.89, 4.99, 0, 0, 0, 0, 0],
-        [0.50, 0.86, 57.28, 86.40, 78.34, 54.26, 112.68, 4.51, .08, .11, .11, .08, .11],
-    ],
-    "rendah": [
-        [0.72, 0.44, 7.28, 46.29, 27.17, 4.04, 36.19, 5.00, 0, 0, 0, 0, 0],
-        [1.10, 1.19, 5.60, 28.30, 9.63, 5.01, 14.09, 5.00, 0, 0, 0, 0, 0],
-        [0.71, 0.53, 6.56, 16.26, 10.90, 5.59, 49.33, 5.00, 0, 0, 0, 0, 0],
-        [0.64, 0.48, 12.64, 50.47, 35.74, 10.06, 48.72, 4.98, 0, .01, .01, 0, .01],
-        [0.93, 1.46, 13.38, 34.62, 18.66, 11.38, 28.39, 5.00, 0, 0, 0, 0, 0],
-        [0.54, 0.99, 59.92, 79.46, 69.82, 53.47, 112.96, 4.60, .08, .08, .08, .08, .08],
-    ],
-    "sedang": [
-        [0.73, 0.33, 6.17, 34.43, 12.67, 5.96, 39.79, 5.00, 0, 0, 0, 0, 0],
-        [0.81, 0.21, 9.30, 88.94, 41.77, 5.19, 55.93, 4.99, 0, 0, 0, 0, 0],
-        [0.66, 0.63, 14.01, 65.44, 37.41, 12.92, 57.36, 5.00, 0, 0, 0, 0, 0],
-        [1.07, 1.69, 24.95, 117.57, 45.49, 24.11, 45.97, 4.98, 0, 0, 0, 0, 0],
-        [0.46, 0.99, 218.08, 356.04, 249.55, 218.26, 288.06, 2.50, .45, .51, .51, .51, .51],
-        [0.97, 1.94, 344.96, 395.34, 386.94, 324.69, 389.28, 0.50, .84, .95, .95, .80, .95],
-    ],
-    "tinggi": [
-        [0.73, 0.11, 7.12, 56.27, 22.78, 6.17, 70.22, 4.99, 0, 0, 0, 0, .01],
-        [0.79, 0.37, 19.65, 383.22, 98.90, 13.14, 80.30, 3.92, .02, .93, .05, .01, .08],
-        [0.52, 0.45, 13.16, 70.30, 36.74, 11.51, 72.29, 4.97, 0, .02, 0, 0, 0],
-        [1.02, 1.13, 19.72, 96.69, 53.64, 17.97, 160.47, 4.70, .01, .06, .01, .01, .21],
-        [0.53, 1.25, 385.78, 401.75, 401.59, 305.76, 401.70, 0.30, .96, 1, 1, .74, 1],
-        [1.03, 1.90, 392.71, 402.19, 400.58, 390.31, 399.75, 0.07, .98, 1, .99, .97, .99],
-    ],
-}
 
 FEATURE_LABELS = {
     "Road_Density_mean":      "Kepadatan Jaringan Jalan",
@@ -154,9 +104,9 @@ def resolve_level(level: Optional[str] = None, intensity: Optional[float] = None
 
 
 def feature_columns(cfg: Cfg) -> List[str]:
-    """10 variabel penelitian sesuai Tabel 5 draft skripsi. Penanda isolasi per
-    kategori TES tetap dihitung untuk profil klaster (Tabel 12–15), tetapi fitur
-    klasterisasi memakai satu penanda is_isolated (tidak ada TES terjangkau)."""
+    """Variabel masukan klasterisasi (10 variabel). Penanda isolasi per kategori
+    TES tetap dihitung untuk profil klaster, tetapi fitur klasterisasi memakai
+    satu penanda is_isolated (tidak ada kategori TES yang terjangkau)."""
     return (
         ["Road_Density_mean"]
         + [f"waktu_tes_{k}" for k in cfg.kategori_fac]
@@ -334,44 +284,6 @@ def relabel_by_metric(labels: np.ndarray, metric: np.ndarray) -> np.ndarray:
     order = sorted(uniq, key=lambda c: (means[c], c))
     mapping = {old: new for new, old in enumerate(order)}
     return np.array([mapping.get(int(l), int(l)) for l in labels], dtype=int)
-
-
-def _profile_vector(P: np.ndarray) -> np.ndarray:
-    """Ruang pembanding profil: waktu tempuh dalam skala log agar klaster
-    ekstrem (±400 menit) tidak mendominasi pencocokan."""
-    P = np.asarray(P, float)
-    return np.column_stack([P[:, 0] * 3, P[:, 1] * 2, np.log1p(P[:, 2:7]), P[:, 7], P[:, 8:13] * 3])
-
-
-REFERENCE_COLS = (["Road_Density_mean", SKENARIO]
-                  + [f"waktu_tes_{k}" for k in ["pendidikan", "kesehatan", "pemerintahan", "ibadah", "gor"]]
-                  + ["jumlah_opsi_rute"]
-                  + [f"is_isolated_{k}" for k in ["pendidikan", "kesehatan", "pemerintahan", "ibadah", "gor"]])
-
-
-def align_labels_to_reference(df: pd.DataFrame, labels: np.ndarray, U: Optional[np.ndarray],
-                              key: str) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-    """Samakan penomoran klaster dengan draft skripsi (Tabel 12–15).
-
-    Label SDWFCM bersifat arbitrer; pencocokan Hungarian antara profil klaster
-    hasil dan profil referensi hanya mengganti nomor (permutasi), tidak mengubah
-    keanggotaan grid.
-    """
-    ref = REFERENCE_PROFILES.get(key)
-    uniq = sorted(int(c) for c in np.unique(labels) if c >= 0)
-    if ref is None or len(uniq) != len(ref):
-        return labels, U
-    P = np.array([[df.loc[labels == c, col].mean() for col in REFERENCE_COLS] for c in uniq])
-    cost = ((_profile_vector(P)[:, None, :] - _profile_vector(ref)[None, :, :]) ** 2).sum(-1)
-    rows, cols = linear_sum_assignment(np.nan_to_num(cost, nan=1e6))
-    mapping = {uniq[r]: int(c) for r, c in zip(rows, cols)}
-    new_labels = np.array([mapping.get(int(l), -1) for l in labels], dtype=int)
-    new_U = U
-    if U is not None and U.ndim == 2 and U.shape[1] == len(uniq):
-        new_U = np.zeros_like(U)
-        for old, new in mapping.items():
-            new_U[:, new] = U[:, old]
-    return new_labels, new_U
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -607,9 +519,9 @@ def compare_algorithms(X, gdf_coords, w, k, mask, net_time, cfg: Cfg,
     sk_labels = run_skater(gdf_coords, w, X, k, cfg)
     runs["SKATER"] = (np.asarray(sk_labels, dtype=int), time.time() - t0)
 
-    # Algoritma pembanding dilabel ulang berdasarkan rata-rata waktu tempuh
-    # minimum (klaster 0 = tercepat), seperti relabel_clusters_by_metric pada
-    # draft skripsi. Moran's I label kategorik bergantung pada penomoran ini.
+    # Algoritma pembanding dinomori ulang berdasarkan rata-rata waktu tempuh
+    # minimum (klaster 0 = tercepat). Moran's I pada label kategorik bergantung
+    # pada penomoran, sehingga aturan penomoran harus sama untuk semua algoritma.
     for algo in ("SFCM", "REDCAP", "SKATER"):
         labels, t = runs[algo]
         runs[algo] = (relabel_by_metric(labels, net_time), t)
@@ -806,13 +718,13 @@ def prepare_level(gdf_base, roads_raw, tes_raw, intensity: float, cfg: Cfg,
     return {**acc, "X": X, "preprocessing": prep, "level_key": level_from_intensity(intensity)["key"]}
 
 
-def cluster_level(prep: dict, gdf_base, cfg: Cfg, k: int = K_THESIS, fast: bool = False,
+def cluster_level(prep: dict, gdf_base, cfg: Cfg, k: int, fast: bool = False,
                   seeds: Optional[List[int]] = None) -> dict:
     """SDWFCM satu level. `seeds` (mis. seed terbaik hasil offline) mempercepat
     simulasi blokir jalan: cukup satu inisialisasi pada cekungan yang sama."""
     df = prep["df"]
     res = run_sdwfcm(prep["X"], gdf_base, k, prep["mask"], cfg, fast=fast, seeds=seeds)
-    labels, U = align_labels_to_reference(df, res["labels"], res["U"], prep.get("level_key"))
+    labels, U = res["labels"], res["U"]
     membership = U.max(axis=1) if U is not None else res["max_membership"]
     xy = np.column_stack([gdf_base["cx"].values, gdf_base["cy"].values])
     tas = detect_tas_detour(df, xy, prep["tes_v"], prep["graph"], prep["t_pen"], cfg)

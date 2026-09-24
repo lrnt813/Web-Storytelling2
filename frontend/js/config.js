@@ -4,7 +4,7 @@ const backendOrigin = backendOriginOverride || ((window.location.hostname === '1
     ? `${window.location.protocol}//${window.location.hostname}:8000`
     : window.location.origin);
 const RESOLVED_API_BASE = `${backendOrigin}/api`;
-// Warna klaster mengikuti peta tipologi pada draft skripsi (Gambar 19–22)
+// Warna klaster: palet kategorikal tab10 (urutan tetap per nomor klaster)
 const clusterColors = { 0: "#1f77b4", 1: "#2ca02c", 2: "#9467bd", 3: "#e377c2", 4: "#bcbd22", 5: "#17becf", "-1": "#475569" };
 const TAS_COLOR = "#a855f7";
 const TERDAMPAK_COLOR = "#ff7f0e";
@@ -78,7 +78,7 @@ let roadCuts = [], cutMarkers = [], routeLayers, contextRouteLayers, originMarke
 let routingAbortController = null, isCalculating = false, markerPopupOpen = false;
 let searchMarker = null, activeCluster = null, clustersHidden = false, searchBoundaryLayer = null;
 let isolatedOrigin = null; // Store { latlng, routes, gridAttr, recommendations }
-let lastK = 6; // K terpilih pada skripsi (Tabel 10)
+let lastK = 6; // diperbarui dari hasil API (k_optimal)
 let activeLevel = localStorage.getItem('evac_level') || 'baseline';
 let activeView = 'klaster';
 let lastLevelResult = null;

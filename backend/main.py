@@ -1,7 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║  main.py — FastAPI Application                                              ║
 # ║  Aksesibilitas Spasial Bangunan Publik sebagai TES Banjir (SDWFCM)          ║
-# ║  Kabupaten Kulon Progo — disesuaikan dengan draft skripsi                   ║
+# ║  Kabupaten Kulon Progo                                                      ║
 # ║                                                                             ║
 # ║  • Geometri grid statis dimuat SATU KALI oleh frontend (GeoJSON)            ║
 # ║  • API mengembalikan atribut ringan per id_grid untuk setiap level          ║
@@ -246,7 +246,7 @@ def _level_payload(level: dict, summary: dict, records: List[dict], simulated: b
         "simulated": simulated,
         "n_cut_roads": n_cut,
         "elapsed_sec": round(elapsed, 2),
-        "k_optimal": int(state.thesis_results.get("k", T.K_THESIS)),
+        "k_optimal": int(state.thesis_results["k"]),
         "cluster_names": summary.get("cluster_names", {}),
         "cluster_profile": summary.get("cluster_profile", []),
         "tas": summary.get("tas", {}),
@@ -380,7 +380,7 @@ async def post_simulate(body: SimulateRequest):
                                        graph_pack=(G_cut, nl, tn))
                 seed = state.thesis_results.get("levels", {}).get(lv["key"], {}).get("sdwfcm_seed")
                 cl = T.cluster_level(prep, state.gdf_base, cfg,
-                                     k=int(state.thesis_results.get("k", T.K_THESIS)), fast=False,
+                                     k=int(state.thesis_results["k"]), fast=False,
                                      seeds=[int(seed)] if seed is not None else None)
                 grid = pd.concat([
                     state.thesis_grid[["id_grid", "Road_Density_mean", T.SKENARIO]],

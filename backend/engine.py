@@ -1,15 +1,9 @@
-# ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  engine.py — Computation Engine                                              ║
-# ║  Tipologi Kerawanan Evakuasi & Deteksi Titik Aman Semu                       ║
-# ║  Kabupaten Kulon Progo                                                       ║
-# ║                                                                              ║
-# ║  STRICT RULES APPLIED:                                                       ║
-# ║  ✔  Logika inti algoritma TIDAK DIUBAH (SDWFCM, SFCM, REDCAP, SKATER)       ║
-# ║  ✔  Semua visualisasi Matplotlib/Folium DIHAPUS                              ║
-# ║  ✔  Semua disk I/O (.to_file, .to_csv, ZIP) DIHAPUS                         ║
-# ║  ✔  log()/section()/kv()/tbl() terminal diganti Python logging              ║
-# ║  ✔  File ini TIDAK bergantung pada FastAPI — murni komputasi                 ║
-# ╚══════════════════════════════════════════════════════════════════════════════╝
+"""Modul komputasi dasar: pemuatan data, graf jaringan jalan, waktu tempuh ke TES,
+simulasi dampak banjir, dan algoritma klasterisasi (SDWFCM, SFCM, REDCAP, SKATER).
+
+Modul ini murni komputasi (tidak bergantung pada FastAPI). Alur analisis penelitian
+disusun di backend/thesis.py; persamaan lengkap di docs/METODOLOGI.md.
+"""
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. IMPORTS
@@ -115,9 +109,7 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════════════════════
 @dataclass
 class Cfg:
-    """Konfigurasi terpusat untuk seluruh pipeline.
-    Catatan: bab_subdirs dan output_dir DIHAPUS — tidak relevan untuk API.
-    """
+    """Konfigurasi terpusat: lokasi data dan seluruh parameter model."""
     # ── Path data (di-override dari main.py via environment / argumen) ────────
     base_dir: str = "./data"
     target_crs: str = "EPSG:32749"
@@ -299,13 +291,14 @@ def load_road_network(cfg: Cfg) -> Tuple[Optional[gpd.GeoDataFrame], Dict[str, g
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 4. SPATIAL WEIGHT MATRIX
-#    ⚠ LOGIKA INTI — JANGAN UBAH
+# 4. MATRIKS BOBOT SPASIAL (ROOK)
 # ══════════════════════════════════════════════════════════════════════════════
 def build_weights(gdf: gpd.GeoDataFrame):
-    """Bangun matriks bobot spasial Rook (fallback Queen).
-    Pulau (island) ditangani dengan KNN fallback.
-    Komponen tidak terhubung disambungkan via edge MST terdekat.
+    """Matriks bobot spasial ketetanggaan rook (fallback queen), distandardisasi baris.
+
+    Grid tanpa tetangga (island) diberi 2 tetangga terdekat (KNN). Komponen yang
+    tidak terhubung disambungkan ke komponen lain melalui pasangan grid terdekat,
+    sehingga graf ketetanggaan terhubung. Dipakai oleh SFCM, REDCAP, SKATER, dan Moran's I.
     """
     n = len(gdf)
     try:
@@ -389,11 +382,14 @@ def build_weights(gdf: gpd.GeoDataFrame):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 6. NETWORKX ROAD GRAPH
-#    ⚠ LOGIKA INTI — JANGAN UBAH
+# 6. GRAF JARINGAN JALAN
 # ══════════════════════════════════════════════════════════════════════════════
 def build_road_graph(roads: gpd.GeoDataFrame, skenario: str, intensity: float, cfg: Cfg):
-    """Bangun NetworkX graph dari segmen jalan aktif (tidak ditutup bencana).
+    """Graf tak berarah dari segmen jalan yang tidak ditutup banjir.
+
+    Ruas ditutup bila norm_haz(kelas bahaya ruas) × intensitas ≥ impact_closure_threshold.
+    Simpul = koordinat ujung segmen (dibulatkan 0,01 m); bobot sisi = panjang segmen (m),
+    diambil yang terpendek bila ada segmen ganda.
     Returns: (G, node_array, kdtree)
     """
     hc = cfg.hazard_col_map.get(skenario, skenario)
@@ -475,10 +471,12 @@ def apply_road_cuts_to_graph(G: nx.Graph, nl, tn, cut_roads: List[dict], cfg: Cf
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 7. FILTER TES
-#    ⚠ LOGIKA INTI — JANGAN UBAH
 # ══════════════════════════════════════════════════════════════════════════════
 def filter_tes(tes_raw: Dict[str, gpd.GeoDataFrame], skenario: str, cfg: Cfg):
-    """Filter TES berdasarkan threshold hazard skenario.
+    """TES valid = titik dengan kelas bahaya < tes_hazard_threshold.
+
+    Kelas bahaya TES yang terkena grid terdampak (lihat simulate_hazard) sudah
+    dinaikkan sebelum fungsi ini dipanggil.
     Returns: (tes_valid_gdf | None, stats_dict)
     """
     hc   = cfg.hazard_col_map.get(skenario, skenario)
@@ -503,8 +501,7 @@ def filter_tes(tes_raw: Dict[str, gpd.GeoDataFrame], skenario: str, cfg: Cfg):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 8. COMPUTE DISTANCES (Pandana / Dijkstra)
-#    ⚠ LOGIKA INTI — JANGAN UBAH
+# 8. WAKTU TEMPUH KE TES (DIJKSTRA MULTI-SUMBER)
 # ══════════════════════════════════════════════════════════════════════════════
 def compute_distances(
     gdf: gpd.GeoDataFrame,
@@ -519,8 +516,12 @@ def compute_distances(
     nl=None,
     tn=None,
 ):
-    """Hitung waktu tempuh (menit) dari setiap grid ke TES per kategori.
-    MENGGUNAKAN: Optimized Multi-Source Dijkstra + Vectorized cKDTree
+    """Waktu tempuh (menit) dari centroid setiap grid ke TES terdekat per kategori.
+
+    Centroid grid dan titik TES di-snap ke simpul jalan terdekat (maks. 300 m);
+    jarak jaringan dihitung dengan Dijkstra multi-sumber (sumber = semua TES
+    kategori tsb.), lalu dibagi kecepatan berjalan (walking_speed_m_per_min).
+    Grid/TES yang gagal di-snap atau tidak terhubung diberi waktu penalti `t_pen`.
     """
     n  = len(gdf)
     if "cx" in gdf.columns and "cy" in gdf.columns:
@@ -591,7 +592,11 @@ def compute_distances(
 
 
 def calc_t_max(tpk: dict, cfg: Cfg) -> float:
-    """Hitung T_max dari rata-rata waktu tempuh yang valid (non-unreachable)."""
+    """T_max = waktu tempuh MAKSIMUM yang valid (terjangkau, > 0) di seluruh kategori TES.
+
+    Pada Baseline, waktu penalti untuk grid tak terjangkau ditetapkan
+    T_pen = 3 × T_max dan dipakai tetap untuk semua level.
+    """
     all_t = []
     for arr in tpk.values():
         v = arr[(arr < cfg.unreachable_time * 0.9) & ~np.isinf(arr) & (arr > 0)]
@@ -605,8 +610,7 @@ def calc_t_max(tpk: dict, cfg: Cfg) -> float:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 9. SIMULASI HAZARD
-#    ⚠ LOGIKA INTI — JANGAN UBAH (plot dihapus sesuai aturan #2)
+# 9. SIMULASI DAMPAK BANJIR
 # ══════════════════════════════════════════════════════════════════════════════
 def simulate_hazard(
     gdf: gpd.GeoDataFrame,
@@ -617,7 +621,13 @@ def simulate_hazard(
     cfg: Cfg,
     rs: int = 42,
 ):
-    """Simulasi dampak bencana pada grid, jalan, dan TES.
+    """Simulasi dampak banjir pada grid dan TES untuk satu intensitas.
+
+    p = (h − h_min) / (h_max − h_min) dari kelas bahaya grid h (0–3).
+    Grid terdampak ⇔ intensitas > 0 ∧ p ≥ 1 − intensitas ∧ p > 0.
+    TES dalam radius 50 m dari grid terdampak dan berkelas bahaya < tes_hazard_threshold
+    dinaikkan kelasnya ke road_break_threshold (sehingga tidak valid di filter_tes).
+    Penutupan ruas jalan dihitung terpisah di build_road_graph.
     Returns: (gdf_sim, roads_sim, tes_sim, mask_dampak)
     """
     n  = len(gdf)
@@ -672,8 +682,7 @@ def simulate_hazard(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 10. PREPROCESSING & FEATURE ENGINEERING
-#     ⚠ LOGIKA INTI — JANGAN UBAH (PowerTransformer → RobustScaler → PCA)
+# 10. PRA-PEMROSESAN (VERSI LAMA, TIDAK DIPAKAI PIPELINE PENELITIAN)
 # ══════════════════════════════════════════════════════════════════════════════
 def preprocess(
     gdf: gpd.GeoDataFrame,
@@ -682,7 +691,9 @@ def preprocess(
     cfg: Cfg,
     mask_dampak=None,
 ) -> np.ndarray:
-    """Feature engineering: PowerTransformer → RobustScaler → PCA (95% var).
+    """Pra-pemrosesan versi lama (Yeo-Johnson → RobustScaler → PCA 95%).
+
+    Tidak dipakai oleh pipeline penelitian; lihat thesis.Preprocessor.
     Returns: X_pca (np.ndarray, shape [n_grid, n_components])
     """
     df     = pd.DataFrame(index=gdf.index)
@@ -721,11 +732,11 @@ def preprocess(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 11. K OPTIMAL (ELBOW METHOD)
-#     ⚠ LOGIKA INTI — JANGAN UBAH
+# 11. K OPTIMAL — METODE ELBOW (VERSI LAMA, TIDAK DIPAKAI PIPELINE PENELITIAN)
 # ══════════════════════════════════════════════════════════════════════════════
 def determine_k(X_pca: np.ndarray, skenario: str, cfg: Cfg) -> int:
-    """Tentukan K optimal via elbow method (KneeLocator / heuristik).
+    """K optimal dengan metode elbow K-Means (versi lama; pipeline penelitian
+    memakai skor komposit di thesis.evaluate_k_candidates).
     Returns: k_optimal (int)
     """
     ks       = list(cfg.k_range)
@@ -788,8 +799,7 @@ def determine_k(X_pca: np.ndarray, skenario: str, cfg: Cfg) -> int:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 12. NUMBA HELPERS (REDCAP)
-#     ⚠ LOGIKA INTI — JANGAN UBAH
+# 12. FUNGSI BANTU REDCAP (dipercepat numba bila tersedia)
 # ══════════════════════════════════════════════════════════════════════════════
 @jit(nopython=True)
 def _redcap_ward(Xa, Xb):
@@ -835,16 +845,16 @@ def _euc(xa, xb):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 13. ALGORITMA CLUSTERING
-#     ⚠ LOGIKA INTI — JANGAN UBAH SAMA SEKALI
+# 13. ALGORITMA KLASTERISASI
 # ══════════════════════════════════════════════════════════════════════════════
 
 class SpatialDistanceWeightedFCM:
-    """
-    Spatial Distance-Weighted Fuzzy C-Means (SDWFCM) — Algoritma Utama.
-    Menggabungkan jarak fitur (da) dan jarak spasial berbobot KNN-Gaussian (ds)
-    dalam fungsi membership fuzzy.
-    ⚠ LOGIKA MATEMATIKA TIDAK DIUBAH — hanya tqdm dipindah ke logger.
+    """Spatial Distance-Weighted Fuzzy C-Means (SDWFCM).
+
+    Jarak gabungan d_t = (1 − α)·d_a + α·d_s, dengan d_a jarak Euclidean kuadrat
+    ke pusat klaster dan d_s rata-rata tertimbang d_a·u^m tetangga (bobot KNN-Gaussian
+    W, dan bobot tambahan untuk tetangga terdampak banjir). Persamaan lengkap:
+    docs/METODOLOGI.md.
     """
     def __init__(self, k=5, m=1.7, alpha=0.5, sigma=None, knn=8,
                  max_iter=150, tol=1e-4, rs=42):
@@ -933,10 +943,10 @@ class SpatialDistanceWeightedFCM:
 
 
 class SpatialFuzzyCMeans:
-    """
-    Spatial Fuzzy C-Means (SFCM) — Pembanding 1.
-    Memodifikasi jarak FCM standar dengan lag spasial dari bobot ketetanggaan (W).
-    ⚠ LOGIKA MATEMATIKA TIDAK DIUBAH.
+    """Spatial Fuzzy C-Means (SFCM), algoritma pembanding.
+
+    Jarak FCM standar dimodifikasi dengan suku spasial dari tetangga rook:
+    d_t = (1 − α)·d_a + α·d_s, d_s,ik = rata-rata d_a tetangga × rata-rata u_k tetangga.
     """
     def __init__(self, k=5, m=2.0, alpha=0.5, max_iter=150, tol=1e-4, rs=42):
         self.k = k; self.m = m; self.alpha = alpha
@@ -984,10 +994,10 @@ class SpatialFuzzyCMeans:
 
 
 class REDCAPManual:
-    """
-    REDCAP — Pembanding 2.
-    Penggabungan hirarki berbasis MST dengan kendala kontiguitas spasial.
-    ⚠ LOGIKA MATEMATIKA TIDAK DIUBAH.
+    """REDCAP (regionalisasi hierarkis berkendala kontiguitas), algoritma pembanding.
+
+    Region bertetangga digabung berurutan menurut ketidakmiripan (linkage) yang
+    dikalikan penalti ukuran (n^size_alpha) dan penalti isolasi, sampai tersisa K region.
     """
     def __init__(self, X, w, k=5, linkage="ward", size_alpha=1.0,
                  net_dist=None, iso_pen=10.0, iso_thr=30.0):
@@ -1125,10 +1135,10 @@ class REDCAPManual:
 
 
 def run_skater(gdf: gpd.GeoDataFrame, w, X_pca: np.ndarray, k: int, cfg: Cfg) -> np.ndarray:
-    """
-    SKATER — Pembanding 3.
-    MST + edge removal. Menggunakan spopt.region.Skater jika tersedia.
-    ⚠ LOGIKA INTI — JANGAN UBAH.
+    """SKATER (pemangkasan pohon rentang minimum), algoritma pembanding.
+
+    Memakai spopt.region.Skater bila tersedia; jika gagal, fallback: MST pada graf
+    ketetanggaan berbobot jarak atribut, lalu K − 1 sisi terberat dipotong.
     """
     if SKATER_OK:
         try:
@@ -1316,8 +1326,8 @@ def evaluate_all(results: dict, X_pca, gdf, w, k: int, skenario: str, cfg: Cfg) 
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 16. DETEKSI TITIK AMAN SEMU
-#     ⚠ LOGIKA INTI — JANGAN UBAH (plot & to_file dihapus sesuai aturan #2 #3)
+# 16. TITIK AMAN SEMU BERBASIS PSI/ALR (VERSI LAMA, TIDAK DIPAKAI PIPELINE PENELITIAN)
+#     Definisi TAS penelitian: thesis.detect_tas_detour (Detour Index).
 # ══════════════════════════════════════════════════════════════════════════════
 def detect_titik_aman_semu(
     gdf_sim: gpd.GeoDataFrame,
@@ -1456,8 +1466,7 @@ def detect_titik_aman_semu(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 17. ROUTE SINGLE POINT (untuk endpoint /api/route)
-#     Fungsi BARU — menggabungkan logika Dijkstra + path reconstruction
+# 17. RUTE SATU TITIK (VERSI LAMA, TIDAK DIPAKAI; rute dashboard di backend/main.py)
 # ══════════════════════════════════════════════════════════════════════════════
 def route_to_nearest_tes(
     origin_x: float,
@@ -1613,7 +1622,7 @@ def route_to_nearest_tes(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 18. FULL PIPELINE (dipanggil oleh endpoint /api/baseline & /api/simulate)
+# 18. PIPELINE LENGKAP VERSI LAMA (TIDAK DIPAKAI; pipeline penelitian di backend/thesis.py)
 # ══════════════════════════════════════════════════════════════════════════════
 def run_pipeline(
     gdf_base: gpd.GeoDataFrame,
