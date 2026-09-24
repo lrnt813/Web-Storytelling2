@@ -86,7 +86,8 @@ DUNN_SAMPLE = 2000        # sampel grid untuk Dunn titik-ke-titik (O(n²))
 MORAN_PERMUTATION_SEED = 42   # esda.Moran tidak punya parameter seed → seed global di-set sebelum dipanggil
 TAS_MIN_EUCLID_M = 50.0   # jarak minimum (setengah lebar grid 100 m) untuk T_ideal DAN T_aktual
 TAS_DI_ABSOLUTE = 2.0     # ambang absolut DI_t pada uji sensitivitas TAS
-TAS_STATUS = {0: "Non-TAS", 1: "TAS", 2: "Terputus"}
+TAS_STATUS = {0: "Non-TAS", 1: "TAS", 2: "Terputus", 3: "Tergenang"}
+TERGENANG = "Tergenang"   # status grid yang terdampak (mask simulasi) pada suatu level
 
 FEATURE_LABELS = {
     "Road_Density_mean":      "Kepadatan Jaringan Jalan",
@@ -167,7 +168,7 @@ def compute_level_accessibility(
         "Road_Density_mean": gdf_sim["Road_Density_mean"].fillna(
             gdf_sim["Road_Density_mean"].median()).values,
         SKENARIO: gdf_sim[SKENARIO].fillna(0).values.astype(float),
-        "terdampak": mask.astype(int),
+        "tergenang": mask.astype(int),   # grid terdampak simulasi → status "Tergenang"
     })
     for kat in cfg.kategori_fac:
         arr = tpk[kat]
@@ -765,6 +766,7 @@ def detect_tas_detour(
     t_pen: float,
     cfg: Cfg,
     max_snap: float = 300.0,
+    tergenang: Optional[np.ndarray] = None,
 ) -> dict:
     """Deteksi Titik Aman Semu berbasis Detour Index waktu.
 
@@ -775,20 +777,23 @@ def detect_tas_detour(
                perjalanan centroid → titik TES. Batas minimum TAS_MIN_EUCLID_M (50 m) dipasang
                pada KEDUA jarak, sehingga T_aktual ≥ T_ideal untuk semua grid terjangkau
     DI_t = T_aktual / T_ideal
-    Grid dengan T_aktual = T_pen (tidak terjangkau) → kelas "Terputus", dikeluarkan dari
-    perhitungan persentil dan rata-rata DI. Untuk grid terjangkau:
+    Grid Tergenang (mask simulasi level ini) → status "Tergenang", dikeluarkan dari seluruh
+    perhitungan TAS. Grid non-Tergenang dengan T_aktual = T_pen (tidak terjangkau) → "Terputus",
+    dikeluarkan dari persentil dan rata-rata DI. Untuk grid non-Tergenang yang terjangkau:
         TAS ⇔ T_ideal ≤ P25(T_ideal) ∧ DI_t ≥ P75(DI_t)
     Uji sensitivitas: T_ideal ≤ P25(T_ideal) ∧ DI_t ≥ TAS_DI_ABSOLUTE.
-    status: 0 = Non-TAS, 1 = TAS, 2 = Terputus.
+    status: 0 = Non-TAS, 1 = TAS, 2 = Terputus, 3 = Tergenang.
     """
     n = len(grid_xy)
     speed = cfg.walking_speed_m_per_min
     G, nl, tn = graph_pack
+    wet = np.zeros(n, bool) if tergenang is None else np.asarray(tergenang, bool)
 
     if tes_v is None or len(tes_v) == 0 or tn is None or len(nl) == 0:
         return {"t_ideal": np.full(n, np.nan), "t_aktual": np.full(n, t_pen),
                 "detour_index": np.full(n, np.nan), "is_tas": np.zeros(n, int),
-                "status": np.full(n, 2, int), "summary": {"jumlah_terputus": n}}
+                "status": np.where(wet, 3, 2).astype(int),
+                "summary": {"jumlah_terputus": int((~wet).sum()), "jumlah_tergenang": int(wet.sum())}}
 
     tes_xy = np.column_stack([tes_v.geometry.x.values, tes_v.geometry.y.values])
     d_euc_raw, tes_idx = cKDTree(tes_xy).query(grid_xy, k=1)
@@ -829,7 +834,8 @@ def detect_tas_detour(
     total_m = g_snap_d + net + t_snap_d[tes_idx]          # ruas snapping + jaringan
     total_m = np.maximum(total_m, TAS_MIN_EUCLID_M)        # batas minimum yang sama dengan T_ideal
     t_akt[fin] = np.minimum(total_m[fin] / speed, t_pen)
-    reach = t_akt < t_pen                       # terjangkau; sisanya "Terputus"
+    reach = (t_akt < t_pen) & ~wet              # non-Tergenang & terjangkau
+    cut = (t_akt >= t_pen) & ~wet               # non-Tergenang & tidak terjangkau → "Terputus"
     di = np.full(n, np.nan)
     di[reach] = t_akt[reach] / t_ideal[reach]
 
@@ -838,7 +844,7 @@ def detect_tas_detour(
     dekat = reach & (t_ideal <= p25)
     is_tas = dekat & (di >= p75)
     is_tas_abs = dekat & (di >= TAS_DI_ABSOLUTE)
-    status = np.where(~reach, 2, np.where(is_tas, 1, 0)).astype(int)
+    status = np.select([wet, cut, is_tas], [3, 2, 1], default=0).astype(int)
 
     non = reach & ~is_tas
     tas_mean = float(di[is_tas].mean()) if is_tas.any() else None
@@ -847,11 +853,15 @@ def detect_tas_detour(
     summary = {
         "jumlah_tas": int(is_tas.sum()),
         "jumlah_non_tas": int(non.sum()),
-        "jumlah_terputus": int((~reach).sum()),
+        "jumlah_terputus": int(cut.sum()),
+        "jumlah_tergenang": int(wet.sum()),
         "jumlah_terjangkau": n_reach,
+        "jumlah_non_tergenang": int((~wet).sum()),
         "persen_tas": float(is_tas.sum() / n * 100),
+        "persen_tas_non_tergenang": float(is_tas.sum() / (~wet).sum() * 100) if (~wet).any() else None,
         "persen_tas_terjangkau": float(is_tas.sum() / n_reach * 100) if n_reach else None,
-        "persen_terputus": float((~reach).sum() / n * 100),
+        "persen_terputus": float(cut.sum() / n * 100),
+        "persen_tergenang": float(wet.sum() / n * 100),
         "tas_rate": float(is_tas.sum() / n),
         "mean_di_tas": tas_mean,
         "mean_di_non_tas": non_mean,
@@ -933,7 +943,8 @@ def cluster_level(prep: dict, gdf_base, cfg: Cfg, k: int, fast: bool = False,
     centers = fuzzy_centers(prep["X"], U, cfg.sdwfcm_m)
     membership = U.max(axis=1) if U is not None else res["max_membership"]
     xy = np.column_stack([gdf_base["cx"].values, gdf_base["cy"].values])
-    tas = detect_tas_detour(df, xy, prep["tes_v"], prep["graph"], prep["t_pen"], cfg)
+    tas = detect_tas_detour(df, xy, prep["tes_v"], prep["graph"], prep["t_pen"], cfg,
+                            tergenang=df["tergenang"].values)
     profile = cluster_profile(df, labels, k)
     for row in profile:
         row["deskripsi"] = describe_cluster(row)
@@ -948,7 +959,7 @@ def level_grid_frame(key: str, df: pd.DataFrame, cl: dict, cfg: Cfg) -> pd.DataF
     out = pd.DataFrame({
         f"cl_{key}": cl["labels"],
         f"mem_{key}": np.round(cl["membership"], 4),
-        f"terdampak_{key}": df["terdampak"].values,
+        f"terdampak_{key}": df["tergenang"].values,
     })
     for k in cfg.kategori_fac:
         out[f"waktu_{k}_{key}"] = np.round(df[f"waktu_tes_{k}"].values, 3)
