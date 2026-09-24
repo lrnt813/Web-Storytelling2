@@ -81,14 +81,18 @@ def _map(png, grid_geom, tes_pt, path_xy, gxy, roads_lv, closed_lv):
         ax.fill(*poly.exterior.xy, facecolor="#a855f7", alpha=0.35, edgecolor="#6b21a8", linewidth=1)
     ax.plot([gxy[0], tes_pt[0]], [gxy[1], tes_pt[1]], color="#111827", linestyle=":", linewidth=1.2)
     if path_xy:
-        ax.plot([p[0] for p in path_xy], [p[1] for p in path_xy], color="#2563eb", linewidth=1.8)
+        net = path_xy[1:-1]
+        ax.plot([p[0] for p in net], [p[1] for p in net], color="#2563eb", linewidth=1.8)
+        for a_, b_ in ((path_xy[0], path_xy[1]), (path_xy[-2], path_xy[-1])):     # ruas snapping
+            ax.plot([a_[0], b_[0]], [a_[1], b_[1]], color="#f97316", linewidth=1.4, linestyle="--")
     ax.plot(*tes_pt, marker="*", markersize=12, color="#16a34a")
     ax.set_xlim(x0, x1)
     ax.set_ylim(y0, y1)
     ax.set_aspect("equal")
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.set_title("ungu = grid TAS; bintang = TES terdekat\n··· garis lurus; biru = rute jaringan; merah = ruas ditutup",
+    ax.set_title("ungu = grid TAS; bintang = TES terdekat; ··· garis lurus\n"
+                 "biru = rute jaringan; oranye putus = ruas snapping; merah = ruas ditutup",
                  fontsize=6.5)
     fig.tight_layout()
     fig.savefig(png)
