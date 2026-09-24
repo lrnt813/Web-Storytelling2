@@ -284,7 +284,7 @@ Untuk pasangan Baseline→Rendah, Rendah→Sedang, Sedang→Tinggi, dan Baseline
 - **CDVM** = total variation distance distribusi state:
   \(\tfrac12 \sum_{u=0}^{K} \lvert p_u^{(b)} - p_u^{(a)} \rvert\).
 
-## 13. Perbandingan algoritma (Baseline, \(K^\ast\))
+## 13. Perbandingan algoritma (Baseline, K = 2 dan K = 3)
 
 Data: baris Baseline dari data gabungan (semua grid; ruang PCA dan praproses yang sama). Perbandingan
 dijalankan untuk **K = 2 dan K = 3**. Algoritma fuzzy memakai \(m = 1{,}7\) yang sama, 10 inisialisasi
