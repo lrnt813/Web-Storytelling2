@@ -102,8 +102,13 @@ SILHOUETTE_SEED = 42
 MORAN_PERMUTATIONS = 999
 MORAN_PERMUTATION_SEED = 42   # esda.Moran tidak punya parameter seed → seed global di-set sebelum dipanggil
 DEGENERATE_MAX_SHARE = 0.90   # partisi degeneratif: klaster terbesar > 90% grid
+K_OUTPUT = (2, 3)             # keluaran lengkap disusun untuk kedua K (model utama diputuskan peneliti)
+LABEL_TERISOLASI_MIN = 0.50   # label "Terisolasi": proporsi baris waktu minimum = penalti > 50%
+LABEL_BAIK_MAX = 10.0         # "Akses Baik": median waktu minimum ≤ 10 menit
+LABEL_SEDANG_MAX = 30.0       # "Akses Sedang": 10 < median ≤ 30 menit; "Akses Kritis": > 30 menit
 TAS_MIN_EUCLID_M = 50.0   # jarak minimum (setengah lebar grid 100 m) untuk T_ideal DAN T_aktual
-TAS_DI_ABSOLUTE = 2.0     # ambang absolut DI_t pada uji sensitivitas TAS
+TAS_DI_ABSOLUTE = 2.0     # aturan utama TAS: DI_t ≥ 2 …
+TAS_T_IDEAL_MAX = 5.0     # … dan T_ideal ≤ 5 menit (garis lurus ≤ 400 m pada 80 m/menit)
 TAS_STATUS = {0: "Non-TAS", 1: "TAS", 2: "Terputus", 3: "Tergenang"}
 TERGENANG = "Tergenang"   # status grid yang terdampak (mask simulasi) pada suatu level
 
@@ -646,6 +651,13 @@ def moran_labels(labels, w, permutations: int = MORAN_PERMUTATIONS) -> Tuple[Opt
         return None, None
 
 
+def partition_coefficients(U: np.ndarray) -> dict:
+    """Koefisien partisi PC = (1/N) Σ_i Σ_k u_ik² dan entropi partisi PE = −(1/N) Σ_i Σ_k u_ik ln u_ik
+    (Bezdek), pada keanggotaan akhir algoritma."""
+    U = np.clip(np.asarray(U, float), 1e-12, None)
+    return {"pc": float((U ** 2).sum(axis=1).mean()), "pe": float(-(U * np.log(U)).sum(axis=1).mean())}
+
+
 def cdvm_distribution(states_a, states_b, n_states: int) -> float:
     """CDVM: total variation distance ½ Σ_s |p_s(b) − p_s(a)| antara distribusi state dua level."""
     pa = np.bincount(states_a, minlength=n_states) / len(states_a)
@@ -788,31 +800,33 @@ def evaluate_k_stability(X: np.ndarray, W: csr_matrix, pool: pd.DataFrame, A_poo
 # ══════════════════════════════════════════════════════════════════════════════
 def compare_algorithms(X: np.ndarray, W: csr_matrix, w_rook, A_rook: csr_matrix, k: int,
                        waktu_min: np.ndarray, cfg: Cfg) -> List[dict]:
-    """FCM (α = 0), SFCM, SDWFCM (masing-masing 10 inisialisasi, J terkecil), REDCAP, SKATER.
-    Semua memakai praproses, K, dan aturan penomoran yang sama (urut rata-rata waktu_tes_min).
-    Partisi dengan klaster terbesar > 90% grid ditandai degeneratif (tidak layak dibandingkan)."""
+    """FCM (α = 0), SFCM, SDWFCM (masing-masing 10 inisialisasi, J terkecil, m sama = cfg.sdwfcm_m),
+    REDCAP, SKATER. Semua memakai praproses, K, dan aturan penomoran yang sama (urut rata-rata
+    waktu_tes_min). Untuk algoritma fuzzy dilaporkan koefisien partisi (PC) dan entropi partisi (PE)
+    dari keanggotaan akhir. Partisi dengan klaster terbesar > 90% grid ditandai degeneratif."""
     import copy
     runs = {}
 
     fcm = run_sdwfcm(X, W, k, cfg, alpha=0.0)
     runs["FCM"] = {"labels": fcm["labels"], "time_per_init": fcm["time_per_init"], "n_init": SDWFCM_N_INIT,
-                   "seed_terbaik": fcm["seed"], "objective": fcm["objective"]}
+                   "seed_terbaik": fcm["seed"], "objective": fcm["objective"], "U": fcm["U"], "m": cfg.sdwfcm_m}
 
     op = neighbor_mean_operator(w_rook, len(X))
     best, times = None, []
     for rs in [SDWFCM_SEED + i for i in range(SDWFCM_N_INIT)]:
         t0 = time.time()
-        sf = SpatialFuzzyCMeans(k=k, m=cfg.sfcm_m, alpha=cfg.sfcm_alpha, max_iter=cfg.sfcm_max_iter,
+        sf = SpatialFuzzyCMeans(k=k, m=cfg.sdwfcm_m, alpha=cfg.sfcm_alpha, max_iter=cfg.sfcm_max_iter,
                                 tol=cfg.sfcm_tol, rs=rs).fit(X, w_rook, operator=op)
         times.append(time.time() - t0)
         if best is None or sf.objective_ < best.objective_:
             best = sf
     runs["SFCM"] = {"labels": best.labels_.astype(int), "time_per_init": float(np.mean(times)),
-                    "n_init": SDWFCM_N_INIT, "seed_terbaik": int(best.rs), "objective": best.objective_}
+                    "n_init": SDWFCM_N_INIT, "seed_terbaik": int(best.rs), "objective": best.objective_,
+                    "U": best.U_, "m": best.m}
 
     sd = run_sdwfcm(X, W, k, cfg)
     runs["SDWFCM"] = {"labels": sd["labels"], "time_per_init": sd["time_per_init"], "n_init": SDWFCM_N_INIT,
-                      "seed_terbaik": sd["seed"], "objective": sd["objective"]}
+                      "seed_terbaik": sd["seed"], "objective": sd["objective"], "U": sd["U"], "m": cfg.sdwfcm_m}
 
     t0 = time.time()
     try:
@@ -850,7 +864,10 @@ def compare_algorithms(X: np.ndarray, W: csr_matrix, w_rook, A_rook: csr_matrix,
                "klaster_terbesar_persen": big,
                "size_entropy": size_entropy(labels),
                "seed_terbaik": r.get("seed_terbaik"),
-               "objective": r.get("objective")}
+               "objective": r.get("objective"),
+               "m": r.get("m")}
+        if r.get("U") is not None:
+            row.update(partition_coefficients(r["U"]))
         if n_cl >= 2:
             mi, mp = moran_labels(labels, w_rook)
             row.update({
@@ -878,19 +895,57 @@ PROFILE_COLS = (
 )
 
 
-def cluster_profile(df: pd.DataFrame, labels: np.ndarray, k: int) -> List[dict]:
-    """Rata-rata variabel per klaster pada data gabungan (kelas bahaya banjir = deskriptif)."""
+TIME_COLS = ["waktu_tes_pendidikan", "waktu_tes_kesehatan", "waktu_tes_pemerintahan",
+             "waktu_tes_ibadah", "waktu_tes_gor", "waktu_tes_min"]
+
+
+def interpret_cluster(prop_penalti_min: float, median_min: float) -> str:
+    """Label netral (aturan ditetapkan sebelum melihat hasil, Putaran 3):
+    "Terisolasi" bila proporsi baris dengan waktu minimum = penalti > 50%; selain itu
+    "Akses Baik" (median waktu minimum ≤ 10 menit), "Akses Sedang" (10–30), "Akses Kritis" (> 30)."""
+    if prop_penalti_min > LABEL_TERISOLASI_MIN:
+        return "Terisolasi"
+    if median_min <= LABEL_BAIK_MAX:
+        return "Akses Baik"
+    if median_min <= LABEL_SEDANG_MAX:
+        return "Akses Sedang"
+    return "Akses Kritis"
+
+
+def cluster_profile(df: pd.DataFrame, labels: np.ndarray, k: int, t_pen: float) -> List[dict]:
+    """Profil klaster pada data gabungan: rerata semua variabel profil; untuk variabel waktu juga
+    median, P25, P75; jumlah dan persentase baris bernilai penalti (per kategori dan waktu minimum);
+    proporsi grid terisolasi; label interpretasi otomatis (interpret_cluster).
+    Kelas bahaya banjir = variabel deskriptif (bukan fitur)."""
     rows = []
     n = len(labels)
     for c in range(k):
         sel = labels == c
-        row = {"klaster": c, "jumlah_baris": int(sel.sum()),
-               "persen_baris": float(sel.sum() / n * 100)}
+        m = int(sel.sum())
+        row = {"klaster": c, "jumlah_baris": m, "persen_baris": float(m / n * 100)}
         for col in PROFILE_COLS:
-            row[col] = float(df.loc[sel, col].mean()) if sel.any() else None
-        row["deskripsi"] = describe_cluster(row) if sel.any() else None
+            row[col] = float(df.loc[sel, col].mean()) if m else None
+        for col in TIME_COLS:
+            v = df.loc[sel, col].values.astype(float)
+            q = np.percentile(v, [50, 25, 75]) if m else [None] * 3
+            row[f"{col}_median"], row[f"{col}_p25"], row[f"{col}_p75"] = (float(x) if m else None for x in q)
+            pen = int((v >= t_pen - 1e-9).sum()) if m else 0
+            row[f"{col}_n_penalti"] = pen
+            row[f"{col}_persen_penalti"] = float(pen / m * 100) if m else None
+        row["proporsi_terisolasi"] = float(df.loc[sel, "is_isolated"].mean()) if m else None
+        row["deskripsi"] = (interpret_cluster(row["waktu_tes_min_persen_penalti"] / 100,
+                                              row["waktu_tes_min_median"]) if m else None)
         rows.append(row)
     return rows
+
+
+def crosstab_labels(a: np.ndarray, b: np.ndarray, ka: int, kb: int) -> dict:
+    """Tabulasi silang label dua model pada baris yang sama (baris = model a, kolom = model b)."""
+    M = np.zeros((ka, kb), dtype=int)
+    np.add.at(M, (np.asarray(a), np.asarray(b)), 1)
+    return {"matrix": M.tolist(), "baris": [f"K{ka}-{i}" for i in range(ka)],
+            "kolom": [f"K{kb}-{j}" for j in range(kb)],
+            "ari": float(adjusted_rand_score(a, b))}
 
 
 def level_distribution(states: np.ndarray, k: int) -> List[dict]:
@@ -904,26 +959,6 @@ def level_distribution(states: np.ndarray, k: int) -> List[dict]:
     out.append({"state": k, "nama": TERGENANG, "jumlah_grid": int(cnt[k]),
                 "persen_semua_grid": float(cnt[k] / n * 100), "persen_non_tergenang": None})
     return out
-
-
-def describe_cluster(row: dict) -> str:
-    """Deskripsi singkat tipologi berdasarkan profil klaster."""
-    iso = np.mean([row[f"is_isolated_{k}"] for k in
-                   ["pendidikan", "kesehatan", "pemerintahan", "ibadah", "gor"]])
-    t = row["waktu_tes_min"]
-    if iso >= 0.5 or row["jumlah_opsi_rute"] < 3:
-        akses = "Terisolasi"
-    elif iso >= 0.05 or t > 30:
-        akses = "Akses Kritis"
-    elif t > 10:
-        akses = "Akses Rendah"
-    elif t > 5:
-        akses = "Akses Sedang"
-    else:
-        akses = "Akses Baik"
-    b = row[SKENARIO]
-    bahaya = "Bahaya Tinggi" if b >= 1.0 else ("Bahaya Sedang" if b >= 0.5 else "Bahaya Rendah")
-    return f"{akses} · {bahaya}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1003,11 +1038,12 @@ def detect_tas_detour(
                pada KEDUA jarak, sehingga T_aktual ≥ T_ideal untuk semua grid terjangkau
     DI_t = T_aktual / T_ideal
     Grid Tergenang (mask simulasi level ini) → status "Tergenang", dikeluarkan dari seluruh
-    perhitungan TAS. Grid non-Tergenang dengan T_aktual = T_pen (tidak terjangkau) → "Terputus",
-    dikeluarkan dari persentil dan rata-rata DI. Untuk grid non-Tergenang yang terjangkau:
-        TAS ⇔ T_ideal ≤ P25(T_ideal) ∧ DI_t ≥ P75(DI_t)
-    Uji sensitivitas: T_ideal ≤ P25(T_ideal) ∧ DI_t ≥ TAS_DI_ABSOLUTE.
-    status: 0 = Non-TAS, 1 = TAS, 2 = Terputus, 3 = Tergenang.
+    perhitungan TAS. Grid non-Tergenang dengan T_aktual = T_pen (tidak terjangkau) → "Terputus".
+    Untuk grid non-Tergenang yang terjangkau (R):
+        aturan utama      : TAS ⇔ DI_t ≥ TAS_DI_ABSOLUTE (2) ∧ T_ideal ≤ TAS_T_IDEAL_MAX (5 menit)
+        sensitivitas      : TAS ⇔ T_ideal ≤ P25(T_ideal | R) ∧ DI_t ≥ P75(DI_t | R)
+    status (aturan utama) dan status_persentil: 0 = Non-TAS, 1 = TAS, 2 = Terputus, 3 = Tergenang.
+    Kategori TES terdekat = kategori TES valid terdekat secara Euclidean (e(i)).
     """
     n = len(grid_xy)
     speed = cfg.walking_speed_m_per_min
@@ -1015,9 +1051,10 @@ def detect_tas_detour(
     wet = np.zeros(n, bool) if tergenang is None else np.asarray(tergenang, bool)
 
     if tes_v is None or len(tes_v) == 0 or tn is None or len(nl) == 0:
+        st = np.where(wet, 3, 2).astype(int)
         return {"t_ideal": np.full(n, np.nan), "t_aktual": np.full(n, t_pen),
                 "detour_index": np.full(n, np.nan), "is_tas": np.zeros(n, int),
-                "status": np.where(wet, 3, 2).astype(int),
+                "status": st, "status_persentil": st.copy(), "kategori_tes_terdekat": np.full(n, None),
                 "summary": {"jumlah_terputus": int((~wet).sum()), "jumlah_tergenang": int(wet.sum())}}
 
     tes_xy = np.column_stack([tes_v.geometry.x.values, tes_v.geometry.y.values])
@@ -1063,51 +1100,69 @@ def detect_tas_detour(
     cut = (t_akt >= t_pen) & ~wet               # non-Tergenang & tidak terjangkau → "Terputus"
     di = np.full(n, np.nan)
     di[reach] = t_akt[reach] / t_ideal[reach]
+    kat = tes_v["kategori"].values[tes_idx] if "kategori" in tes_v.columns else np.full(n, None)
 
+    # aturan utama (absolut)
+    is_tas = reach & (di >= TAS_DI_ABSOLUTE) & (t_ideal <= TAS_T_IDEAL_MAX)
+    status = np.select([wet, cut, is_tas], [3, 2, 1], default=0).astype(int)
+    # sensitivitas (persentil, aturan v2)
     p25 = float(np.percentile(t_ideal[reach], 25))
     p75 = float(np.percentile(di[reach], 75))
-    dekat = reach & (t_ideal <= p25)
-    is_tas = dekat & (di >= p75)
-    is_tas_abs = dekat & (di >= TAS_DI_ABSOLUTE)
-    status = np.select([wet, cut, is_tas], [3, 2, 1], default=0).astype(int)
+    is_tas_p = reach & (t_ideal <= p25) & (di >= p75)
+    status_p = np.select([wet, cut, is_tas_p], [3, 2, 1], default=0).astype(int)
 
     non = reach & ~is_tas
-    tas_mean = float(di[is_tas].mean()) if is_tas.any() else None
-    non_mean = float(di[non].mean()) if non.any() else None
     n_reach = int(reach.sum())
+    n_dry = int((~wet).sum())
     summary = {
+        "aturan": f"DI_t ≥ {TAS_DI_ABSOLUTE:g} dan T_ideal ≤ {TAS_T_IDEAL_MAX:g} menit (grid non-Tergenang terjangkau)",
         "jumlah_tas": int(is_tas.sum()),
         "jumlah_non_tas": int(non.sum()),
         "jumlah_terputus": int(cut.sum()),
         "jumlah_tergenang": int(wet.sum()),
         "jumlah_terjangkau": n_reach,
-        "jumlah_non_tergenang": int((~wet).sum()),
+        "jumlah_non_tergenang": n_dry,
         "persen_tas": float(is_tas.sum() / n * 100),
-        "persen_tas_non_tergenang": float(is_tas.sum() / (~wet).sum() * 100) if (~wet).any() else None,
+        "persen_tas_non_tergenang": float(is_tas.sum() / n_dry * 100) if n_dry else None,
         "persen_tas_terjangkau": float(is_tas.sum() / n_reach * 100) if n_reach else None,
         "persen_terputus": float(cut.sum() / n * 100),
         "persen_tergenang": float(wet.sum() / n * 100),
-        "tas_rate": float(is_tas.sum() / n),
-        "mean_di_tas": tas_mean,
-        "mean_di_non_tas": non_mean,
-        "delta_di": (tas_mean - non_mean) if (tas_mean is not None and non_mean is not None) else None,
-        "p25_t_ideal": p25,
-        "p75_di": p75,
-        "median_di": float(np.median(di[reach])),
-        "sensitivitas_di_absolut": {
-            "ambang_di": TAS_DI_ABSOLUTE,
-            "jumlah_tas": int(is_tas_abs.sum()),
-            "persen_tas": float(is_tas_abs.sum() / n * 100),
-            "mean_di_tas": float(di[is_tas_abs].mean()) if is_tas_abs.any() else None,
-            "persen_tas_juga_lolos_absolut": (float((is_tas & (di >= TAS_DI_ABSOLUTE)).sum() / is_tas.sum() * 100)
-                                              if is_tas.any() else None),
+        "sebaran_di_tas": _quantiles(di[is_tas]),
+        "sebaran_di_non_tas": _quantiles(di[non]),
+        "median_t_ideal_tas": float(np.median(t_ideal[is_tas])) if is_tas.any() else None,
+        "median_t_aktual_tas": float(np.median(t_akt[is_tas])) if is_tas.any() else None,
+        "tas_per_kategori_tes_terdekat": {str(k): int(v) for k, v in
+                                           pd.Series(kat[is_tas]).value_counts().sort_index().items()},
+        "sensitivitas_persentil": {
+            "aturan": "T_ideal ≤ P25(T_ideal) dan DI_t ≥ P75(DI_t) pada grid non-Tergenang terjangkau",
+            "p25_t_ideal": p25,
+            "p75_di": p75,
+            "jumlah_tas": int(is_tas_p.sum()),
+            "persen_tas_non_tergenang": float(is_tas_p.sum() / n_dry * 100) if n_dry else None,
+            "jumlah_tas_kedua_aturan": int((is_tas & is_tas_p).sum()),
+            "jumlah_tas_hanya_aturan_utama": int((is_tas & ~is_tas_p).sum()),
+            "jumlah_tas_hanya_persentil": int((~is_tas & is_tas_p).sum()),
+            "sebaran_di_tas": _quantiles(di[is_tas_p]),
+            "tas_per_kategori_tes_terdekat": {str(k): int(v) for k, v in
+                                               pd.Series(kat[is_tas_p]).value_counts().sort_index().items()},
         },
         "jarak_euclid_min_m": TAS_MIN_EUCLID_M,
+        "jumlah_t_aktual_lt_t_ideal": int((reach & (t_akt < t_ideal - 1e-9)).sum()),
+        "jumlah_t_aktual_lt_euclid_tanpa_batas": int((reach & (t_akt < d_euc_raw / speed - 1e-9)).sum()),
     }
-    summary["jumlah_t_aktual_lt_t_ideal"] = int((reach & (t_akt < t_ideal - 1e-9)).sum())
-    summary["jumlah_t_aktual_lt_euclid_tanpa_batas"] = int((reach & (t_akt < d_euc_raw / speed - 1e-9)).sum())
     return {"t_ideal": t_ideal, "t_aktual": t_akt, "detour_index": di, "t_euclid_raw": d_euc_raw / speed,
-            "is_tas": is_tas.astype(int), "status": status, "summary": summary}
+            "is_tas": is_tas.astype(int), "status": status, "status_persentil": status_p,
+            "kategori_tes_terdekat": kat, "summary": summary}
+
+
+def _quantiles(v: np.ndarray) -> dict:
+    """Median, P25, P75, P90, dan n dari sebaran nilai (tanpa NaN)."""
+    v = np.asarray(v, float)
+    v = v[np.isfinite(v)]
+    if len(v) == 0:
+        return {"n": 0, "median": None, "p25": None, "p75": None, "p90": None}
+    q = np.percentile(v, [50, 25, 75, 90])
+    return {"n": int(len(v)), "median": float(q[0]), "p25": float(q[1]), "p75": float(q[2]), "p90": float(q[3])}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1150,15 +1205,9 @@ def simulate_level(prep: dict, preprocessor: Preprocessor, centers: np.ndarray, 
     return {"labels": labels, "membership": membership, "states": np.where(keep, labels, k)}
 
 
-def level_grid_frame(key: str, df: pd.DataFrame, labels: np.ndarray, membership: np.ndarray,
-                     tas: dict, cfg: Cfg) -> pd.DataFrame:
-    """Atribut per grid dengan sufiks level (format file hasil offline).
-    cl = −1 untuk grid Tergenang; mem = kosong untuk grid Tergenang."""
-    out = pd.DataFrame({
-        f"cl_{key}": labels,
-        f"mem_{key}": np.round(membership, 4),
-        f"tergenang_{key}": df["tergenang"].values,
-    })
+def level_grid_frame(key: str, df: pd.DataFrame, tas: dict, cfg: Cfg) -> pd.DataFrame:
+    """Atribut per grid dengan sufiks level yang tidak bergantung K (akses, Tergenang, TAS)."""
+    out = pd.DataFrame({f"tergenang_{key}": df["tergenang"].values})
     for k in cfg.kategori_fac:
         out[f"waktu_{k}_{key}"] = np.round(df[f"waktu_tes_{k}"].values, 3)
     out[f"waktu_min_{key}"] = np.round(df["waktu_tes_min"].values, 3)
@@ -1168,16 +1217,25 @@ def level_grid_frame(key: str, df: pd.DataFrame, labels: np.ndarray, membership:
     out[f"di_{key}"] = np.round(tas["detour_index"], 4)
     out[f"tas_{key}"] = tas["is_tas"]
     out[f"tas_status_{key}"] = tas["status"]
+    out[f"tas_status_persentil_{key}"] = tas["status_persentil"]
+    out[f"tes_terdekat_{key}"] = tas["kategori_tes_terdekat"]
     return out
 
 
-def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg) -> List[dict]:
-    """Array JSON ringan (tanpa geometri) untuk frontend, JOIN via id_grid."""
+def model_grid_frame(key: str, k: int, labels: np.ndarray, membership: np.ndarray,
+                     states: np.ndarray) -> pd.DataFrame:
+    """Kolom model K per level: cl (−1 = Tergenang), mem (kosong untuk Tergenang), state (K = Tergenang)."""
+    return pd.DataFrame({f"cl_{key}_k{k}": labels, f"mem_{key}_k{k}": np.round(membership, 4),
+                         f"state_{key}_k{k}": states})
+
+
+def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg, k: int) -> List[dict]:
+    """Array JSON ringan (tanpa geometri) untuk frontend, JOIN via id_grid, untuk model K."""
     cols = {
         "id_grid": "id_grid",
         "id_grid_asli": "id_grid_asli",
-        f"cl_{key}": "cluster_sdwfcm",
-        f"mem_{key}": "membership_max",
+        f"cl_{key}_k{k}": "cluster_sdwfcm",
+        f"mem_{key}_k{k}": "membership_max",
         f"tergenang_{key}": "tergenang",
         f"waktu_min_{key}": "waktu_tes_min",
         f"opsi_{key}": "jumlah_opsi_rute",
@@ -1186,15 +1244,17 @@ def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg) -> List[dict]:
         f"di_{key}": "detour_index",
         f"tas_{key}": "titik_aman_semu",
         f"tas_status_{key}": "status_tas",
+        f"tas_status_persentil_{key}": "status_tas_persentil",
+        f"tes_terdekat_{key}": "tes_terdekat",
         SKENARIO: "indeks_bahaya",
         "Road_Density_mean": "road_density",
     }
-    for k in cfg.kategori_fac:
-        cols[f"waktu_{k}_{key}"] = f"waktu_tes_{k}"
+    for kk in cfg.kategori_fac:
+        cols[f"waktu_{kk}_{key}"] = f"waktu_tes_{kk}"
     sub = grid[list(cols)].rename(columns=cols).copy()
     sub["is_isolated"] = (sub["jumlah_opsi_rute"] == 0).astype(int)
     for c in ["id_grid", "cluster_sdwfcm", "tergenang", "jumlah_opsi_rute",
-              "titik_aman_semu", "status_tas", "is_isolated"]:
+              "titik_aman_semu", "status_tas", "status_tas_persentil", "is_isolated"]:
         sub[c] = sub[c].astype(int)
     sub["id_grid_asli"] = sub["id_grid_asli"].astype(str)
     sub["road_density"] = sub["road_density"].round(3)
@@ -1202,7 +1262,8 @@ def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg) -> List[dict]:
     return sub.to_dict(orient="records")
 
 
-def level_summary(key: str, prep: dict, states: np.ndarray, k: int, cfg: Cfg) -> dict:
+def level_summary(key: str, prep: dict, cfg: Cfg) -> dict:
+    """Ringkasan level yang tidak bergantung K (distribusi tipologi disimpan per model K)."""
     df = prep["df"]
     lv = LEVEL_BY_KEY[key]
     non = df["tergenang"].values == 0
@@ -1220,7 +1281,6 @@ def level_summary(key: str, prep: dict, states: np.ndarray, k: int, cfg: Cfg) ->
         "mean_waktu_min_tergenang": float(df.loc[~non, "waktu_tes_min"].mean()) if (~non).any() else None,
         "mean_waktu": {kk: float(df.loc[non, f"waktu_tes_{kk}"].mean()) for kk in cfg.kategori_fac},
         "n_isolated_non_tergenang": int(df.loc[non, "is_isolated"].sum()),
-        "distribusi_tipologi": level_distribution(states, k),
         "tas": prep["tas"]["summary"],
     }
 

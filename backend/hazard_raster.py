@@ -32,7 +32,7 @@ class HazardRaster:
     def values_at(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         """Nilai piksel pada koordinat (x, y); di luar raster = 0."""
         inv = ~self.transform
-        col, row = inv * (np.asarray(x, float), np.asarray(y, float))
+        col, row = inv @ (np.asarray(x, float), np.asarray(y, float))
         col = np.floor(col).astype(np.int64)
         row = np.floor(row).astype(np.int64)
         ok = (row >= 0) & (row < self.a.shape[0]) & (col >= 0) & (col < self.a.shape[1])

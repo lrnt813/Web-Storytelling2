@@ -1,4 +1,5 @@
-"""Uji deteksi Titik Aman Semu (Langkah 6) pada graf jalan sintetis."""
+"""Uji deteksi Titik Aman Semu pada graf jalan sintetis: aturan utama absolut (DI ≥ 2 dan
+T_ideal ≤ 5 menit) dan sensitivitas persentil."""
 import geopandas as gpd
 import networkx as nx
 import numpy as np
@@ -7,7 +8,7 @@ from scipy.spatial import cKDTree
 from shapely.geometry import Point
 
 from backend.engine import Cfg
-from backend.thesis import TAS_DI_ABSOLUTE, TAS_MIN_EUCLID_M, detect_tas_detour
+from backend.thesis import TAS_DI_ABSOLUTE, TAS_MIN_EUCLID_M, TAS_T_IDEAL_MAX, detect_tas_detour
 
 
 def _setup():
@@ -40,9 +41,16 @@ def test_terputus_dikeluarkan_dan_jarak_minimum():
     assert s["jumlah_tas"] + s["jumlah_non_tas"] + s["jumlah_terputus"] == len(grid_xy)
     # jarak Euclidean minimum 50 m
     assert res["t_ideal"].min() >= TAS_MIN_EUCLID_M / cfg.walking_speed_m_per_min - 1e-12
-    # grid di seberang (dekat secara Euclidean, jalur memutar jauh) terdeteksi TAS
+    # grid di seberang (dekat secara Euclidean, jalur memutar jauh) terdeteksi TAS (aturan utama)
     assert st[len(grid_xy) - 3] == 1
-    # persentil dihitung hanya dari grid terjangkau
     reach = st != 2
-    assert np.isclose(s["p25_t_ideal"], np.percentile(res["t_ideal"][reach], 25))
-    assert s["sensitivitas_di_absolut"]["ambang_di"] == TAS_DI_ABSOLUTE
+    di, ti = res["detour_index"], res["t_ideal"]
+    expect = reach & (di >= TAS_DI_ABSOLUTE) & (ti <= TAS_T_IDEAL_MAX)
+    np.testing.assert_array_equal(st == 1, expect)
+    # sensitivitas persentil dihitung hanya dari grid terjangkau
+    sp = s["sensitivitas_persentil"]
+    assert np.isclose(sp["p25_t_ideal"], np.percentile(ti[reach], 25))
+    assert np.isclose(sp["p75_di"], np.percentile(di[reach], 75))
+    np.testing.assert_array_equal(res["status_persentil"] == 1, reach & (ti <= sp["p25_t_ideal"]) & (di >= sp["p75_di"]))
+    assert s["tas_per_kategori_tes_terdekat"] == {"ibadah": s["jumlah_tas"]}
+    assert "delta_di" not in s and "mean_di_tas" not in s

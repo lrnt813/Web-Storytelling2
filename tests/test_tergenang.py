@@ -24,7 +24,8 @@ def test_tas_mengeluarkan_grid_tergenang():
     assert s["jumlah_tergenang"] == 3
     assert s["jumlah_tas"] + s["jumlah_non_tas"] + s["jumlah_terputus"] + s["jumlah_tergenang"] == len(grid_xy)
     ok = (st == 0) | (st == 1)
-    assert np.isclose(s["p25_t_ideal"], np.percentile(res["t_ideal"][ok], 25))
+    assert np.isclose(s["sensitivitas_persentil"]["p25_t_ideal"], np.percentile(res["t_ideal"][ok], 25))
+    assert np.all(res["status_persentil"][wet] == 3)
     assert np.all(np.isnan(res["detour_index"][wet]))
 
 

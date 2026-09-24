@@ -153,13 +153,14 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     results = {
         "meta": {
             "git": git_info(),
-            "versi_desain": "v2 (data gabungan, status Tergenang, K berbasis stabilitas)",
+            "versi_desain": "v3 (kelas bahaya dari raster InaRisk, TAS aturan absolut, keluaran K = 2 dan 3)",
+            "sumber_kelas_bahaya": "data/Kulonprogo_Banjir.tif (grid mayoritas, ruas maksimum, TES titik)",
             "skenario": T.SKENARIO,
             "levels": T.LEVELS,
             "walking_speed_m_per_min": cfg.walking_speed_m_per_min,
             "sdwfcm": {"m": cfg.sdwfcm_m, "alpha": cfg.sdwfcm_alpha, "knn": cfg.sdwfcm_knn,
                        "impact_weight": cfg.sdwfcm_impact_weight},
-            "sfcm": {"m": cfg.sfcm_m, "alpha": cfg.sfcm_alpha},
+            "sfcm": {"m": cfg.sdwfcm_m, "alpha": cfg.sfcm_alpha},
             "pca_variance": T.PCA_VARIANCE,
             "iqr_factor": T.IQR_FACTOR,
             "capped_columns": T.CAPPED_COLUMNS,
@@ -167,6 +168,11 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
             "sdwfcm_n_init": T.SDWFCM_N_INIT,
             "feature_labels": T.FEATURE_LABELS,
             "tas_status": T.TAS_STATUS,
+            "tas_aturan_utama": {"di_min": T.TAS_DI_ABSOLUTE, "t_ideal_maks_menit": T.TAS_T_IDEAL_MAX,
+                                 "jarak_min_m": T.TAS_MIN_EUCLID_M},
+            "label_interpretasi": {"terisolasi_proporsi_penalti_lebih_dari": T.LABEL_TERISOLASI_MIN,
+                                   "akses_baik_median_maks": T.LABEL_BAIK_MAX,
+                                   "akses_sedang_median_maks": T.LABEL_SEDANG_MAX},
         },
         "data_summary": {
             "n_grid": int(len(gdf)),
@@ -207,84 +213,101 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     }
     t = _tick("data_gabungan_praproses_W", t)
 
-    # ── 3. Pemilihan K (stabilitas) ──────────────────────────────────────────
+    # ── 3. Pemilihan K (stabilitas, dihitung ulang pada data v3) ─────────────
     k_rows, k_summary, solutions = T.evaluate_k_stability(X, W, pool, A_pool, cfg, B=subsample_b)
-    k_final = k_summary["k_terpilih"]
-    results["k"] = k_final
     results["k_selection"] = {"candidates": k_rows, **k_summary}
+    results["k_terpilih_aturan"] = k_summary["k_terpilih"]
+    results["k_keluaran"] = list(T.K_OUTPUT)
     t = _tick("pemilihan_k", t)
 
-    # ── 4. Model final: solusi J terkecil (seed 42–51) untuk K terpilih ──────
-    sol = solutions[k_final]
-    labels, U = T.number_by_travel_time(sol["labels"], sol["U"], pool["waktu_tes_min"].values)
-    centers = T.fuzzy_centers(X, U, cfg.sdwfcm_m)
-    desc, pesc = T.desc_pesc(X, labels, A_pool, coords)
-    results["model_final"] = {
-        "seed_terbaik": sol["seed"], "objective": sol["objective"], "time_sec": sol["time"],
-        "pusat_klaster_pca": centers.tolist(),
-        "validity": {
-            "iidx": T.i_index(X, labels, centers=centers),
-            "ketegasan_partisi": T.ketegasan_partisi(U, X, cfg.sdwfcm_m),
-            "dunn": T.dunn_multi(X, labels),
-            "desc": desc,
-            "pesc": pesc,
-            "silhouette_sampel": T.silhouette_sampled(X, labels),
-            "size_entropy": T.size_entropy(labels),
-            "proporsi_tetangga_sama": T.same_label_neighbor_share(labels, A_pool),
-        },
-    }
-    results["cluster_profile"] = T.cluster_profile(pool, labels, k_final)
-    results["cluster_names"] = {str(r["klaster"]): r["deskripsi"] for r in results["cluster_profile"]}
-    membership_pool = U.max(axis=1)
-    pooled_out = pool[["id_grid", "id_grid_asli", "level"] + pre.params["features_in"]].copy()
-    for i in range(X.shape[1]):
-        pooled_out[f"pc{i + 1}"] = np.round(X[:, i], 6)
-    pooled_out["klaster"] = labels
-    pooled_out["keanggotaan_maks"] = np.round(membership_pool, 6)
-    for c in range(k_final):
-        pooled_out[f"u{c}"] = np.round(U[:, c], 6)
-    t = _tick("model_final", t)
-
-    # ── 5. State per level, transisi ─────────────────────────────────────────
-    states = {}
+    # ── 4. Keluaran tingkat grid yang tidak bergantung K ─────────────────────
     grid_parts = [pd.DataFrame({
         "id_grid": gdf["id_grid"].values,
         "id_grid_asli": gdf["id_grid_asli"].values,
         "Road_Density_mean": gdf["Road_Density_mean"].values,
         T.SKENARIO: gdf[T.SKENARIO].values,
+        f"{T.SKENARIO}_atribut_lama": gdf[f"{T.SKENARIO}_atribut_lama"].values,
     })]
     for lv in T.LEVELS:
         key = lv["key"]
-        prep = preps[key]
-        sel = groups == key
-        st = T.states_for_level(prep["df"], labels[sel], k_final)
-        states[key] = st
-        lab = np.where(st < k_final, st, -1)
-        mem = np.full(len(st), np.nan)
-        mem[prep["df"]["tergenang"].values == 0] = membership_pool[sel]
-        summary = T.level_summary(key, prep, st, k_final, cfg)
-        summary["diagnostik"] = T.level_diagnostics(prep, gdf, roads, cfg)
+        summary = T.level_summary(key, preps[key], cfg)
+        summary["diagnostik"] = T.level_diagnostics(preps[key], gdf, roads, cfg)
         results["levels"][key] = summary
-        frame = T.level_grid_frame(key, prep["df"], lab, mem, prep["tas"], cfg)
-        frame[f"state_{key}"] = st
-        grid_parts.append(frame)
-    trans = []
-    for a, b in T.TRANSITION_PAIRS:
-        tr = T.transition_analysis(states[a], states[b], k_final)
-        tr.update({"from_level": a, "to_level": b})
-        trans.append(tr)
-    results["transitions"] = trans
-    results["cdvm_vs_baseline"] = {
-        key: T.cdvm_distribution(states["baseline"], states[key], k_final + 1) for key in T.LEVEL_KEYS}
-    t = _tick("transisi_dan_ringkasan_level", t)
+        grid_parts.append(T.level_grid_frame(key, preps[key]["df"], preps[key]["tas"], cfg))
+    pooled_out = pool[["id_grid", "id_grid_asli", "level"] + pre.params["features_in"]].copy()
+    for i in range(X.shape[1]):
+        pooled_out[f"pc{i + 1}"] = np.round(X[:, i], 6)
 
-    # ── 6. Perbandingan algoritma di Baseline ────────────────────────────────
+    # ── 5. Model final per K keluaran (solusi J terkecil, seed 42–51) ────────
+    results["model"] = {}
+    pool_labels = {}
+    for K in T.K_OUTPUT:
+        sol = solutions[K]
+        labels, U = T.number_by_travel_time(sol["labels"], sol["U"], pool["waktu_tes_min"].values)
+        pool_labels[K] = labels
+        centers = T.fuzzy_centers(X, U, cfg.sdwfcm_m)
+        desc, pesc = T.desc_pesc(X, labels, A_pool, coords)
+        profile = T.cluster_profile(pool, labels, K, t_pen)
+        model = {
+            "k": K,
+            "model_final": {
+                "seed_terbaik": sol["seed"], "objective": sol["objective"], "time_sec": sol["time"],
+                "pusat_klaster_pca": centers.tolist(),
+                "validity": {
+                    "iidx": T.i_index(X, labels, centers=centers),
+                    "ketegasan_partisi": T.ketegasan_partisi(U, X, cfg.sdwfcm_m),
+                    **T.partition_coefficients(U),
+                    "dunn": T.dunn_multi(X, labels),
+                    "desc": desc,
+                    "pesc": pesc,
+                    "silhouette_sampel": T.silhouette_sampled(X, labels),
+                    "size_entropy": T.size_entropy(labels),
+                    "klaster_terbesar_persen": T.largest_cluster_share(labels),
+                    "proporsi_tetangga_sama": T.same_label_neighbor_share(labels, A_pool),
+                },
+            },
+            "cluster_profile": profile,
+            "cluster_names": {str(r["klaster"]): r["deskripsi"] for r in profile},
+            "distribusi": {},
+        }
+        membership_pool = U.max(axis=1)
+        pooled_out[f"klaster_k{K}"] = labels
+        pooled_out[f"keanggotaan_maks_k{K}"] = np.round(membership_pool, 6)
+        for c in range(K):
+            pooled_out[f"u{c}_k{K}"] = np.round(U[:, c], 6)
+        states = {}
+        for lv in T.LEVELS:
+            key = lv["key"]
+            df = preps[key]["df"]
+            sel = groups == key
+            st = T.states_for_level(df, labels[sel], K)
+            states[key] = st
+            lab = np.where(st < K, st, -1)
+            mem = np.full(len(st), np.nan)
+            mem[df["tergenang"].values == 0] = membership_pool[sel]
+            model["distribusi"][key] = T.level_distribution(st, K)
+            grid_parts.append(T.model_grid_frame(key, K, lab, mem, st))
+        trans = []
+        for a, b in T.TRANSITION_PAIRS:
+            tr = T.transition_analysis(states[a], states[b], K)
+            tr.update({"from_level": a, "to_level": b})
+            trans.append(tr)
+        model["transitions"] = trans
+        model["cdvm_vs_baseline"] = {key: T.cdvm_distribution(states["baseline"], states[key], K + 1)
+                                     for key in T.LEVEL_KEYS}
+        results["model"][str(K)] = model
+    if 2 in pool_labels and 3 in pool_labels:
+        results["tabulasi_silang_k2_k3"] = T.crosstab_labels(pool_labels[2], pool_labels[3], 2, 3)
+    t = _tick("model_final_dan_transisi", t)
+
+    # ── 6. Perbandingan algoritma di Baseline untuk setiap K keluaran ─────────
     if not skip_comparison:
         sel = groups == "baseline"
         Wb = W[sel][:, sel]
-        logger.info("Perbandingan algoritma (FCM, SFCM, SDWFCM, REDCAP, SKATER) di Baseline...")
-        results["algorithm_comparison"] = T.compare_algorithms(
-            X[sel], Wb, w, A_rook, k_final, pool.loc[sel, "waktu_tes_min"].values, cfg)
+        for K in T.K_OUTPUT:
+            logger.info(f"Perbandingan algoritma (FCM, SFCM, SDWFCM, REDCAP, SKATER) di Baseline, K = {K}...")
+            results["model"][str(K)]["algorithm_comparison"] = T.compare_algorithms(
+                X[sel], Wb, w, A_rook, K, pool.loc[sel, "waktu_tes_min"].values, cfg)
         t = _tick("perbandingan_algoritma", t)
 
     timing["total"] = time.time() - t_start
