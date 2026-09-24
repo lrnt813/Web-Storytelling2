@@ -1,0 +1,13 @@
+﻿Level,Klaster,Jarak ke pusat Baseline,Batas (2 × median jarak antarpusat Baseline),Tipologi baru
+Rendah,0,0.593449,3.439001,False
+Rendah,1,0.48391,3.439001,False
+Rendah,2,0.349803,3.439001,False
+Rendah,3,0.38156,3.439001,False
+Sedang,0,1.899956,3.439001,False
+Sedang,1,10.759758,3.439001,True
+Sedang,2,2.143453,3.439001,False
+Sedang,3,19.821575,3.439001,True
+Tinggi,0,2.827242,3.439001,False
+Tinggi,1,9.203694,3.439001,True
+Tinggi,2,10.481425,3.439001,True
+Tinggi,3,19.820663,3.439001,True
