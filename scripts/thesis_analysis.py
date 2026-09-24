@@ -168,6 +168,7 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
             "size_entropy": T.size_entropy(cl["labels"]),
             "proporsi_tetangga_sama": T.same_label_neighbor_share(cl["labels"], A_rook),
         }
+        summary["diagnostik"] = T.level_diagnostics(prep, cl, gdf, roads, cfg, k_final)
         results["levels"][key] = summary
         grid_parts.append(T.level_grid_frame(key, df, cl, cfg))
 

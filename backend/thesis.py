@@ -988,6 +988,72 @@ def level_summary(key: str, prep: dict, cl: dict, cfg: Cfg) -> dict:
     }
 
 
+def hazard_classes_affected(intensity: float, gdf_base, roads_raw, cfg: Cfg, mask) -> dict:
+    """Kelas bahaya banjir yang terkena pada satu intensitas.
+
+    Diturunkan dari aturan di kode (simulate_hazard untuk grid, build_road_graph untuk ruas
+    jalan) DAN diverifikasi dari data (kelas grid yang benar-benar ditandai terdampak dan kelas
+    ruas yang benar-benar ditutup).
+    """
+    h = gdf_base[SKENARIO].fillna(0).astype(float).values
+    hmin, hmax = float(h.min()), float(h.max())
+    grid_rule = []
+    for c in sorted(int(v) for v in np.unique(h)):
+        p_c = (c - hmin) / (hmax - hmin) if hmax > hmin else 0.5
+        if intensity > 0 and p_c >= 1.0 - intensity and p_c > 0:
+            grid_rule.append(c)
+    grid_data = sorted(int(v) for v in np.unique(h[np.asarray(mask, bool)])) if np.any(mask) else []
+
+    road_rule, road_data = [], []
+    if roads_raw is not None and SKENARIO in roads_raw.columns:
+        rc = roads_raw[SKENARIO].fillna(0).astype(int).values
+        for c in sorted(int(v) for v in np.unique(rc)):
+            if cfg.norm_haz(c) * intensity >= cfg.impact_closure_threshold:
+                road_rule.append(c)
+        closed = np.array([cfg.norm_haz(c) * intensity >= cfg.impact_closure_threshold for c in rc])
+        road_data = sorted(int(v) for v in np.unique(rc[closed])) if closed.any() else []
+    return {
+        "grid_terdampak_kelas_aturan": grid_rule,
+        "grid_terdampak_kelas_data": grid_data,
+        "ruas_ditutup_kelas_aturan": road_rule,
+        "ruas_ditutup_kelas_data": road_data,
+        "konsisten": grid_rule == grid_data and road_rule == road_data,
+        "tes_tidak_valid_kelas": f"kelas ≥ {cfg.tes_hazard_threshold} (semua level) + TES berkelas "
+                                 f"< {cfg.tes_hazard_threshold} dalam radius 50 m grid terdampak",
+    }
+
+
+def level_diagnostics(prep: dict, cl: dict, gdf_base, roads_raw, cfg: Cfg, k: int) -> dict:
+    """Diagnostik per level (tidak memengaruhi model)."""
+    df = prep["df"]
+    iso = df["jumlah_opsi_rute"].values == 0
+    terdampak = np.asarray(prep["mask"], bool)
+    labels = cl["labels"]
+    per_klaster = []
+    for c in range(k):
+        sel = labels == c
+        per_klaster.append({
+            "klaster": c,
+            "jumlah_grid": int(sel.sum()),
+            "jumlah_terdampak": int((sel & terdampak).sum()),
+            "proporsi_terdampak": float((sel & terdampak).sum() / sel.sum()) if sel.any() else None,
+        })
+    tes_stats = prep["tes_stats"]
+    return {
+        "grid_terisolasi": int(iso.sum()),
+        "grid_terisolasi_terdampak": int((iso & terdampak).sum()),
+        "grid_terisolasi_tidak_terdampak": int((iso & ~terdampak).sum()),
+        "grid_terdampak": int(terdampak.sum()),
+        "ruas_jalan_ditutup": int(prep["n_roads_closed"]),
+        "tes_valid_per_kategori": {kat: int(v["valid"]) for kat, v in tes_stats.items()},
+        "tes_total_per_kategori": {kat: int(v["total"]) for kat, v in tes_stats.items()},
+        "tes_valid_total": int(sum(v["valid"] for v in tes_stats.values())),
+        "proporsi_terdampak_per_klaster": per_klaster,
+        "kelas_bahaya": hazard_classes_affected(LEVEL_BY_KEY[prep["level_key"]]["intensity"],
+                                                gdf_base, roads_raw, cfg, terdampak),
+    }
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 12. STATISTIK DESKRIPTIF
 # ══════════════════════════════════════════════════════════════════════════════
