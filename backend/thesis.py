@@ -74,6 +74,9 @@ IINDEX_P = 2
 SDWFCM_N_INIT = 10        # jumlah inisialisasi acak SDWFCM
 SDWFCM_SEED = 42          # seed awal; inisialisasi ke-i memakai SDWFCM_SEED + i
 DUNN_SAMPLE = 2000        # sampel grid untuk Dunn titik-ke-titik (O(n²))
+TAS_MIN_EUCLID_M = 50.0   # jarak Euclidean minimum (setengah lebar grid 100 m) untuk T_ideal
+TAS_DI_ABSOLUTE = 2.0     # ambang absolut DI_t pada uji sensitivitas TAS
+TAS_STATUS = {0: "Non-TAS", 1: "TAS", 2: "Terputus"}
 
 FEATURE_LABELS = {
     "Road_Density_mean":      "Kepadatan Jaringan Jalan",
@@ -743,23 +746,29 @@ def detect_tas_detour(
     cfg: Cfg,
     max_snap: float = 300.0,
 ) -> dict:
-    """T_ideal = jarak Euclidean ke TES geometris terdekat / kecepatan;
-    T_aktual = waktu tempuh jaringan ke TES yang sama (penalti t_pen bila tidak
-    terjangkau); DI_t = T_aktual / T_ideal.
-    TAS ⇔ T_ideal ≤ P25(T_ideal) ∧ DI_t ≥ P75(DI_t)."""
+    """Deteksi Titik Aman Semu berbasis Detour Index waktu.
+
+    T_ideal = max(d_Euclid(centroid, TES terdekat), TAS_MIN_EUCLID_M) / kecepatan
+    T_aktual = waktu tempuh jaringan ke TES yang SAMA (antar-simpul hasil snapping ≤ max_snap)
+    DI_t = T_aktual / T_ideal
+    Grid dengan T_aktual = T_pen (tidak terjangkau) → kelas "Terputus", dikeluarkan dari
+    perhitungan persentil dan rata-rata DI. Untuk grid terjangkau:
+        TAS ⇔ T_ideal ≤ P25(T_ideal) ∧ DI_t ≥ P75(DI_t)
+    Uji sensitivitas: T_ideal ≤ P25(T_ideal) ∧ DI_t ≥ TAS_DI_ABSOLUTE.
+    status: 0 = Non-TAS, 1 = TAS, 2 = Terputus.
+    """
     n = len(grid_xy)
     speed = cfg.walking_speed_m_per_min
     G, nl, tn = graph_pack
 
     if tes_v is None or len(tes_v) == 0 or tn is None or len(nl) == 0:
-        t_ideal = np.full(n, np.nan)
-        return {"t_ideal": t_ideal, "t_aktual": np.full(n, t_pen),
+        return {"t_ideal": np.full(n, np.nan), "t_aktual": np.full(n, t_pen),
                 "detour_index": np.full(n, np.nan), "is_tas": np.zeros(n, int),
-                "summary": {}}
+                "status": np.full(n, 2, int), "summary": {"jumlah_terputus": n}}
 
     tes_xy = np.column_stack([tes_v.geometry.x.values, tes_v.geometry.y.values])
     d_euc, tes_idx = cKDTree(tes_xy).query(grid_xy, k=1)
-    d_euc = np.maximum(d_euc, 1.0)
+    d_euc = np.maximum(d_euc, TAS_MIN_EUCLID_M)
     t_ideal = d_euc / speed
 
     csr = _graph_to_csr(G, nl)
@@ -775,8 +784,8 @@ def detect_tas_detour(
 
     def _solve(sources, targets_by_src, limit):
         unresolved = []
-        for s in range(0, len(sources), 32):
-            batch = sources[s:s + 32]
+        for s_ in range(0, len(sources), 32):
+            batch = sources[s_:s_ + 32]
             D = dijkstra(csr, directed=False, indices=batch, limit=limit)
             for bi, src in enumerate(batch):
                 gi = targets_by_src[src]
@@ -786,36 +795,54 @@ def detect_tas_detour(
                     unresolved.append(src)
         return unresolved
 
-    targets = pd.Series(cand).groupby(src_nodes).apply(lambda s: s.values).to_dict()
+    targets = pd.Series(cand).groupby(src_nodes).apply(lambda v: v.values).to_dict()
     pending = _solve(uniq_src, targets, limit=8000.0)
     if pending:
         _solve(np.array(pending), targets, limit=t_pen * speed)
 
-    # T_aktual memakai jarak jaringan antar-simpul (tanpa ruas snapping),
-    # konsisten dengan perhitungan waktu tempuh ke TES pada fitur aksesibilitas.
-    reach = np.isfinite(net)
     t_akt = np.full(n, float(t_pen))
-    t_akt[reach] = np.minimum(net[reach] / speed, t_pen)
-    di = t_akt / t_ideal
+    fin = np.isfinite(net)
+    t_akt[fin] = np.minimum(net[fin] / speed, t_pen)
+    reach = t_akt < t_pen                       # terjangkau; sisanya "Terputus"
+    di = np.full(n, np.nan)
+    di[reach] = t_akt[reach] / t_ideal[reach]
 
-    p25 = float(np.percentile(t_ideal, 25))
-    p75 = float(np.percentile(di, 75))
-    is_tas = (t_ideal <= p25) & (di >= p75)
+    p25 = float(np.percentile(t_ideal[reach], 25))
+    p75 = float(np.percentile(di[reach], 75))
+    dekat = reach & (t_ideal <= p25)
+    is_tas = dekat & (di >= p75)
+    is_tas_abs = dekat & (di >= TAS_DI_ABSOLUTE)
+    status = np.where(~reach, 2, np.where(is_tas, 1, 0)).astype(int)
+
+    non = reach & ~is_tas
     tas_mean = float(di[is_tas].mean()) if is_tas.any() else None
-    non_mean = float(di[~is_tas].mean()) if (~is_tas).any() else None
+    non_mean = float(di[non].mean()) if non.any() else None
+    n_reach = int(reach.sum())
     summary = {
         "jumlah_tas": int(is_tas.sum()),
-        "persen_tas": float(is_tas.mean() * 100),
-        "tas_rate": float(is_tas.mean()),
+        "jumlah_non_tas": int(non.sum()),
+        "jumlah_terputus": int((~reach).sum()),
+        "jumlah_terjangkau": n_reach,
+        "persen_tas": float(is_tas.sum() / n * 100),
+        "persen_tas_terjangkau": float(is_tas.sum() / n_reach * 100) if n_reach else None,
+        "persen_terputus": float((~reach).sum() / n * 100),
+        "tas_rate": float(is_tas.sum() / n),
         "mean_di_tas": tas_mean,
         "mean_di_non_tas": non_mean,
         "delta_di": (tas_mean - non_mean) if (tas_mean is not None and non_mean is not None) else None,
         "p25_t_ideal": p25,
         "p75_di": p75,
-        "median_di": float(np.median(di)),
+        "median_di": float(np.median(di[reach])),
+        "sensitivitas_di_absolut": {
+            "ambang_di": TAS_DI_ABSOLUTE,
+            "jumlah_tas": int(is_tas_abs.sum()),
+            "persen_tas": float(is_tas_abs.sum() / n * 100),
+            "mean_di_tas": float(di[is_tas_abs].mean()) if is_tas_abs.any() else None,
+        },
+        "jarak_euclid_min_m": TAS_MIN_EUCLID_M,
     }
     return {"t_ideal": t_ideal, "t_aktual": t_akt, "detour_index": di,
-            "is_tas": is_tas.astype(int), "summary": summary}
+            "is_tas": is_tas.astype(int), "status": status, "summary": summary}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -903,6 +930,7 @@ def level_grid_frame(key: str, df: pd.DataFrame, cl: dict, cfg: Cfg) -> pd.DataF
     out[f"t_aktual_{key}"] = np.round(tas["t_aktual"], 3)
     out[f"di_{key}"] = np.round(tas["detour_index"], 4)
     out[f"tas_{key}"] = tas["is_tas"]
+    out[f"tas_status_{key}"] = tas["status"]
     return out
 
 
@@ -919,6 +947,7 @@ def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg) -> List[dict]:
         f"t_aktual_{key}": "t_aktual",
         f"di_{key}": "detour_index",
         f"tas_{key}": "titik_aman_semu",
+        f"tas_status_{key}": "status_tas",
         SKENARIO: "indeks_bahaya",
         "Road_Density_mean": "road_density",
     }
@@ -927,7 +956,7 @@ def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg) -> List[dict]:
     sub = grid[list(cols)].rename(columns=cols).copy()
     sub["is_isolated"] = (sub["jumlah_opsi_rute"] == 0).astype(int)
     for c in ["id_grid", "cluster_sdwfcm", "terdampak", "jumlah_opsi_rute",
-              "titik_aman_semu", "is_isolated"]:
+              "titik_aman_semu", "status_tas", "is_isolated"]:
         sub[c] = sub[c].astype(int)
     sub["road_density"] = sub["road_density"].round(3)
     sub = sub.astype(object).where(pd.notna(sub), None)
