@@ -77,7 +77,8 @@ def _map(png, grid_geom, tes_pt, path_xy, gxy, roads_lv, closed_lv):
         sub[~sc].plot(ax=ax, color="#9ca3af", linewidth=0.6)
     if sc.any():
         sub[sc].plot(ax=ax, color="#dc2626", linewidth=0.8, linestyle="--")
-    ax.fill(*grid_geom.exterior.xy, facecolor="#a855f7", alpha=0.35, edgecolor="#6b21a8", linewidth=1)
+    for poly in getattr(grid_geom, "geoms", [grid_geom]):
+        ax.fill(*poly.exterior.xy, facecolor="#a855f7", alpha=0.35, edgecolor="#6b21a8", linewidth=1)
     ax.plot([gxy[0], tes_pt[0]], [gxy[1], tes_pt[1]], color="#111827", linestyle=":", linewidth=1.2)
     if path_xy:
         ax.plot([p[0] for p in path_xy], [p[1] for p in path_xy], color="#2563eb", linewidth=1.8)
