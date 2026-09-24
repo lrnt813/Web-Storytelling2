@@ -1,6 +1,6 @@
 """Ekspor seluruh tabel Bab IV dari hasil TERKUNCI (data/locked/) ke output_bab4/.
 
-    python -m scripts.export_bab4                  # K utama dari pengaturan_hasil.json (bawaan 3)
+    python -m scripts.export_bab4                  # K utama dari pengaturan_hasil.json
     python -m scripts.export_bab4 --k-utama 2      # K utama lain (K lainnya menjadi sensitivitas)
     python -m scripts.export_bab4 --keluaran DIR   # tulis ke folder lain (mis. uji)
 
@@ -11,10 +11,11 @@ Keluaran:
   Tabel_Bab4.docx          semua tabel, format angka Indonesia (koma desimal, titik ribuan;
                            waktu 2 desimal, metrik 3 desimal)
   ringkasan_angka_bab4.md  angka kunci kedua K (K utama di atas)
-  perbandingan_v2_vs_v3.md angka kunci v2 (data/locked/arsip_v2/) vs v3 dan penyebab perubahan
-  peta/                    peta tipologi per level per K dan peta TAS per level (PNG)
+  perbandingan_v3_vs_v4.md angka kunci v3 (data/locked/arsip_v3/) vs v4 dan penyebab perubahan
+  peta/                    peta tipologi per level per K, TAS per level, TAS baru/hilang (Sedang,
+                           Tinggi), dan kategori akses (Baseline, Sedang, Tinggi) (PNG)
 
-Skrip ini hanya membaca data/locked/ (termasuk arsip_v2/ untuk perbandingan), pengaturan_hasil.json,
+Skrip ini hanya membaca data/locked/ (termasuk arsip_v3/ untuk perbandingan), pengaturan_hasil.json,
 dan geometri statis grid (frontend/static_grid_kulonprogo.geojson) untuk peta.
 Folder arsip di output_bab4/ tidak disentuh.
 """
@@ -29,7 +30,8 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOCKED = PROJECT_ROOT / "data" / "locked"
-ARSIP_V2 = LOCKED / "arsip_v2" / "thesis_results.json"
+ARSIP_V3 = LOCKED / "arsip_v3" / "thesis_results.json"
+AKSES = ["Terjangkau", "Jauh", "Terputus", "Tergenang"]
 OUT = PROJECT_ROOT / "output_bab4"
 PENGATURAN = PROJECT_ROOT / "pengaturan_hasil.json"
 GEOM = PROJECT_ROOT / "frontend" / "static_grid_kulonprogo.geojson"
@@ -160,8 +162,12 @@ def tables_common(R):
                    f"{ks['B']} subsampel {id_num(ks['fraksi_subsampel'] * 100, 0)} % id_grid, {ks['n_init_subsampel']} "
                    f"inisialisasi per subsampel; ARI inisialisasi = rerata 45 pasangan run seed 42–51. \"Setara\" = selisih "
                    f"rerata ARI subsampel dari nilai tertinggi ({id_num(best, 3)}) ≤ {id_num(ks['toleransi'], 2)}. Aturan "
-                   f"stabilitas dengan pemecah seri \"K terkecil\" memilih K = {ks['k_terpilih']}. Model utama ditetapkan "
-                   f"peneliti bersama pembimbing (lihat METODOLOGI §9)."))
+                   f"stabilitas dengan pemecah seri \"K terkecil\" memilih K = {ks['k_terpilih']}. K yang setara secara "
+                   f"stabilitas: {', '.join(str(r['K']) for r in rows if r['Setara secara stabilitas dengan K terbaik'])}; "
+                   f"K yang tidak setara di antara K keluaran: "
+                   f"{', '.join(str(k) for k in R['k_keluaran'] if not next(r for r in rows if r['K'] == k)['Setara secara stabilitas dengan K terbaik']) or '–'}. "
+                   f"Hasil stabilitas v3 (tidak dijalankan ulang pada v4). Model utama diputuskan peneliti bersama "
+                   f"pembimbing setelah hasil v3 terlihat, dari himpunan K yang setara (METODOLOGI §9)."))
     rows = [{"K": c["k"], "I-Index": c["iidx"], "Dunn (rerata)": c["dunn"], "Dunn (sd)": c["dunn_sd"],
              "DESC": c["desc"], "PESC": c["pesc"], "Komposit +DESC": c["komposit_dengan_desc"],
              "Komposit −DESC": c["komposit_tanpa_desc"]} for c in ks["candidates"]]
@@ -180,26 +186,48 @@ def tables_common(R):
                      "% TAS (semua grid)": s["persen_tas"], "% TAS (non-Tergenang)": s["persen_tas_non_tergenang"],
                      "Median T_ideal TAS (menit)": s["median_t_ideal_tas"],
                      "Median T_aktual TAS (menit)": s["median_t_aktual_tas"]})
-        rows_s.append({"Level": LEVEL_LABEL[key], "TAS aturan utama": s["jumlah_tas"],
+        sw = s["sensitivitas_ambang_waktu"]
+        rows_s.append({"Level": LEVEL_LABEL[key], "TAS utama (T_aktual ≥ 30)": s["jumlah_tas"],
+                       "TAS T_aktual ≥ 20": sw["20"]["jumlah_tas"], "TAS T_aktual ≥ 40": sw["40"]["jumlah_tas"],
+                       "TAS utama tetap TAS pada 20 (%)": (sw["20"]["proporsi_tas_utama_yang_tetap_tas"] or 0) * 100,
+                       "TAS utama tetap TAS pada 40 (%)": (sw["40"]["proporsi_tas_utama_yang_tetap_tas"] or 0) * 100,
+                       "TAS absolut v3 (tanpa syarat T_aktual)": s["sensitivitas_absolut_v3"]["jumlah_tas"],
                        "TAS aturan persentil": sp["jumlah_tas"], "P25 T_ideal (menit)": sp["p25_t_ideal"],
-                       "P75 DI": sp["p75_di"], "TAS kedua aturan": sp["jumlah_tas_kedua_aturan"],
-                       "Hanya aturan utama": sp["jumlah_tas_hanya_aturan_utama"],
-                       "Hanya aturan persentil": sp["jumlah_tas_hanya_persentil"]})
+                       "P75 DI": sp["p75_di"]})
         for grp, q in (("TAS", s["sebaran_di_tas"]), ("Non-TAS", s["sebaran_di_non_tas"])):
             rows_d.append({"Level": LEVEL_LABEL[key], "Kelompok": grp, "n": q["n"], "Median DI": q["median"],
                            "P25": q["p25"], "P75": q["p75"], "P90": q["p90"]})
         rows_k.append({"Level": LEVEL_LABEL[key], **{KAT_LABEL[c]: s["tas_per_kategori_tes_terdekat"].get(c, 0) for c in KAT}})
     df = pd.DataFrame(rows)
-    T.append(Table("T11", "Titik Aman Semu per level (aturan utama: DI ≥ 2 dan T_ideal ≤ 5 menit)", df,
+    T.append(Table("T11", "Titik Aman Semu per level (aturan utama: DI ≥ 2, T_ideal ≤ 5 menit, T_aktual ≥ 30 menit)", df,
                    {c: 0 for c in ("TAS", "Non-TAS", "Terputus", "Tergenang")}
                    | {"% TAS (semua grid)": 2, "% TAS (non-Tergenang)": 2, "Median T_ideal TAS (menit)": 2,
                       "Median T_aktual TAS (menit)": 2},
-                   "Grid non-Tergenang yang terjangkau: TAS bila DI_t ≥ 2 dan T_ideal ≤ 5 menit (garis lurus ≤ 400 m). "
-                   "Batas minimum 50 m pada T_ideal dan T_aktual. Terputus = non-Tergenang tidak menjangkau TES."))
+                   "Grid non-Tergenang yang terjangkau: TAS bila DI_t ≥ 2, T_ideal ≤ 5 menit (garis lurus ≤ 400 m), dan "
+                   "T_aktual ≥ 30 menit (batas waktu evakuasi; Li dkk., 2026). Batas minimum 50 m pada T_ideal dan "
+                   "T_aktual. Terputus = non-Tergenang tidak menjangkau TES."))
     df = pd.DataFrame(rows_s)
-    T.append(Table("T11b", "Sensitivitas TAS: aturan persentil (T_ideal ≤ P25 dan DI ≥ P75)", df,
-                   {c: 0 for c in df.columns if c not in ("Level", "P25 T_ideal (menit)", "P75 DI")}
-                   | {"P25 T_ideal (menit)": 2, "P75 DI": 3}))
+    T.append(Table("T11b", "Sensitivitas TAS: ambang T_aktual 20/40 menit, aturan absolut v3, aturan persentil", df,
+                   {c: 0 for c in df.columns if c.startswith("TAS") and "(%)" not in c}
+                   | {"TAS utama tetap TAS pada 20 (%)": 2, "TAS utama tetap TAS pada 40 (%)": 2,
+                      "P25 T_ideal (menit)": 2, "P75 DI": 3},
+                   "Ambang 20 dan 40 menit mengikuti sensitivitas d0 pada Li dkk. (2026, hlm. 2920). \"Tetap TAS\" = "
+                   "proporsi TAS utama yang juga TAS pada ambang tersebut (irisan)."))
+    rows_c = []
+    for key in LEVEL_ORDER[1:]:
+        c = lv[key]["tas_perubahan_vs_baseline"]
+        rows_c.append({"Level": LEVEL_LABEL[key], "TAS baru akibat banjir": c["tas_baru"],
+                       "dari Non-TAS Baseline": c["tas_baru_dari_status_baseline"]["Non-TAS"],
+                       "dari Terputus Baseline": c["tas_baru_dari_status_baseline"]["Terputus"],
+                       "TAS tetap": c["tas_tetap"], "TAS hilang": c["tas_hilang"],
+                       "hilang: jadi Tergenang": c["tas_hilang_jadi_tergenang"],
+                       "hilang: jadi Terputus": c["tas_hilang_jadi_terputus"],
+                       "hilang: lainnya (Non-TAS)": c["tas_hilang_lainnya"]})
+    df = pd.DataFrame(rows_c)
+    T.append(Table("T11e", "Perubahan TAS terhadap Baseline (aturan utama)", df,
+                   {c: 0 for c in df.columns if c != "Level"},
+                   "TAS baru akibat banjir = bukan TAS di Baseline, TAS di level ini. TAS hilang = TAS di Baseline, "
+                   "bukan TAS di level ini."))
     df = pd.DataFrame(rows_d)
     T.append(Table("T11c", "Sebaran Detour Index pada TAS dan Non-TAS (aturan utama)", df,
                    {"n": 0, "Median DI": 3, "P25": 3, "P75": 3, "P90": 3},
@@ -208,6 +236,27 @@ def tables_common(R):
     df = pd.DataFrame(rows_k)
     T.append(Table("T11d", "Jumlah TAS per kategori TES terdekat (aturan utama)", df,
                    {KAT_LABEL[c]: 0 for c in KAT}, "TES valid terdekat secara Euclidean."))
+
+    rows = []
+    for key in LEVEL_ORDER:
+        for thr in ("20", "30", "40"):
+            a = lv[key]["kategori_akses"][thr]
+            row = {"Level": LEVEL_LABEL[key], "Batas waktu (menit)": int(thr)}
+            for c in AKSES:
+                row[f"{c} (grid)"] = a[c]["jumlah_grid"]
+                row[f"{c} (%)"] = a[c]["persen"]
+            rows.append(row)
+    df = pd.DataFrame(rows)
+    T.append(Table("T18", "Kategori akses per level (padanan Li dkk. 2026) untuk batas 20/30/40 menit", df,
+                   {c: (0 if c.endswith("(grid)") or c.startswith("Batas") else 2) for c in df.columns if c != "Level"},
+                   "Tergenang (flooded); Terputus (isolated): non-Tergenang, waktu minimum = penalti; Jauh (remote): "
+                   "terhubung, waktu minimum > batas; Terjangkau: ≤ batas. Utama = 30 menit."))
+    for i, t in enumerate(R["transisi_akses"]):
+        mat = pd.DataFrame(t["matrix"], columns=[f"ke {c}" for c in AKSES])
+        mat.insert(0, "Dari", AKSES)
+        T.append(Table(f"T19{chr(97 + i)}", f"Transisi kategori akses {LEVEL_LABEL[t['from_level']]} → "
+                       f"{LEVEL_LABEL[t['to_level']]} (batas 30 menit; jumlah grid)", mat,
+                       {c: 0 for c in mat.columns if c != "Dari"}))
 
     rows = []
     for key in LEVEL_ORDER:
@@ -286,23 +335,31 @@ def tables_for_k(R, k, prefix):
                      "% baris waktu minimum = penalti": p["waktu_tes_min_persen_penalti"],
                      "Proporsi terisolasi": p["proporsi_terisolasi"], "Opsi rute (rerata)": p["jumlah_opsi_rute"],
                      "Kepadatan jalan (rerata)": p["Road_Density_mean"], "Kelas bahaya (deskriptif)": p["banjir"],
-                     "Interpretasi": p["deskripsi"]})
+                     "P90 waktu minimum": p["waktu_tes_min_p90"],
+                     "Proporsi waktu minimum > 30 menit": p["proporsi_waktu_min_lebih_batas"],
+                     "Proporsi waktu minimum > 20 menit": p["proporsi_waktu_min_lebih_20"],
+                     "Proporsi waktu minimum > 40 menit": p["proporsi_waktu_min_lebih_40"],
+                     "Proporsi Terputus": p["proporsi_terputus"], "Tipologi": p["deskripsi"]})
         for c in TIME_COLS:
             rows_t.append({"Klaster": p["klaster"], "Variabel": VAR_LABEL[c], "Rerata": p[c],
                            "Median": p[f"{c}_median"], "P25": p[f"{c}_p25"], "P75": p[f"{c}_p75"],
+                           "P90": p[f"{c}_p90"],
                            "Baris penalti": p[f"{c}_n_penalti"], "% baris penalti": p[f"{c}_persen_penalti"]})
     df = pd.DataFrame(rows)
     T.append(Table(f"{prefix}07", f"Profil tipologi SDWFCM {sfx} (data gabungan keempat level)", df,
                    {"Klaster": 0, "Jumlah baris": 0, "% baris": 2, "Median waktu minimum": 2, "P25 waktu minimum": 2,
                     "P75 waktu minimum": 2, "Rerata waktu minimum": 2, "Baris waktu minimum = penalti": 0,
                     "% baris waktu minimum = penalti": 2, "Proporsi terisolasi": 3, "Opsi rute (rerata)": 2,
-                    "Kepadatan jalan (rerata)": 3, "Kelas bahaya (deskriptif)": 3},
-                   "Label: \"Terisolasi\" bila > 50 % baris waktu minimum = penalti; selain itu median waktu minimum "
-                   "≤ 10 menit \"Akses Baik\", 10–30 \"Akses Sedang\", > 30 \"Akses Kritis\". Klaster 0 = rerata waktu "
-                   "minimum terkecil. Kelas bahaya bukan fitur."))
+                    "Kepadatan jalan (rerata)": 3, "Kelas bahaya (deskriptif)": 3, "P90 waktu minimum": 2,
+                    "Proporsi waktu minimum > 30 menit": 3, "Proporsi waktu minimum > 20 menit": 3,
+                    "Proporsi waktu minimum > 40 menit": 3, "Proporsi Terputus": 3},
+                   "Label peringkat menurut rerata waktu minimum: Tipologi 1 = terbaik, Tipologi K = terburuk (penyajian; "
+                   "model tidak berubah). Batas waktu evakuasi 30 menit (Li dkk., 2026). Terputus = waktu minimum = "
+                   "penalti. Kelas bahaya bukan fitur."))
     df = pd.DataFrame(rows_t)
     T.append(Table(f"{prefix}07b", f"Waktu tempuh per kategori TES per klaster {sfx} (menit)", df,
-                   {"Klaster": 0, "Rerata": 2, "Median": 2, "P25": 2, "P75": 2, "Baris penalti": 0, "% baris penalti": 2}))
+                   {"Klaster": 0, "Rerata": 2, "Median": 2, "P25": 2, "P75": 2, "P90": 2, "Baris penalti": 0,
+                    "% baris penalti": 2}))
 
     rows = []
     for key in LEVEL_ORDER:
@@ -364,9 +421,10 @@ def worst_drop(grid, k, a="sedang", b="tinggi"):
     return int(((sa < k - 1) & (sb == k - 1)).sum())
 
 
-def tables_k2_vs_k3(R, grid):
+def tables_k_compare(R, grid):
     T = []
     ks = [int(k) for k in R["k_keluaran"]]
+    lab = " vs ".join(f"K = {k}" for k in ks)
     rows = []
     for i, pair in enumerate(R["model"][str(ks[0])]["transitions"]):
         row = {"Transisi": f"{LEVEL_LABEL[pair['from_level']]} → {LEVEL_LABEL[pair['to_level']]}"}
@@ -379,7 +437,7 @@ def tables_k2_vs_k3(R, grid):
             row[f"ARI K{k}"] = t["ari"]
         rows.append(row)
     df = pd.DataFrame(rows)
-    T.append(Table("T16", "Temuan utama K = 2 vs K = 3: transisi", df,
+    T.append(Table("T16", f"Temuan utama {lab}: transisi", df,
                    {c: (2 if c.startswith("SR") else 3) for c in df.columns if c.startswith(("SR", "ARI"))}))
 
     rows = []
@@ -392,27 +450,25 @@ def tables_k2_vs_k3(R, grid):
                 f"{state_name(s, k)} {'+' if cur[s] - base[s] >= 0 else '−'}{id_num(abs(cur[s] - base[s]), 1)}"
                 for s in sorted(cur))
         rows.append(row)
-    df = pd.DataFrame(rows)
-    T.append(Table("T16b", "Temuan utama K = 2 vs K = 3: arah perubahan distribusi per level", df))
+    T.append(Table("T16b", f"Temuan utama {lab}: arah perubahan distribusi per level", pd.DataFrame(rows)))
 
     rows = [{"Ukuran": "Grid yang turun ke tipologi terburuk (K−1) pada Sedang → Tinggi",
              **{f"K{k}": worst_drop(grid, k) for k in ks}},
-            {"Ukuran": "Tipologi terburuk (label interpretasi)",
-             **{f"K{k}": R["model"][str(k)]["cluster_names"][str(k - 1)] for k in ks}}]
-    T.append(Table("T16c", "Temuan utama K = 2 vs K = 3: penurunan ke tipologi terburuk", pd.DataFrame(rows),
-                   {f"K{k}": None for k in ks},
+            {"Ukuran": "Tipologi terburuk (label)", **{f"K{k}": R["model"][str(k)]["cluster_names"][str(k - 1)] for k in ks}}]
+    T.append(Table("T16c", f"Temuan utama {lab}: penurunan ke tipologi terburuk", pd.DataFrame(rows), {},
                    "Dihitung pada grid non-Tergenang di Sedang dan Tinggi yang di Sedang bukan tipologi terburuk."))
 
-    if R.get("tabulasi_silang_k2_k3"):
-        ct = R["tabulasi_silang_k2_k3"]
+    for n, (key, ct) in enumerate(sorted(R.get("tabulasi_silang", {}).items())):
+        ka, kb = (int(x[1:]) for x in key.split("_"))
         df = pd.DataFrame(ct["matrix"], columns=ct["kolom"])
-        df.insert(0, "K=2 \\ K=3", ct["baris"])
+        df.insert(0, f"K={ka} \\ K={kb}", ct["baris"])
         tot = df[ct["kolom"]].sum(axis=1)
         for c in ct["kolom"]:
-            df[f"{c} (% baris K2)"] = df[c] / tot * 100
-        T.append(Table("T17", "Tabulasi silang label K = 2 × K = 3 (data gabungan)", df,
-                       {c: (0 if "(%" not in c else 2) for c in df.columns if c != "K=2 \\ K=3"},
-                       f"Baris = klaster K = 2, kolom = klaster K = 3; ARI antar-partisi = {id_num(ct['ari'], 3)}."))
+            df[f"{c} (% baris K{ka})"] = df[c] / tot * 100
+        code = "T17" + ("" if n == 0 else chr(97 + n))
+        T.append(Table(code, f"Tabulasi silang label K = {ka} × K = {kb} (data gabungan)", df,
+                       {c: (0 if "(%" not in c else 2) for c in df.columns if not c.startswith("K=")},
+                       f"Baris = klaster K = {ka}, kolom = klaster K = {kb}; ARI antar-partisi = {id_num(ct['ari'], 3)}."))
     return T
 
 
@@ -442,6 +498,36 @@ def write_maps(R, grid, out_dir):
             fig.tight_layout()
             fig.savefig(d / f"tipologi_K{k}_{key}.png")
             plt.close(fig)
+    akses_pal = {0: "#22c55e", 1: "#f97316", 2: "#0f172a", 3: TERGENANG_COLOR}
+    for key in ("baseline", "sedang", "tinggi"):
+        st = g[f"akses_{key}"].values
+        fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
+        g.plot(ax=ax, color=[akses_pal[int(v)] for v in st], linewidth=0)
+        ax.set_axis_off()
+        ax.set_title(f"Kategori akses (batas 30 menit) — {R['levels'][key]['label_lengkap']}", fontsize=9)
+        ax.legend(handles=[Patch(color=akses_pal[c], label=f"{AKSES[c]} ({id_num(int((st == c).sum()), 0)})") for c in range(4)],
+                  loc="lower left", fontsize=7)
+        fig.tight_layout()
+        fig.savefig(d / f"akses_{key}.png")
+        plt.close(fig)
+    b0 = g["tas_status_baseline"].values
+    for key in ("sedang", "tinggi"):
+        st = g[f"tas_status_{key}"].values
+        cls = np.select([(b0 != 1) & (st == 1), (b0 == 1) & (st == 3), (b0 == 1) & (st == 2), (b0 == 1) & (st == 0),
+                         (b0 == 1) & (st == 1)], [1, 2, 3, 4, 5], default=0)
+        pal2 = {0: "#e5e7eb", 1: "#dc2626", 2: TERGENANG_COLOR, 3: "#0f172a", 4: "#f59e0b", 5: "#a855f7"}
+        lab2 = {1: "TAS baru akibat banjir", 2: "TAS hilang: jadi Tergenang", 3: "TAS hilang: jadi Terputus",
+                4: "TAS hilang: lainnya", 5: "TAS tetap", 0: "lainnya"}
+        fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
+        g.plot(ax=ax, color=[pal2[int(v)] for v in cls], linewidth=0)
+        ax.set_axis_off()
+        ax.set_title(f"Perubahan TAS terhadap Baseline — {R['levels'][key]['label_lengkap']}", fontsize=9)
+        ax.legend(handles=[Patch(color=pal2[c], label=f"{lab2[c]} ({id_num(int((cls == c).sum()), 0)})") for c in (1, 5, 2, 3, 4)],
+                  loc="lower left", fontsize=7)
+        fig.tight_layout()
+        fig.savefig(d / f"tas_perubahan_{key}.png")
+        plt.close(fig)
+
     pal = {0: "#e5e7eb", 1: "#a855f7", 2: "#0f172a", 3: TERGENANG_COLOR}
     lab = {0: "Non-TAS", 1: "TAS", 2: "Terputus", 3: "Tergenang"}
     for key in LEVEL_ORDER:
@@ -449,7 +535,8 @@ def write_maps(R, grid, out_dir):
         fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
         g.plot(ax=ax, color=[pal[int(s)] for s in st], linewidth=0)
         ax.set_axis_off()
-        ax.set_title(f"Titik Aman Semu (DI ≥ 2, T_ideal ≤ 5 menit) — {R['levels'][key]['label_lengkap']}", fontsize=9)
+        ax.set_title(f"Titik Aman Semu (DI ≥ 2, T_ideal ≤ 5, T_aktual ≥ 30 menit) — {R['levels'][key]['label_lengkap']}",
+                     fontsize=9)
         ax.legend(handles=[Patch(color=pal[s], label=f"{lab[s]} ({id_num(int((st == s).sum()), 0)})") for s in pal],
                   loc="lower left", fontsize=7)
         fig.tight_layout()
@@ -521,9 +608,10 @@ def _summary_k(R, k, grid):
              f"{id_num(v['klaster_terbesar_persen'], 2)} %")
     for p in M["cluster_profile"]:
         L.append(f"- K{p['klaster']} — **{p['deskripsi']}**: {id_num(p['jumlah_baris'], 0)} baris ({id_num(p['persen_baris'], 2)} %); "
-                 f"waktu minimum median {id_num(p['waktu_tes_min_median'], 2)} [P25 {id_num(p['waktu_tes_min_p25'], 2)}; "
-                 f"P75 {id_num(p['waktu_tes_min_p75'], 2)}] menit, rerata {id_num(p['waktu_tes_min'], 2)}; penalti "
-                 f"{id_num(p['waktu_tes_min_persen_penalti'], 2)} %; terisolasi {id_num(p['proporsi_terisolasi'], 3)}")
+                 f"waktu minimum median {id_num(p['waktu_tes_min_median'], 2)} [P75 {id_num(p['waktu_tes_min_p75'], 2)}; "
+                 f"P90 {id_num(p['waktu_tes_min_p90'], 2)}] menit, rerata {id_num(p['waktu_tes_min'], 2)}; > 30 menit "
+                 f"{id_num(p['proporsi_waktu_min_lebih_batas'] * 100, 2)} %; Terputus {id_num(p['proporsi_terputus'] * 100, 2)} %; "
+                 f"terisolasi {id_num(p['proporsi_terisolasi'], 3)}")
     for key in LEVEL_ORDER:
         dist = ", ".join(f"{state_name(x['state'], k)} = {id_num(x['jumlah_grid'], 0)} ({id_num(x['persen_semua_grid'], 2)} %)"
                          for x in M["distribusi"][key])
@@ -561,7 +649,18 @@ def write_summary(R, lock, k_utama, grid, out_dir):
                  f"ruas ditutup {id_num(s['n_roads_closed'], 0)}; TES valid {id_num(sum(s['tes_valid'].values()), 0)}; "
                  f"rerata waktu minimum {id_num(s['mean_waktu_min'], 2)} menit (median {id_num(s['median_waktu_min'], 2)}); "
                  f"TAS {id_num(t['jumlah_tas'], 0)} ({id_num(t['persen_tas_non_tergenang'], 2)} % non-Tergenang); "
-                 f"Terputus {id_num(t['jumlah_terputus'], 0)}; TAS persentil {id_num(t['sensitivitas_persentil']['jumlah_tas'], 0)}")
+                 f"TAS ≥ 20 / ≥ 40 menit {id_num(t['sensitivitas_ambang_waktu']['20']['jumlah_tas'], 0)} / "
+                 f"{id_num(t['sensitivitas_ambang_waktu']['40']['jumlah_tas'], 0)}; absolut v3 "
+                 f"{id_num(t['sensitivitas_absolut_v3']['jumlah_tas'], 0)}; persentil "
+                 f"{id_num(t['sensitivitas_persentil']['jumlah_tas'], 0)}; Terputus {id_num(t['jumlah_terputus'], 0)}")
+        a = s["kategori_akses"]["30"]
+        L.append("  - Kategori akses (30 menit): " + "; ".join(
+            f"{c} {id_num(a[c]['jumlah_grid'], 0)} ({id_num(a[c]['persen'], 2)} %)" for c in AKSES))
+        if key != "baseline":
+            c = s["tas_perubahan_vs_baseline"]
+            L.append(f"  - TAS baru akibat banjir {id_num(c['tas_baru'], 0)}; TAS hilang {id_num(c['tas_hilang'], 0)} "
+                     f"(jadi Tergenang {id_num(c['tas_hilang_jadi_tergenang'], 0)}, jadi Terputus "
+                     f"{id_num(c['tas_hilang_jadi_terputus'], 0)}, lainnya {id_num(c['tas_hilang_lainnya'], 0)})")
     L += ["", "## Pemilihan K", ""]
     for c in ks["candidates"]:
         if c["k"] in order:
@@ -575,67 +674,60 @@ def write_summary(R, lock, k_utama, grid, out_dir):
     (out_dir / "ringkasan_angka_bab4.md").write_text("\n".join(L) + "\n", encoding="utf-8")
 
 
-def write_v2_v3(R, grid, out_dir):
-    if not ARSIP_V2.exists():
+def write_v3_v4(R, grid, out_dir):
+    if not ARSIP_V3.exists():
         return
-    V2 = json.loads(ARSIP_V2.read_text(encoding="utf-8"))
-    l2, l3 = V2["levels"], R["levels"]
+    V3 = json.loads(ARSIP_V3.read_text(encoding="utf-8"))
+    l3, l4 = V3["levels"], R["levels"]
     rows = []
 
     def add(nama, a, b, dec, sebab):
         rows.append(f"| {nama} | {id_num(a, dec)} | {id_num(b, dec)} | {sebab} |")
 
-    SR = "Kelas bahaya dari raster InaRisk (grid mayoritas piksel, ruas maksimum)"
     for key in LEVEL_ORDER:
-        add(f"Grid Tergenang — {LEVEL_LABEL[key]}", l2[key]["n_grid_tergenang"], l3[key]["n_grid_tergenang"], 0, SR)
+        add(f"Grid Tergenang — {LEVEL_LABEL[key]}", l3[key]["n_grid_tergenang"], l4[key]["n_grid_tergenang"], 0,
+            "Tidak berubah (data dan level sama)")
     for key in LEVEL_ORDER:
-        add(f"Ruas ditutup — {LEVEL_LABEL[key]}", l2[key]["n_roads_closed"], l3[key]["n_roads_closed"], 0,
-            SR + "; aturan maksimum menaikkan kelas 2.477 ruas")
+        add(f"Rerata waktu minimum non-Tergenang — {LEVEL_LABEL[key]}", l3[key]["mean_waktu_min"], l4[key]["mean_waktu_min"], 2,
+            "Tidak berubah")
+    add("Baris data gabungan", V3["data_gabungan"]["n_baris"], R["data_gabungan"]["n_baris"], 0,
+        "Tidak berubah (diverifikasi identik)")
+    add("K menurut aturan stabilitas", V3["k_terpilih_aturan"], R["k_terpilih_aturan"], 0,
+        "Pemilihan K tidak dijalankan ulang (tabel v3)")
     for key in LEVEL_ORDER:
-        add(f"TES valid — {LEVEL_LABEL[key]}", l2[key]["diagnostik"]["tes_valid_total"],
-            l3[key]["diagnostik"]["tes_valid_total"], 0, "Kelas TES sama; aturan radius 50 m memakai grid Tergenang baru")
-    add("T_pen (menit)", V2["t_pen"], R["t_pen"], 2, "Tidak ada perubahan pada Baseline (tidak ada penutupan)")
-    for key in LEVEL_ORDER:
-        add(f"Rerata waktu minimum non-Tergenang — {LEVEL_LABEL[key]}", l2[key]["mean_waktu_min"], l3[key]["mean_waktu_min"], 2,
-            SR)
-    add("Baris data gabungan", V2["data_gabungan"]["n_baris"], R["data_gabungan"]["n_baris"], 0, SR)
-    add("Komponen PCA", V2["preprocessing"]["n_components"], R["preprocessing"]["n_components"], 0, "Data gabungan berubah")
-    add("K menurut aturan stabilitas", V2["k"], R["k_selection"]["k_terpilih"], 0,
-        "Stabilitas K dihitung ulang pada data v3 (keputusan peneliti)")
-    c2 = {c["k"]: c for c in V2["k_selection"]["candidates"]}
-    c3 = {c["k"]: c for c in R["k_selection"]["candidates"]}
+        t3, t4 = l3[key]["tas"], l4[key]["tas"]
+        add(f"TAS aturan utama — {LEVEL_LABEL[key]}", t3["jumlah_tas"], t4["jumlah_tas"], 0,
+            "Aturan utama v4 menambah syarat T_aktual ≥ 30 menit (v3: DI ≥ 2 dan T_ideal ≤ 5 menit)")
+        add(f"TAS aturan absolut v3 — {LEVEL_LABEL[key]}", t3["jumlah_tas"], t4["sensitivitas_absolut_v3"]["jumlah_tas"], 0,
+            "Sama (aturan v3 menjadi sensitivitas di v4)")
+        add(f"TAS aturan persentil — {LEVEL_LABEL[key]}", t3["sensitivitas_persentil"]["jumlah_tas"],
+            t4["sensitivitas_persentil"]["jumlah_tas"], 0, "Sama")
     for k in (2, 3):
-        add(f"ARI subsampel K = {k}", c2[k]["ari_subsampel_mean"], c3[k]["ari_subsampel_mean"], 3, "Data v3")
-    for key in LEVEL_ORDER:
-        t2, t3 = l2[key]["tas"], l3[key]["tas"]
-        add(f"TAS — {LEVEL_LABEL[key]}", t2["jumlah_tas"], t3["jumlah_tas"], 0,
-            "Aturan utama v3: DI ≥ 2 dan T_ideal ≤ 5 menit (v2: persentil P25/P75) + " + SR)
-        add(f"TAS aturan persentil — {LEVEL_LABEL[key]}", t2["jumlah_tas"], t3["sensitivitas_persentil"]["jumlah_tas"], 0,
-            "Aturan sama (persentil); perbedaan karena " + SR)
-        add(f"Terputus — {LEVEL_LABEL[key]}", t2["jumlah_terputus"], t3["jumlah_terputus"], 0, SR)
-    tr2 = {(t["from_level"], t["to_level"]): t for t in V2["transitions"]}
-    for t in R["model"]["2"]["transitions"]:
-        a = tr2[(t["from_level"], t["to_level"])]
-        nm = f"{LEVEL_LABEL[t['from_level']]} → {LEVEL_LABEL[t['to_level']]}"
-        add(f"Stability rate K = 2 {nm} (%)", a["stability_rate"], t["stability_rate"], 2, SR)
-        add(f"ARI K = 2 {nm}", a["ari"], t["ari"], 3, SR)
-    a2 = {a["algoritma"]: a for a in V2.get("algorithm_comparison", [])}
-    for a in R["model"]["2"].get("algorithm_comparison", []):
-        b = a2.get(a["algoritma"])
-        sebab = "m SFCM 2,0 → 1,7 + " + SR if a["algoritma"] == "SFCM" else SR
-        add(f"Silhouette {a['algoritma']} (K = 2)", b.get("silhouette") if b else None, a.get("silhouette"), 3, sebab)
-    L = ["# Perbandingan angka kunci v2 vs v3", "",
-         "v2 = `data/locked/arsip_v2/` (tag `hasil-skripsi-v2`); v3 = `data/locked/` (tag `hasil-skripsi-v3`). "
-         "**Angka v3 yang berlaku.** Kolom terakhir = perubahan metode penyebab perbedaan.", "",
-         "| Angka | v2 | v3 | Perubahan metode penyebab |", "|---|---:|---:|---|", *rows, "",
-         "Perubahan metode v3 lainnya (tidak mengubah angka di atas secara langsung): label interpretasi berbasis median "
-         "dan proporsi penalti; PC/PE; tabel K utama/lampiran; keluaran lengkap K = 2 dan K = 3."]
-    (out_dir / "perbandingan_v2_vs_v3.md").write_text("\n".join(L) + "\n", encoding="utf-8")
+        m3, m4 = V3["model"][str(k)], R["model"][str(k)]
+        for c in range(k):
+            add(f"Baris klaster {c} K = {k}", m3["cluster_profile"][c]["jumlah_baris"],
+                m4["cluster_profile"][c]["jumlah_baris"], 0, "Model sama (label diverifikasi identik)")
+        rows.append(f"| Label K = {k} | {', '.join(p['deskripsi'] for p in m3['cluster_profile'])} | "
+                    f"{', '.join(p['deskripsi'] for p in m4['cluster_profile'])} | Label peringkat menggantikan label ambang median (P3-9) |")
+        s3 = {a["algoritma"]: a for a in m3.get("algorithm_comparison", [])}
+        for a in m4.get("algorithm_comparison", []):
+            b = s3.get(a["algoritma"])
+            add(f"Silhouette {a['algoritma']} (K = {k})", b.get("silhouette") if b else None, a.get("silhouette"), 3,
+                "Sama (perbandingan dijalankan ulang dengan pengaturan sama)")
+    rows.append("| Model K = 4 | – | tersedia | Baru di v4 (keluaran lengkap) |")
+    rows.append("| Kategori akses (Tergenang/Terputus/Jauh/Terjangkau) | – | tersedia | Baru di v4 (Li dkk., 2026) |")
+    rows.append("| TAS baru/hilang terhadap Baseline | – | tersedia | Baru di v4 |")
+    L = ["# Perbandingan angka kunci v3 vs v4", "",
+         "v3 = `data/locked/arsip_v3/` (tag `hasil-skripsi-v3`); v4 = `data/locked/` (tag `hasil-skripsi-v4`). "
+         "**Angka v4 yang berlaku.** Data gabungan, praproses, dan pemilihan K tidak dijalankan ulang; "
+         "perbedaan hanya dari perubahan penyajian dan aturan TAS.", "",
+         "| Angka | v3 | v4 | Perubahan metode penyebab |", "|---|---:|---:|---|", *rows]
+    (out_dir / "perbandingan_v3_vs_v4.md").write_text("\n".join(L) + "\n", encoding="utf-8")
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Ekspor tabel Bab IV dari data/locked/")
-    ap.add_argument("--k-utama", type=int, choices=(2, 3), default=None)
+    ap.add_argument("--k-utama", type=int, choices=(2, 3, 4), default=None)
     ap.add_argument("--keluaran", type=Path, default=None)
     args = ap.parse_args(argv)
     R, lock, grid = load_locked()
@@ -645,9 +737,9 @@ def main(argv=None):
         raise SystemExit(f"K utama {k_utama} tidak ada dalam keluaran {ks}")
     out_dir = args.keluaran or OUT
     out_dir.mkdir(parents=True, exist_ok=True)
-    for old in ("perbandingan_v1_vs_v2.md",):                 # laporan versi lama tersimpan di arsip_v2/
+    for old in ("perbandingan_v1_vs_v2.md", "perbandingan_v2_vs_v3.md"):   # laporan versi lama tersimpan di arsip
         (out_dir / old).unlink(missing_ok=True)
-    tables = tables_common(R) + tables_for_k(R, k_utama, "T") + tables_k2_vs_k3(R, grid)
+    tables = tables_common(R) + tables_for_k(R, k_utama, "T") + tables_k_compare(R, grid)
     for k in ks:
         if k != k_utama:
             tables += tables_for_k(R, k, "S")
@@ -656,7 +748,7 @@ def main(argv=None):
     write_csv(tables, out_dir)
     write_docx(tables, lock, k_utama, out_dir)
     write_summary(R, lock, k_utama, grid, out_dir)
-    write_v2_v3(R, grid, out_dir)
+    write_v3_v4(R, grid, out_dir)
     write_maps(R, grid, out_dir)
     print(f"{len(tables)} tabel diekspor ke {out_dir} (K utama = {k_utama})")
 
