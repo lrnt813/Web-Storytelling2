@@ -500,6 +500,42 @@ def filter_tes(tes_raw: Dict[str, gpd.GeoDataFrame], skenario: str, cfg: Cfg):
 # ══════════════════════════════════════════════════════════════════════════════
 # 8. WAKTU TEMPUH KE TES (DIJKSTRA MULTI-SUMBER)
 # ══════════════════════════════════════════════════════════════════════════════
+SNAP_MAX_M = 300.0    # batas snapping centroid grid / titik TES ke simpul jalan
+_EPS_M = 1e-6         # bobot minimum sisi sumber virtual (csgraph mengabaikan bobot 0)
+
+
+def graph_csr(G: nx.Graph, nl: np.ndarray) -> csr_matrix:
+    """Matriks ketetanggaan berbobot (panjang sisi, m) dengan urutan simpul = nl."""
+    return nx.to_scipy_sparse_array(G, nodelist=[tuple(x) for x in nl], weight="weight", format="csr")
+
+
+def snap_points(xy: np.ndarray, tn, max_snap: float = SNAP_MAX_M):
+    """Simpul jalan terdekat per titik. Returns (jarak_m, indeks_simpul, ok)."""
+    d, idx = tn.query(np.asarray(xy, float), k=1)
+    return d, idx, d <= max_snap
+
+
+def network_distance_from_sources(csr: csr_matrix, src_nodes: np.ndarray,
+                                  src_offset_m: np.ndarray) -> np.ndarray:
+    """Jarak terpendek (m) setiap simpul ke sumber terdekat, dengan jarak awal per sumber
+    (= ruas snapping sumber). Sumber virtual tambahan dihubungkan ke semua simpul sumber
+    dengan bobot offset (+1e-6 m), lalu satu Dijkstra dijalankan dari simpul virtual."""
+    n = csr.shape[0]
+    if len(src_nodes) == 0:
+        return np.full(n, np.inf)
+    best = {}
+    for nd, off in zip(np.asarray(src_nodes, int), np.asarray(src_offset_m, float)):
+        if nd not in best or off < best[nd]:
+            best[nd] = off
+    nodes = np.fromiter(best.keys(), int)
+    offs = np.fromiter(best.values(), float) + _EPS_M
+    extra = csr_matrix((offs, (np.full(len(nodes), n), nodes)), shape=(n + 1, n + 1))
+    aug = sp.bmat([[csr, None], [None, csr_matrix((1, 1))]], format="csr") + extra
+    from scipy.sparse.csgraph import dijkstra as _dijkstra
+    d = _dijkstra(aug, directed=False, indices=n)[:n]
+    return d - _EPS_M
+
+
 def compute_distances(
     gdf: gpd.GeoDataFrame,
     skenario: str,
@@ -515,77 +551,45 @@ def compute_distances(
 ):
     """Waktu tempuh (menit) dari centroid setiap grid ke TES terdekat per kategori.
 
-    Centroid grid dan titik TES di-snap ke simpul jalan terdekat (maks. 300 m);
-    jarak jaringan dihitung dengan Dijkstra multi-sumber (sumber = semua TES
-    kategori tsb.), lalu dibagi kecepatan berjalan (walking_speed_m_per_min).
-    Grid/TES yang gagal di-snap atau tidak terhubung diberi waktu penalti `t_pen`.
+    Jarak = (centroid grid → simpul jalan terdekat) + (jarak jaringan antarsimpul)
+          + (simpul jalan terdekat TES → titik TES), dibagi walking_speed_m_per_min.
+    Snapping centroid dan TES maksimum SNAP_MAX_M (300 m). Untuk tiap kategori dicari TES
+    dengan total jarak terkecil (Dijkstra dari sumber virtual yang terhubung ke simpul TES
+    berbobot ruas snapping TES). Grid/TES yang gagal di-snap atau tidak terhubung diberi
+    waktu penalti `t_pen`.
+    Returns: (tpk, t_min, grid_node_idx, iso_per_kategori, jumlah_opsi)
     """
-    n  = len(gdf)
-    if "cx" in gdf.columns and "cy" in gdf.columns:
-        cx = gdf["cx"].values
-        cy = gdf["cy"].values
-    else:
-        cx = gdf.geometry.centroid.x.values
-        cy = gdf.geometry.centroid.y.values
-
+    n = len(gdf)
+    cx = gdf["cx"].values if "cx" in gdf.columns else gdf.geometry.centroid.x.values
+    cy = gdf["cy"].values if "cy" in gdf.columns else gdf.geometry.centroid.y.values
     tp = t_pen if (t_pen and t_pen > 0) else cfg.unreachable_time
+    speed = cfg.walking_speed_m_per_min
+    logger.info(f"[compute_distances] Dijkstra sumber virtual [{skenario}|{intensity:.2f}]")
 
-    # ── Path B: NetworkX Optimized (Multi-Source Dijkstra) ────────────────────
-    logger.info(f"[compute_distances] NetworkX Multi-Source Dijkstra [{skenario}|{intensity:.2f}]")
-    
-    # 1. Vectorized Snap Grid Centroids ke Jaringan Jalan
-    gnodes = np.array([None] * n, dtype=object)
-    if tn is not None and len(nl) > 0:
-        dists, idxs = tn.query(np.column_stack((cx, cy)), k=1)
-        valid_mask = dists <= 300
-        for i in range(n):
-            if valid_mask[i]:
-                idx = idxs[i] if np.isscalar(idxs[i]) else idxs[i][0]
-                nd = tuple(nl[idx])
-                if G.has_node(nd):
-                    gnodes[i] = nd
-
-    if tes_v is None or len(tes_v) == 0:
+    if tes_v is None or len(tes_v) == 0 or tn is None or len(nl) == 0:
         tpk = {k: np.full(n, tp) for k in cfg.kategori_fac}
-        return tpk, np.full(n, tp), gnodes.tolist(), \
-               {k: np.ones(n, int) for k in cfg.kategori_fac}, np.zeros(n, int)
+        return tpk, np.full(n, tp), [None] * n, {k: np.ones(n, int) for k in cfg.kategori_fac}, np.zeros(n, int)
 
-    # 2. Kelompokkan TES berdasarkan kategori dan Snap ke Jaringan Jalan
-    tnpk: Dict[str, List] = {}
-    for kat, sub in tes_v.groupby("kategori"):
-        snapped_nodes = []
-        for _, r in sub.iterrows():
-            d, i = tn.query([r.geometry.x, r.geometry.y], k=1)
-            d_val = d if np.isscalar(d) else d[0]
-            if d_val <= 300:
-                idx = i if np.isscalar(i) else i[0]
-                nd = tuple(nl[idx])
-                if G.has_node(nd):
-                    snapped_nodes.append(nd)
-        tnpk[kat] = list(set(snapped_nodes))
+    csr = graph_csr(G, nl)
+    g_d, g_idx, g_ok = snap_points(np.column_stack((cx, cy)), tn)
 
-    # 3. Multi-Source Dijkstra (Satu kali per kategori fasilitas)
     tpk = {}
     for kat in cfg.kategori_fac:
-        sources = tnpk.get(kat, [])
+        sub = tes_v[tes_v["kategori"] == kat]
         arr = np.full(n, np.inf)
-        if sources:
-            # Dijkstra dari seluruh TES sekaligus untuk kategori ini
-            try:
-                lengths = nx.multi_source_dijkstra_path_length(G, sources, weight="weight")
-                for gi, gnd in enumerate(gnodes):
-                    if gnd is not None:
-                        arr[gi] = lengths.get(gnd, np.inf)
-            except Exception as e:
-                logger.warning(f"[compute_distances] Dijkstra gagal untuk {kat}: {e}")
-        
-        t = arr / cfg.walking_speed_m_per_min
-        tpk[kat] = np.where(np.isinf(t), tp, t)
+        if len(sub):
+            t_xy = np.column_stack([sub.geometry.x.values, sub.geometry.y.values])
+            t_d, t_idx, t_ok = snap_points(t_xy, tn)
+            if t_ok.any():
+                d_node = network_distance_from_sources(csr, t_idx[t_ok], t_d[t_ok])
+                arr[g_ok] = g_d[g_ok] + d_node[g_idx[g_ok]]
+        t = arr / speed
+        tpk[kat] = np.where(np.isfinite(t), t, tp)
 
-    tm   = np.column_stack(list(tpk.values())).min(axis=1)
-    iso  = {k: (tpk[k] >= tp).astype(int)  for k in cfg.kategori_fac}
+    tm = np.column_stack(list(tpk.values())).min(axis=1)
+    iso = {k: (tpk[k] >= tp).astype(int) for k in cfg.kategori_fac}
     opsi = np.column_stack([(tpk[k] < tp).astype(int) for k in cfg.kategori_fac]).sum(axis=1)
-    return tpk, tm, gnodes.tolist(), iso, opsi
+    return tpk, tm, np.where(g_ok, g_idx, -1).tolist(), iso, opsi
 
 
 def calc_t_max(tpk: dict, cfg: Cfg) -> float:

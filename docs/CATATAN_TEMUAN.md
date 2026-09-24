@@ -115,3 +115,16 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
 - **P2-A4. Folder `scratch/` dihapus dari repo** dan diabaikan git. Dashboard membuatnya ulang
   otomatis (cache graf jalan dan `alamat_publik.txt`). Dua skrip diagnostik lama di
   `scratch/diagnostics/` ikut terhapus. — *SELESAI*
+
+## P2-B. Waktu tempuh dan Detour Index (Langkah 3)
+
+- **P2-B1. Waktu tempuh kini memuat ruas snapping**: (centroid → simpul jalan terdekat) + jarak
+  jaringan + (simpul terdekat TES → titik TES), dibagi 80 m/menit. Batas snapping tetap 300 m.
+  Implementasi: satu Dijkstra per kategori dari simpul sumber virtual yang terhubung ke simpul TES
+  dengan bobot ruas snapping TES. T_pen = 3 × T_max Baseline dihitung ulang dari waktu baru.
+  — *SELESAI (menyelesaikan A5)*
+- **P2-B2. Kontradiksi instruksi yang diputuskan pengguna.** Pada Baseline, T_aktual ≥ jarak
+  Euclidean murni berlaku untuk semua grid terjangkau. Namun 204 grid (0,9%) punya T_aktual < T_ideal
+  karena batas minimum 50 m hanya dipasang pada T_ideal. **Keputusan pengguna:** batas 50 m dipasang
+  pada kedua jarak, `T_aktual = max(jarak rute, 50 m)/80`. Akibatnya grid tersebut mendapat DI = 1.
+  Test `tests/test_waktu_snapping.py` memeriksa T_aktual ≥ T_ideal pada data asli. — *SELESAI*

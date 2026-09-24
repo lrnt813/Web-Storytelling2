@@ -44,6 +44,7 @@ from .engine import (
     sdwfcm_objective_value,
     compute_distances,
     filter_tes,
+    graph_csr,
     run_skater,
     simulate_hazard,
 )
@@ -83,7 +84,7 @@ SDWFCM_N_INIT = 10        # jumlah inisialisasi acak SDWFCM
 SDWFCM_SEED = 42          # seed awal; inisialisasi ke-i memakai SDWFCM_SEED + i
 DUNN_SAMPLE = 2000        # sampel grid untuk Dunn titik-ke-titik (O(n²))
 MORAN_PERMUTATION_SEED = 42   # esda.Moran tidak punya parameter seed → seed global di-set sebelum dipanggil
-TAS_MIN_EUCLID_M = 50.0   # jarak Euclidean minimum (setengah lebar grid 100 m) untuk T_ideal
+TAS_MIN_EUCLID_M = 50.0   # jarak minimum (setengah lebar grid 100 m) untuk T_ideal DAN T_aktual
 TAS_DI_ABSOLUTE = 2.0     # ambang absolut DI_t pada uji sensitivitas TAS
 TAS_STATUS = {0: "Non-TAS", 1: "TAS", 2: "Terputus"}
 
@@ -753,8 +754,7 @@ def transition_analysis(labels_from, labels_to, k: int) -> dict:
 # 10. DETEKSI TITIK AMAN SEMU — DETOUR INDEX (Subbab 3.2.11)
 # ══════════════════════════════════════════════════════════════════════════════
 def _graph_to_csr(G: nx.Graph, nl: np.ndarray) -> csr_matrix:
-    nodes = [tuple(x) for x in nl]
-    return nx.to_scipy_sparse_array(G, nodelist=nodes, weight="weight", format="csr")
+    return graph_csr(G, nl)
 
 
 def detect_tas_detour(
@@ -769,7 +769,11 @@ def detect_tas_detour(
     """Deteksi Titik Aman Semu berbasis Detour Index waktu.
 
     T_ideal = max(d_Euclid(centroid, TES terdekat), TAS_MIN_EUCLID_M) / kecepatan
-    T_aktual = waktu tempuh jaringan ke TES yang SAMA (antar-simpul hasil snapping ≤ max_snap)
+    T_aktual = [ruas snapping centroid → simpul + jarak jaringan antarsimpul
+                + ruas snapping simpul → titik TES] / kecepatan, ke TES yang SAMA
+               (snapping ≤ max_snap), sehingga T_ideal dan T_aktual sama-sama mengukur
+               perjalanan centroid → titik TES. Batas minimum TAS_MIN_EUCLID_M (50 m) dipasang
+               pada KEDUA jarak, sehingga T_aktual ≥ T_ideal untuk semua grid terjangkau
     DI_t = T_aktual / T_ideal
     Grid dengan T_aktual = T_pen (tidak terjangkau) → kelas "Terputus", dikeluarkan dari
     perhitungan persentil dan rata-rata DI. Untuk grid terjangkau:
@@ -787,8 +791,8 @@ def detect_tas_detour(
                 "status": np.full(n, 2, int), "summary": {"jumlah_terputus": n}}
 
     tes_xy = np.column_stack([tes_v.geometry.x.values, tes_v.geometry.y.values])
-    d_euc, tes_idx = cKDTree(tes_xy).query(grid_xy, k=1)
-    d_euc = np.maximum(d_euc, TAS_MIN_EUCLID_M)
+    d_euc_raw, tes_idx = cKDTree(tes_xy).query(grid_xy, k=1)
+    d_euc = np.maximum(d_euc_raw, TAS_MIN_EUCLID_M)
     t_ideal = d_euc / speed
 
     csr = _graph_to_csr(G, nl)
@@ -822,7 +826,9 @@ def detect_tas_detour(
 
     t_akt = np.full(n, float(t_pen))
     fin = np.isfinite(net)
-    t_akt[fin] = np.minimum(net[fin] / speed, t_pen)
+    total_m = g_snap_d + net + t_snap_d[tes_idx]          # ruas snapping + jaringan
+    total_m = np.maximum(total_m, TAS_MIN_EUCLID_M)        # batas minimum yang sama dengan T_ideal
+    t_akt[fin] = np.minimum(total_m[fin] / speed, t_pen)
     reach = t_akt < t_pen                       # terjangkau; sisanya "Terputus"
     di = np.full(n, np.nan)
     di[reach] = t_akt[reach] / t_ideal[reach]
@@ -861,7 +867,9 @@ def detect_tas_detour(
         },
         "jarak_euclid_min_m": TAS_MIN_EUCLID_M,
     }
-    return {"t_ideal": t_ideal, "t_aktual": t_akt, "detour_index": di,
+    summary["jumlah_t_aktual_lt_t_ideal"] = int((reach & (t_akt < t_ideal - 1e-9)).sum())
+    summary["jumlah_t_aktual_lt_euclid_tanpa_batas"] = int((reach & (t_akt < d_euc_raw / speed - 1e-9)).sum())
+    return {"t_ideal": t_ideal, "t_aktual": t_akt, "detour_index": di, "t_euclid_raw": d_euc_raw / speed,
             "is_tas": is_tas.astype(int), "status": status, "summary": summary}
 
 
