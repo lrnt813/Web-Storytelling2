@@ -80,20 +80,20 @@ function exportAllResults() {
     collect(renderDataTab(thesisResults), 'Data');
     collect(renderKTab(thesisResults), 'Pemilihan K');
     collect(renderAlgoTab(thesisResults), 'Algoritma');
-    LEVELS.forEach(l => { activeProfileLevel = l.key; collect(renderProfileTab(thesisResults), `Profil ${l.label}`); });
-    (thesisResults.transitions || []).forEach((t, i) => {
+    collect(renderProfileTab(thesisResults), `Profil K${currentK(thesisResults)}`);
+    (currentModel(thesisResults).transitions || []).forEach((t, i) => {
         activeMatrixPair = i;
         const html = renderTransitionTab(thesisResults);
         const box = document.createElement('div'); box.innerHTML = html;
         const secs = box.querySelectorAll('.res-section');
-        if (i === 0) secs.forEach((sec, j) => { if (j === 1) sec.querySelectorAll('table.res-table').forEach(tb => sheets.push({ name: 'Stabilitas Transisi', aoa: tableToAoa(tb) })); });
+        if (i === 0) secs.forEach((sec, j) => { if (j === 1) sec.querySelectorAll('table.res-table').forEach(tb => sheets.push({ name: 'Ringkasan Transisi', aoa: tableToAoa(tb) })); });
         const last = secs[secs.length - 1];
         last?.querySelectorAll('table.res-table').forEach(tb => sheets.push({ name: `Matriks ${levelLabel(t.from_level)}-${levelLabel(t.to_level)}`, aoa: tableToAoa(tb) }));
     });
     collect(renderTasTab(thesisResults), 'TAS');
     collect(renderWaktuTab(thesisResults), 'Waktu');
     activeProfileLevel = keepLevel; activeMatrixPair = keepPair;
-    downloadWorkbook(sheets, `Hasil_Penelitian_Bab_IV_${fileStamp()}.xlsx`);
+    downloadWorkbook(sheets, `Hasil_Penelitian_Bab_IV_K${currentK(thesisResults)}_${fileStamp()}.xlsx`);
 }
 
 // ── Data per grid & ringkasan wilayah ───────────────────────────────────────

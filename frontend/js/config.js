@@ -81,7 +81,10 @@ let roadCuts = [], cutMarkers = [], routeLayers, contextRouteLayers, originMarke
 let routingAbortController = null, isCalculating = false, markerPopupOpen = false;
 let searchMarker = null, activeCluster = null, clustersHidden = false, searchBoundaryLayer = null;
 let isolatedOrigin = null; // Store { latlng, routes, gridAttr, recommendations }
-let lastK = 4; // diperbarui dari hasil API (k_optimal)
+let lastK = 3; // diperbarui dari hasil API (k_optimal)
+let activeK = null;       // K model yang ditampilkan; bawaan = K utama (pengaturan_hasil.json via /api/levels)
+let kUtama = null;
+let kKeluaran = [];
 let activeLevel = localStorage.getItem('evac_level') || 'baseline';
 let activeView = 'klaster';
 let lastLevelResult = null;

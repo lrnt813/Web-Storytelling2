@@ -32,7 +32,8 @@ from scipy.spatial import cKDTree
 from shapely.geometry import Point
 
 from . import thesis as T
-from .config import BASE_DIR, DATA_DIR, cfg, utm_to_wgs84 as _utm_to_wgs84, wgs84_to_utm as _wgs84_to_utm
+from .config import (BASE_DIR, DATA_DIR, cfg, k_utama_default, utm_to_wgs84 as _utm_to_wgs84,
+                     wgs84_to_utm as _wgs84_to_utm)
 from .engine import (apply_road_cuts_to_graph, build_road_graph, filter_tes, load_data, load_road_network,
                      road_closed_mask, simulate_hazard)
 from .schemas import RoadRequest, RouteAllTesRequest, SimulateRequest
@@ -235,8 +236,26 @@ def _tes_name(row) -> str:
     return "Fasilitas TES"
 
 
-def _level_payload(level: dict, summary: dict, records: List[dict], simulated: bool = False,
-                   n_cut: int = 0, elapsed: float = 0.0) -> dict:
+def _k_list() -> List[int]:
+    return [int(k) for k in state.thesis_results.get("k_keluaran", [])]
+
+
+def _resolve_k(k: Optional[int]) -> int:
+    ks = _k_list()
+    if k is None:
+        k = k_utama_default()
+        return k if k in ks else (ks[0] if ks else k)
+    if int(k) not in ks:
+        raise HTTPException(status_code=422, detail=f"K = {k} tidak tersedia. Pilihan: {ks}")
+    return int(k)
+
+
+def _model(k: int) -> dict:
+    return state.thesis_results["model"][str(k)]
+
+
+def _level_payload(level: dict, summary: dict, records: List[dict], k: int, distribusi: List[dict],
+                   simulated: bool = False, n_cut: int = 0, elapsed: float = 0.0) -> dict:
     return {
         "status": "ok",
         "skenario": T.SKENARIO,
@@ -249,10 +268,12 @@ def _level_payload(level: dict, summary: dict, records: List[dict], simulated: b
         "elapsed_sec": round(elapsed, 2),
         "level_label_lengkap": level["label_lengkap"],
         "kelas_ditutup": level["kelas_ditutup"],
-        "k_optimal": int(state.thesis_results["k"]),
-        "cluster_names": state.thesis_results.get("cluster_names", {}),
-        "cluster_profile": state.thesis_results.get("cluster_profile", []),
-        "distribusi_tipologi": summary.get("distribusi_tipologi", []),
+        "k_optimal": int(k),
+        "k_utama": k_utama_default(),
+        "k_keluaran": _k_list(),
+        "cluster_names": _model(k).get("cluster_names", {}),
+        "cluster_profile": _model(k).get("cluster_profile", []),
+        "distribusi_tipologi": distribusi,
         "tas": summary.get("tas", {}),
         "n_titik_semu": int(summary.get("tas", {}).get("jumlah_tas", 0) or 0),
         "n_grid_tergenang": summary.get("n_grid_tergenang"),
@@ -274,10 +295,12 @@ def _load_thesis_results() -> bool:
 
 
 def _build_level_cache():
-    for lv in T.LEVELS:
-        summary = state.thesis_results.get("levels", {}).get(lv["key"], {})
-        records = T.records_from_grid(state.thesis_grid, lv["key"], cfg)
-        state.level_cache[lv["key"]] = _sanitize(_level_payload(lv, summary, records))
+    for k in _k_list():
+        for lv in T.LEVELS:
+            summary = state.thesis_results.get("levels", {}).get(lv["key"], {})
+            records = T.records_from_grid(state.thesis_grid, lv["key"], cfg, k)
+            dist = _model(k)["distribusi"][lv["key"]]
+            state.level_cache[(lv["key"], k)] = _sanitize(_level_payload(lv, summary, records, k, dist))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -315,7 +338,7 @@ async def startup_event():
         await asyncio.get_event_loop().run_in_executor(None, _warm)
         state.is_ready = True
         logger.info(f"[startup] SELESAI dalam {time.time() - t0:.1f} detik "
-                    f"(K={state.thesis_results.get('k')}, t_pen={state.t_pen:.2f} menit)")
+                    f"(K keluaran={_k_list()}, K utama={k_utama_default()}, t_pen={state.t_pen:.2f} menit)")
     except Exception as e:
         state.startup_error = str(e)
         logger.error(f"STARTUP GAGAL: {e}", exc_info=True)
@@ -334,7 +357,8 @@ async def health_check():
             "n_grid": len(state.gdf_base) if state.gdf_base is not None else 0,
             "n_roads": len(state.roads_raw) if state.roads_raw is not None else 0,
             "tes_counts": {k: len(v) for k, v in state.tes_raw.items()},
-            "k": state.thesis_results.get("k"),
+            "k_keluaran": _k_list(),
+            "k_utama": k_utama_default(),
             "t_pen": state.t_pen,
         },
         "config": {"skenario": T.SKENARIO, "levels": T.LEVELS, "target_crs": cfg.target_crs},
@@ -343,7 +367,8 @@ async def health_check():
 
 @app.get("/api/levels", tags=["System"], summary="Daftar level intensitas banjir")
 async def get_levels():
-    return {"status": "ok", "skenario": T.SKENARIO, "levels": T.LEVELS, "k": state.thesis_results.get("k"),
+    return {"status": "ok", "skenario": T.SKENARIO, "levels": T.LEVELS, "k": _resolve_k(None),
+            "k_utama": k_utama_default(), "k_keluaran": _k_list(),
             "tas_status": T.TAS_STATUS}
 
 
@@ -359,10 +384,11 @@ async def get_level(
     level: Optional[str] = Query(None, description="baseline | rendah | sedang | tinggi"),
     intensity: Optional[float] = Query(None, ge=0.0, le=1.0, description="Alternatif numerik untuk level"),
     skenario: Optional[str] = Query(None, description="Diabaikan — penelitian hanya banjir"),
+    k: Optional[int] = Query(None, description="K model (2 atau 3); bawaan = K utama"),
 ):
     _check_ready()
     lv = _resolve_level(level, intensity)
-    return JSONResponse(content=state.level_cache[lv["key"]])
+    return JSONResponse(content=state.level_cache[(lv["key"], _resolve_k(k))])
 
 
 @app.post("/api/simulate", tags=["Clustering"],
@@ -370,8 +396,9 @@ async def get_level(
 async def post_simulate(body: SimulateRequest):
     _check_ready()
     lv = _resolve_level(body.level, body.intensity)
+    k = _resolve_k(body.k)
     if not body.cut_roads:
-        return JSONResponse(content=state.level_cache[lv["key"]])
+        return JSONResponse(content=state.level_cache[(lv["key"], k)])
 
     t0 = time.time()
     cuts = _prepare_cut_roads(body.cut_roads)
@@ -385,21 +412,22 @@ async def post_simulate(body: SimulateRequest):
                                        graph_pack=(G_cut, nl, tn))
                 # Keanggotaan terhadap pusat klaster final yang TETAP (bukan klasterisasi ulang)
                 sim = T.simulate_level(prep, T.Preprocessor.from_dict(state.thesis_results["preprocessing"]),
-                                       np.asarray(state.thesis_results["model_final"]["pusat_klaster_pca"]),
+                                       np.asarray(_model(k)["model_final"]["pusat_klaster_pca"]),
                                        state.gdf_base, cfg)
                 grid = pd.concat([
                     state.thesis_grid[["id_grid", "id_grid_asli", "Road_Density_mean", T.SKENARIO]],
-                    T.level_grid_frame(lv["key"], prep["df"], sim["labels"], sim["membership"], prep["tas"], cfg),
+                    T.level_grid_frame(lv["key"], prep["df"], prep["tas"], cfg),
+                    T.model_grid_frame(lv["key"], k, sim["labels"], sim["membership"], sim["states"]),
                 ], axis=1)
-                k = int(state.thesis_results["k"])
-                return T.level_summary(lv["key"], prep, sim["states"], k, cfg), T.records_from_grid(grid, lv["key"], cfg)
+                return (T.level_summary(lv["key"], prep, cfg), T.records_from_grid(grid, lv["key"], cfg, k),
+                        T.level_distribution(sim["states"], k))
 
-            summary, records = await asyncio.get_event_loop().run_in_executor(None, _run)
+            summary, records, dist = await asyncio.get_event_loop().run_in_executor(None, _run)
         except Exception as e:
             logger.error(f"[POST /api/simulate] error: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Simulasi gagal: {e}")
 
-    payload = _level_payload(lv, summary, records, simulated=True,
+    payload = _level_payload(lv, summary, records, k, dist, simulated=True,
                              n_cut=len(body.cut_roads), elapsed=time.time() - t0)
     return JSONResponse(content=_sanitize(payload))
 

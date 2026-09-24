@@ -15,7 +15,7 @@ class AppState:
     # Hasil analisis skripsi (offline)
     thesis_results: dict = {}
     thesis_grid: Optional[pd.DataFrame] = None
-    level_cache: Dict[str, dict] = {}
+    level_cache: Dict[tuple, dict] = {}     # (level, K) -> payload
     t_pen: Optional[float] = None
 
     graph_cache: Dict[tuple, tuple] = {}

@@ -534,8 +534,8 @@ async function fetchAndRenderData(retryCount = 0) {
 
     try {
         const resp = roadCuts.length > 0
-            ? await fetch(`${API_BASE}/simulate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: activeLevel, cut_roads: roadCuts }) })
-            : await fetch(`${API_BASE}/baseline?level=${activeLevel}`);
+            ? await fetch(`${API_BASE}/simulate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ level: activeLevel, k: activeK, cut_roads: roadCuts }) })
+            : await fetch(`${API_BASE}/baseline?level=${activeLevel}${activeK ? `&k=${activeK}` : ''}`);
 
         if (resp.status === 503 && retryCount < 60) {
             setTimeout(() => { isCalculating = false; fetchAndRenderData(retryCount + 1); }, 3000);
@@ -567,6 +567,33 @@ async function fetchAndRenderData(retryCount = 0) {
             setTimeout(() => restoreActivePopupState(popupSnapshot), 0);
         }
     }
+}
+
+function renderKButtons() {
+    const g = document.getElementById('k-group');
+    if (!g) return;
+    g.innerHTML = kKeluaran.map(k => `<button class="level-btn ${k === activeK ? 'active' : ''}" onclick="setK(${k})"
+        title="${k === kUtama ? 'Model utama' : 'Sensitivitas'}">K = ${k}<small>${k === kUtama ? 'utama' : 'sensitivitas'}</small></button>`).join('');
+    const note = document.getElementById('k-utama-note');
+    if (note && kUtama) note.textContent = `(utama: K = ${kUtama})`;
+}
+
+async function initK() {
+    try {
+        const resp = await fetch(`${API_BASE}/levels`);
+        const d = await resp.json();
+        kUtama = d.k_utama; kKeluaran = d.k_keluaran || [];
+        if (!activeK) activeK = kKeluaran.includes(kUtama) ? kUtama : kKeluaran[0];
+    } catch (e) { console.error('Gagal memuat pilihan K:', e); }
+    renderKButtons();
+}
+
+function setK(k) {
+    activeK = k;
+    activeCluster = null;
+    renderKButtons();
+    if (typeof thesisResults !== 'undefined' && document.getElementById('results-overlay') && !document.getElementById('results-overlay').hidden) renderResultsBody();
+    fetchAndRenderData();
 }
 
 function setLevel(key) {
@@ -602,7 +629,7 @@ function renderLevelSummary(result) {
             <div class="summary-tile"><span>Grid Tergenang</span><b>${fmtInt(result.n_grid_tergenang)}</b></div>
             <div class="summary-tile"><span>Rata-rata waktu min.</span><b>${fmtNum(result.mean_waktu_min)} <small>mnt</small></b></div>
             <div class="summary-tile"><span>Titik Aman Semu</span><b>${fmtInt(tas.jumlah_tas)} <small>(${fmtNum(tas.persen_tas_non_tergenang)}%)</small></b></div>
-            <div class="summary-tile"><span>Rerata DI TAS / Non-TAS</span><b>${fmtNum(tas.mean_di_tas)} / ${fmtNum(tas.mean_di_non_tas)}</b></div>
+            <div class="summary-tile"><span>Median DI TAS / Non-TAS</span><b>${fmtNum(tas.sebaran_di_tas?.median)} / ${fmtNum(tas.sebaran_di_non_tas?.median)}</b></div>
         </div>${sim}`;
 }
 
@@ -725,12 +752,13 @@ let compareFraction = 0.5;
 const compareLookups = {};
 
 async function fetchLevelLookup(level) {
-    if (compareLookups[level]) return compareLookups[level];
-    const resp = await fetch(`${API_BASE}/baseline?level=${level}`);
+    const key = `${level}|${activeK}`;
+    if (compareLookups[key]) return compareLookups[key];
+    const resp = await fetch(`${API_BASE}/baseline?level=${level}${activeK ? `&k=${activeK}` : ''}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const result = await resp.json();
-    compareLookups[level] = Object.fromEntries(result.data_klaster.map(d => [d.id_grid, d]));
-    return compareLookups[level];
+    compareLookups[key] = Object.fromEntries(result.data_klaster.map(d => [d.id_grid, d]));
+    return compareLookups[key];
 }
 
 function ensureComparePane() {

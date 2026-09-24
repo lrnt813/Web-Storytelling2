@@ -17,7 +17,7 @@ function legendSwatch(color, border = null) {
 
 function legendTitle() {
     return `<h4 class="legend-title">${viewModes[activeView].toUpperCase()}</h4>
-            <div class="legend-sub">Banjir · ${levelFullLabel(activeLevel)}${lastLevelResult?.simulated ? ' · <span class="legend-sim">SIMULASI</span>' : ''}</div>`;
+            <div class="legend-sub">Banjir · ${levelFullLabel(activeLevel)}${activeK ? ` · K = ${activeK}` : ''}${lastLevelResult?.simulated ? ' · <span class="legend-sim">SIMULASI</span>' : ''}</div>`;
 }
 
 function countBy(fn) {
@@ -45,7 +45,7 @@ function buildLegendHtml(k) {
                  <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Non-TAS <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 0))}</span></div>
                  <div class="legend-static-item">${legendSwatch(TERPUTUS_COLOR, '#94a3b8')} Terputus <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 2))}</span></div>
                  <div class="legend-static-item">${legendSwatch(TERGENANG_COLOR)} Tergenang <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 3))}</span></div>
-                 <div class="legend-foot">TAS: T<sub>ideal</sub> ≤ P25 dan Detour Index ≥ P75 (grid non-Tergenang yang terjangkau). Terputus: tidak menjangkau TES.</div>`;
+                 <div class="legend-foot">TAS: Detour Index ≥ 2 dan T<sub>ideal</sub> ≤ 5 menit (grid non-Tergenang yang terjangkau). Terputus: tidak menjangkau TES.</div>`;
     } else if (activeView === 'terdampak') {
         html += `<div class="legend-static-item">${legendSwatch(TERGENANG_COLOR)} Tergenang <span class="legend-note">${fmtInt(countBy(d => d.tergenang === 1))}</span></div>
                  <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Tidak tergenang</div>

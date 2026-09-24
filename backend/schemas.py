@@ -16,6 +16,7 @@ class RoadCutItem(BaseModel):
 
 class SimulateRequest(BaseModel):
     level: Optional[str] = Field("baseline", description=LEVEL_DESC)
+    k: Optional[int] = Field(None, description="K model (2 atau 3); bawaan = K utama")
     intensity: Optional[float] = Field(None, ge=0.0, le=1.0, description="Alternatif numerik untuk level")
     cut_roads: List[RoadCutItem] = Field(default_factory=list)
 

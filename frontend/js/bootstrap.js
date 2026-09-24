@@ -18,6 +18,7 @@ window.onload = async () => {
     } catch (e) { console.error("Gagal memuat daftar wilayah dari GPKG:", e); }
 
     loadGridAdmin();
+    await initK();
     loadStaticGeometry().then(() => {
         loadSession();
         // Tautan langsung ke panel hasil, mis. #hasil-transisi
