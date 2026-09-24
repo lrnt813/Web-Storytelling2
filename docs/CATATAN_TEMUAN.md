@@ -363,3 +363,36 @@ Model, K, data, dan semua ambang tidak diubah; putaran ini hanya penyajian, vali
   `scripts/rekap_validasi_TAS.py` setelah lembar diisi peneliti (belum dijalankan). — *MENUNGGU PENGISIAN*
 - **P5-5. Referensi draft lama di kode**: tidak ada (diperiksa dengan grep di backend/, scripts/,
   frontend/, tests/). `docs/angka_draft_lama.json` tetap sebagai arsip dokumentasi. — *SELESAI*
+
+---
+
+# Diagnostik topologi jaringan (branch `diagnostik-topologi`; hasil v5 tidak diubah)
+
+**Definisi dan toleransi (ditetapkan sebelum melihat hasil):**
+
+- Graf dibangun persis seperti `build_road_graph`: simpul = ujung segmen dibulatkan 0,01 m; sisi =
+  segmen (semua segmen jalan GPKG berupa garis 2 titik).
+- **Segmen khusus** = `bridge = T` atau `tunnel = T` atau `layer ≠ 0`. Perpotongan atau sambungan yang
+  melibatkan segmen khusus dianggap wajar tidak tersambung, sehingga tidak dihitung sebagai artefak dan
+  tidak disambungkan saat perapian.
+- **Ujung buntu** = simpul berderajat 1.
+- **Near-miss** pada toleransi d ∈ {0,5; 1; 2; 5} m: ujung buntu u yang punya titik pada sisi lain e
+  berjarak ≤ d dengan tiga syarat: (i) e tidak bersisian dengan u; (ii) tidak ada ujung e yang dapat
+  dicapai dari u dalam jarak jaringan ≤ 20 m (agar sisi tetangga di jalan yang sama tidak ikut
+  terhitung); (iii) u dan e bukan segmen khusus.
+- **Perpotongan tanpa simpul** = dua sisi yang berpotongan geometris di satu titik tanpa berbagi ujung.
+  Dilaporkan terpisah: yang melibatkan segmen khusus vs yang tidak.
+- **Per TAS**: diklasifikasikan "kemungkinan artefak topologi" bila ada near-miss ≤ 2 m atau
+  perpotongan tanpa simpul (non-khusus) dalam radius 100 m dari garis lurus grid–TES terdekat. Selain
+  itu diklasifikasikan "tidak terdeteksi artefak". Komponen terhubung simpul grid dan simpul TES
+  dilaporkan pada graf Baseline.
+- **Jaringan dirapikan** (toleransi utama 1 m, sensitivitas 2 m):
+  - (a) noding: sisi non-khusus yang berpotongan dipecah di titik potong dan disambungkan;
+  - (b) setiap near-miss pada toleransi tersebut disambungkan ke titik terdekat pada sisi sasaran
+    (sisi dipecah bila titiknya bukan ujung), dengan panjang sambungan = jarak.
+  - Sisi hasil pecahan mewarisi segmen sumbernya. Pada level banjir, sisi dan sambungan yang segmen
+    sumbernya ditutup ikut dihapus.
+- **Perhitungan ulang** per level: waktu tempuh, kategori akses (20/30/40 menit), dan TAS aturan utama,
+  dengan T_pen v5 (403,87 menit) dan aturan yang sama. Klasterisasi tidak di-fit ulang. "Tipologi 4 v5
+  menjadi terjangkau" = baris data gabungan K = 4 berlabel 3 yang waktu minimumnya < T_pen pada
+  jaringan dirapikan.
