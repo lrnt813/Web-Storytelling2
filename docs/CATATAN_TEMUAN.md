@@ -50,3 +50,45 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
   bukan rata-rata tertimbang yang ternormalisasi; tetangga terdampak memperbesar jarak spasial
   secara absolut. Apakah ini disengaja perlu dikonfirmasi. Bobot kini parameter
   `Cfg.sdwfcm_impact_weight = 2.0` dan dipakai sama di `fit()` dan `sdwfcm_objective()`. — *DICATAT*
+
+## C. Implementasi dan data (ditemukan selama rekonstruksi)
+
+- **C1. SKATER memakai fallback manual.** `spopt.region.Skater` (spopt 0.7.0) menolak argumen
+  `min_region` (`TypeError`), sehingga perbandingan algoritma memakai fallback: MST pada graf
+  ketetanggaan berbobot jarak atribut, lalu memotong K−1 sisi terpanjang. Pada data ini fallback
+  menghasilkan satu klaster raksasa (Size Entropy ≈ 0,006). Silhouette SKATER yang tinggi (≈ 0,77)
+  adalah artefak ketimpangan ukuran, bukan kualitas partisi. — *DICATAT*
+- **C2. PESC sangat kecil walau sudah dalam km** (≈ 0,0004–0,007 km untuk K = 2–10). Nilainya tidak
+  lagi dibulatkan (tidak ikut pembulatan 6 desimal), tetapi skala ini membuat PESC tidak informatif
+  sebagai metrik pembanding. PESC tidak ikut skor komposit. — *DICATAT*
+- **C3. Kode lama yang tidak dipakai masih ada.** `backend/engine.py` bagian 10, 11, 16, 17, 18
+  (sudah diberi label "VERSI LAMA, TIDAK DIPAKAI") dan impor `backend/pseudo_safety.py` (dipakai
+  jalur lama `simulate_*`). Kode ini tidak dihapus karena di luar lingkup instruksi. — *DICATAT*
+- **C4. `is_isolated` biner dan jarang setelah Yeo-Johnson + standardisasi.** Nilai 1 hanya pada
+  ≈ 0,5% grid di Baseline, sehingga setelah transformasi nilainya menjadi ekstrem dan berpotensi
+  mendominasi satu komponen PCA. Tidak ada fitur yang terbuang oleh filter varians (10 fitur
+  masuk, 5 komponen PCA, varians terjelaskan 85,2%). — *DICATAT*
+- **C5. Kolom `id_grid` di GPKG ditimpa** dengan integer urut 0..N−1 saat pemuatan (peringatan di
+  log). Penomoran grid di hasil adalah urutan baris GPKG, bukan ID asli berkas. — *DICATAT*
+- **C6. Moran's I memakai 99 permutasi**, sehingga p minimum = 0,01. Semua algoritma memperoleh
+  p = 0,01, jadi nilai p tidak membedakan algoritma. — *DICATAT*
+
+## D. Pengamatan dari hasil final (untuk dibahas dengan pembimbing)
+
+- **D1. Selisih skor K kecil.** K = 4 terpilih (skor 0,706) dengan runner-up K = 2 (0,689),
+  selisih 0,017. DESC sangat tidak stabil antar-K (0,14 / 0,20 / 7,48 / 0,47 / 4,49 / … / 8,60)
+  dan praktis menentukan urutan peringkat. Pemilihan K sebaiknya disajikan beserta tabel lengkap,
+  bukan hanya pemenangnya.
+- **D2. Tipologi baru di level Sedang dan Tinggi.** Dengan batas 2 × median jarak antarpusat
+  Baseline (= 3,44), pada Sedang 2 dari 4 klaster, dan pada Tinggi 3 dari 4 klaster, tidak
+  berpadanan dengan tipologi Baseline (jarak 9–20). Nomor klaster pada level itu tetap hasil
+  pencocokan Hungarian, tetapi *maknanya* tidak boleh disamakan dengan klaster Baseline bernomor
+  sama. Matriks transisi, SR, dan "klaster dominan" untuk level tersebut perlu dibaca dengan
+  catatan ini.
+- **D3. Grid Terputus sudah ada di Baseline** (168 grid), sedangkan grid terisolasi (opsi rute = 0)
+  berjumlah 111. Perbedaan definisinya: Terputus = T_aktual sama dengan waktu penalti (termasuk
+  grid yang gagal snapping ≤ 300 m), sedangkan terisolasi = tidak ada satu pun kategori TES yang
+  terjangkau.
+- **D4. REDCAP dan SKATER menghasilkan partisi sangat timpang** (Size Entropy 0,44 dan 0,006), dan
+  proporsi tetangga berlabel sama ≈ 1 karena hampir semua grid berada di satu klaster.
+  Perbandingan algoritma perlu membaca Size Entropy bersama metrik lain.
