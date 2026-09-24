@@ -52,6 +52,14 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+# Batas waktu evakuasi berjalan kaki (menit) dan nilai sensitivitasnya. Satu-satunya sumber
+# angka ini di kode (dipakai aturan TAS, kategori akses "Jauh", dan ambang isolasi REDCAP).
+# Rujukan: Li dkk. (2026) hlm. 2915 (d0 = 30 menit) dan hlm. 2920 (sensitivitas 20 dan 40 menit);
+# lihat docs/RUJUKAN_PARAMETER.md.
+EVAC_TIME_MIN: float = 30.0
+EVAC_TIME_SENS: Tuple[float, ...] = (20.0, 40.0)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 2. KONFIGURASI (Cfg)
 #    Lokasi berkas data dan seluruh parameter model.
@@ -87,7 +95,7 @@ class Cfg:
     tes_hazard_threshold: int = 2
     road_break_threshold: int = 3
     walking_speed_m_per_min: float = 80.0
-    isolation_time_threshold: float = 30.0
+    isolation_time_threshold: float = EVAC_TIME_MIN
     isolation_penalty_weight: float = 10.0
     unreachable_time: float = 9999.0
 
@@ -917,7 +925,7 @@ class REDCAPManual:
     dikalikan penalti ukuran (n^size_alpha) dan penalti isolasi, sampai tersisa K region.
     """
     def __init__(self, X, w, k=5, linkage="ward", size_alpha=1.0,
-                 net_dist=None, iso_pen=10.0, iso_thr=30.0):
+                 net_dist=None, iso_pen=10.0, iso_thr=EVAC_TIME_MIN):
         self.X = X; self.w = w; self.k = k; self.linkage = linkage
         self.size_alpha = size_alpha; self.net_dist = net_dist
         self.iso_pen = iso_pen; self.iso_thr = iso_thr
