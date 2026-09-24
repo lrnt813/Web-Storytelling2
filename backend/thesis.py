@@ -39,6 +39,8 @@ from .engine import (
     SpatialFuzzyCMeans,
     build_road_graph,
     calc_t_max,
+    impact_weights,
+    sdwfcm_objective_value,
     compute_distances,
     filter_tes,
     run_skater,
@@ -227,23 +229,13 @@ def preprocess_features(df: pd.DataFrame, cfg: Cfg) -> Tuple[np.ndarray, dict]:
 # ══════════════════════════════════════════════════════════════════════════════
 # 4. SDWFCM + PELABELAN
 # ══════════════════════════════════════════════════════════════════════════════
-def sdwfcm_objective(model: SpatialDistanceWeightedFCM, X: np.ndarray, coords_gdf, mask) -> float:
-    """Fungsi objektif SDWFCM J = Σ_i Σ_k u_ik^m · d_ik, dengan d_ik jarak
-    gabungan atribut–spasial (sama seperti pada iterasi model)."""
-    U, m, alpha = model.U_, model.m, model.alpha
+def sdwfcm_objective(model: SpatialDistanceWeightedFCM, X: np.ndarray, coords_gdf, mask,
+                     cfg: Cfg) -> float:
+    """J = Σ_i Σ_k u_ik^m · d_t,ik untuk keanggotaan akhir model, memakai fungsi jarak
+    yang sama dengan iterasi (engine.sdwfcm_distances) dan cfg.sdwfcm_impact_weight."""
     W = model._build_W(coords_gdf)
-    dw = np.ones(len(X))
-    if mask is not None and np.any(mask):
-        dw[np.asarray(mask, bool)] = 2.0
-    We = W.multiply(dw[None, :]).tocsr()
-    Um = U ** m
-    C = (Um.T @ X) / (Um.sum(axis=0)[:, None] + 1e-10)
-    da = cdist(X, C) ** 2 + 1e-10
-    ds = np.column_stack([
-        (We @ (da[:, c] * Um[:, c])) / ((W @ Um[:, c]) + 1e-10) for c in range(U.shape[1])
-    ])
-    dt = np.clip((1 - alpha) * da + alpha * ds, 1e-10, None)
-    return float((Um * dt).sum())
+    dw = impact_weights(len(X), mask, cfg.sdwfcm_impact_weight)
+    return sdwfcm_objective_value(X, model.U_, W, dw, model.m, model.alpha)
 
 
 def run_sdwfcm(X: np.ndarray, coords_gdf, k: int, mask, cfg: Cfg, fast: bool = False,
@@ -259,9 +251,9 @@ def run_sdwfcm(X: np.ndarray, coords_gdf, k: int, mask, cfg: Cfg, fast: bool = F
             knn=cfg.sdwfcm_knn,
             max_iter=min(cfg.sdwfcm_max_iter, 40) if fast else cfg.sdwfcm_max_iter,
             tol=max(cfg.sdwfcm_tol, 1e-3) if fast else cfg.sdwfcm_tol,
-            rs=rs,
+            rs=rs, impact_weight=cfg.sdwfcm_impact_weight,
         ).fit(X, coords_gdf, mask_dampak=mask)
-        J = sdwfcm_objective(model, X, coords_gdf, mask)
+        J = sdwfcm_objective(model, X, coords_gdf, mask, cfg)
         if best is None or J < best[0]:
             best = (J, rs, model)
     J, rs, model = best
@@ -327,7 +319,7 @@ def membership_distribution_metric(U: np.ndarray, X: Optional[np.ndarray] = None
     if X is not None and m is not None:
         d = cdist(X, fuzzy_centers(X, U, m)) ** 2 + 1e-10
         r = d[:, :, None] / d[:, None, :]
-        U = 1.0 / (r ** (2.0 / (m - 1.0))).sum(axis=2)
+        U = 1.0 / (r ** (1.0 / (m - 1.0))).sum(axis=2)
         U = U / U.sum(axis=1, keepdims=True)
     pe = float(-(U * np.log(np.clip(U, 1e-12, None))).sum(axis=1).mean())
     return 1.0 - pe / np.log(K)

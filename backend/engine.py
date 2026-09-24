@@ -158,6 +158,7 @@ class Cfg:
     sdwfcm_knn: int = 8
     sdwfcm_max_iter: int = 150
     sdwfcm_tol: float = 1e-4
+    sdwfcm_impact_weight: float = 2.0   # bobot tetangga yang terdampak banjir pada suku spasial d_s
 
     # ── SFCM — Pembanding 1 ───────────────────────────────────────────────────
     sfcm_m: float = 2.0
@@ -848,6 +849,54 @@ def _euc(xa, xb):
 # 13. ALGORITMA KLASTERISASI
 # ══════════════════════════════════════════════════════════════════════════════
 
+def fuzzy_membership_update(dt: np.ndarray, m: float) -> np.ndarray:
+    """Aturan update keanggotaan FCM untuk jarak KUADRAT dt:
+        u_ik = 1 / Σ_l (dt_ik / dt_il)^(1/(m−1))
+    (setara dengan bentuk baku 1 / Σ_l (‖x_i−v_k‖ / ‖x_i−v_l‖)^(2/(m−1)) untuk jarak tak-kuadrat).
+    """
+    r = dt[:, :, None] / dt[:, None, :]
+    U = 1.0 / (r ** (1.0 / (m - 1.0))).sum(axis=2)
+    U = np.clip(U, 1e-10, None)
+    return U / U.sum(axis=1, keepdims=True)
+
+
+def sdwfcm_distances(X: np.ndarray, U: np.ndarray, W: csr_matrix, dw: np.ndarray,
+                     m: float, alpha: float):
+    """Jarak SDWFCM untuk keanggotaan U (dipakai bersama oleh fit() dan fungsi objektif).
+
+        v_k   = Σ_i u_ik^m x_i / Σ_i u_ik^m
+        d_a   = ‖x_i − v_k‖² (+1e-10)
+        d_s   = Σ_j W_ij ω_j d_a,jk u_jk^m / Σ_j W_ij u_jk^m     (ω_j = bobot dampak tetangga j)
+        d_t   = (1 − α) d_a + α d_s
+    Returns: (centers, d_a, d_s, d_t)
+    """
+    k = U.shape[1]
+    Um = U ** m
+    centers = (Um.T @ X) / (Um.sum(axis=0)[:, None] + 1e-10)
+    da = cdist(X, centers) ** 2 + 1e-10
+    We = W @ sp.diags(dw, format="csr")
+    ds = np.zeros_like(da)
+    for ci in range(k):
+        ds[:, ci] = (We @ (da[:, ci] * Um[:, ci])) / ((W @ Um[:, ci]) + 1e-10)
+    dt = np.clip((1 - alpha) * da + alpha * ds, 1e-10, None)
+    return centers, da, ds, dt
+
+
+def sdwfcm_objective_value(X: np.ndarray, U: np.ndarray, W: csr_matrix, dw: np.ndarray,
+                           m: float, alpha: float) -> float:
+    """Fungsi objektif SDWFCM J(U) = Σ_i Σ_k u_ik^m · d_t,ik(U), dengan d_t dari sdwfcm_distances."""
+    _, _, _, dt = sdwfcm_distances(X, U, W, dw, m, alpha)
+    return float(((U ** m) * dt).sum())
+
+
+def impact_weights(n: int, mask_dampak, impact_weight: float) -> np.ndarray:
+    """ω_j = impact_weight untuk grid terdampak banjir, 1 untuk lainnya."""
+    dw = np.ones(n)
+    if mask_dampak is not None and np.any(mask_dampak):
+        dw[np.asarray(mask_dampak, bool)] = impact_weight
+    return dw
+
+
 class SpatialDistanceWeightedFCM:
     """Spatial Distance-Weighted Fuzzy C-Means (SDWFCM).
 
@@ -857,10 +906,12 @@ class SpatialDistanceWeightedFCM:
     docs/METODOLOGI.md.
     """
     def __init__(self, k=5, m=1.7, alpha=0.5, sigma=None, knn=8,
-                 max_iter=150, tol=1e-4, rs=42):
+                 max_iter=150, tol=1e-4, rs=42, impact_weight=2.0, track_objective=False):
         self.k = k; self.m = m; self.alpha = alpha; self.sigma = sigma
         self.knn = knn; self.max_iter = max_iter; self.tol = tol; self.rs = rs
+        self.impact_weight = impact_weight; self.track_objective = track_objective
         self.labels_ = self.U_ = self.max_membership_ = self.centers_ = None
+        self.objective_ = None; self.objective_history_ = []; self.n_iter_ = 0
 
     def _build_W(self, gdf_or_coords):
         if hasattr(gdf_or_coords, "columns") and "cx" in gdf_or_coords.columns and "cy" in gdf_or_coords.columns:
@@ -904,41 +955,38 @@ class SpatialDistanceWeightedFCM:
         return W
 
     def fit(self, X, gdf_or_coords, mask_dampak=None):
+        """Iterasi: d_t(U) → U_baru = fuzzy_membership_update(d_t, m), sampai ‖U_baru − U‖_F < tol.
+
+        Inisialisasi: np.random.seed(rs); U ~ Dirichlet(1,…,1).
+        objective_ = J(U_akhir); objective_history_ berisi J(U_t) per iterasi bila
+        track_objective=True.
+        """
         np.random.seed(self.rs)
         n, _ = X.shape; k = self.k; m = self.m
         W  = self._build_W(gdf_or_coords)
-        dw = np.ones(n)
-        if mask_dampak is not None and mask_dampak.any():
-            dw[mask_dampak] = 2.0
-        D = sp.diags(dw, format="csr")
+        dw = impact_weights(n, mask_dampak, self.impact_weight)
         U = np.random.dirichlet(np.ones(k), size=n)
+        self.objective_history_ = []
+        if self.track_objective:
+            self.objective_history_.append(sdwfcm_objective_value(X, U, W, dw, m, self.alpha))
+        it = 0
         for it in range(self.max_iter):
-            Um      = U ** m
-            centers = (Um.T @ X) / (Um.sum(axis=0)[:, None] + 1e-10)
-            da      = cdist(X, centers) ** 2 + 1e-10
-            We      = W @ D
-            ds      = np.zeros((n, k))
-            for ci in range(k):
-                ds[:, ci] = (
-                    (We @ (da[:, ci] * Um[:, ci]))
-                    / ((W @ Um[:, ci]) + 1e-10)
-                )
-            dt  = np.clip((1 - self.alpha) * da + self.alpha * ds, 1e-10, None)
-            exp = 2 / (m - 1)
-            r   = dt[:, :, None] / dt[:, None, :]
-            Un  = 1 / (r ** exp).sum(axis=2)
-            Un  = np.clip(Un, 1e-10, None)
-            Un /= Un.sum(axis=1, keepdims=True)
+            centers, _, _, dt = sdwfcm_distances(X, U, W, dw, m, self.alpha)
+            Un   = fuzzy_membership_update(dt, m)
             diff = np.linalg.norm(Un - U)
             U    = Un
+            if self.track_objective:
+                self.objective_history_.append(sdwfcm_objective_value(X, U, W, dw, m, self.alpha))
             if diff < self.tol:
                 logger.info(f"[SDWFCM] konvergen pada iterasi {it} | diff={diff:.6f}")
                 break
+        self.n_iter_          = it + 1
         self.U_               = U
         self.labels_          = np.argmax(U, axis=1)
         self.max_membership_  = U.max(axis=1)
         self.centers_         = centers
-        logger.info(f"[SDWFCM] {len(set(self.labels_))} klaster | σ={self._sigma:.2f}")
+        self.objective_       = sdwfcm_objective_value(X, U, W, dw, m, self.alpha)
+        logger.info(f"[SDWFCM] {len(set(self.labels_))} klaster | σ={self._sigma:.2f} | J={self.objective_:.4f}")
         return self
 
 
@@ -975,12 +1023,7 @@ class SpatialFuzzyCMeans:
                         if adj[i] else da[i, ci]
                     )
             dt  = np.clip((1 - self.alpha) * da + self.alpha * ds, 1e-10, None)
-            exp = 2 / (m - 1)
-            Un  = np.zeros_like(U)
-            for ci in range(k):
-                Un[:, ci] = 1 / ((dt[:, ci:ci + 1] / dt).sum(axis=1) ** exp)
-            Un   = np.clip(Un, 1e-10, None)
-            Un  /= Un.sum(axis=1, keepdims=True)
+            Un  = fuzzy_membership_update(dt, m)
             diff = np.linalg.norm(Un - U)
             U    = Un
             if diff < self.tol:
