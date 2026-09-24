@@ -4,7 +4,7 @@ Menghasilkan:
   data/thesis_results.json         — ringkasan seluruh tabel/metrik Bab IV
   data/thesis_grid_results.csv.gz  — atribut per grid untuk setiap level
 
-Jalankan:  python -m scripts.thesis_analysis   (± 10–15 menit, SFCM paling lama)
+Jalankan:  python -m scripts.thesis_analysis --force
            tambahkan --skip-comparison untuk melewati perbandingan algoritma.
 """
 import os
@@ -54,7 +54,8 @@ def restore_locked(data_dir) -> bool:
     return all((Path(data_dir) / f).exists() for f in (RESULTS_FILE, GRID_FILE))
 
 
-TIME_KEYS = {"elapsed_sec", "time_sec", "sdwfcm_time_sec",   # dibuang sebelum hashing
+TIME_KEYS = {"elapsed_sec", "time_sec", "sdwfcm_time_sec", "time_per_init_sec",   # dibuang sebelum hashing
+             "waktu_komputasi", "waktu_inisialisasi_sec", "waktu_subsampel_sec", "waktu_metrik_sec",
              "git"}                                           # identitas commit (bukan hasil)
 
 
@@ -121,7 +122,8 @@ def git_info(root=PROJECT_ROOT) -> dict:
             "kode_berubah_belum_commit": bool(dirty) if dirty is not None else None}
 
 
-def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: bool = False) -> dict:
+def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: bool = False,
+                        subsample_b: int = T.SUBSAMPLE_B) -> dict:
     t_start = time.time()
     data_dir = data_dir or os.environ.get("SDWFCM_DATA_DIR", str(PROJECT_ROOT / "data"))
     if is_locked(data_dir) and not force:
@@ -130,27 +132,37 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
                        "Gunakan --force untuk menimpa.")
         return json.loads((Path(data_dir) / RESULTS_FILE).read_text(encoding="utf-8"))
     cfg = Cfg(base_dir=data_dir)
+    timing = {}
 
+    def _tick(name, t0):
+        timing[name] = time.time() - t0
+        logger.info(f"[waktu] {name}: {timing[name]:.1f} s")
+        return time.time()
+
+    t = time.time()
     gdf = load_data(cfg)
     roads, tes = load_road_network(cfg)
-    w = build_weights(gdf)
-    A = T.queen_adjacency(gdf)   # blok spasial DESC/PESC (lihat CATATAN_TEMUAN A1)
+    w = build_weights(gdf)                 # rook (+ perbaikan pulau/komponen) — Moran's I, SFCM, REDCAP
     A_rook = T.rook_adjacency(w)
-    xy = np.column_stack([gdf["cx"].values, gdf["cy"].values])
-    k_final = None   # ditentukan dari skor komposit pada Baseline
+    t = _tick("muat_data", t)
 
     results = {
         "meta": {
             "git": git_info(),
+            "versi_desain": "v2 (data gabungan, status Tergenang, K berbasis stabilitas)",
             "skenario": T.SKENARIO,
             "levels": T.LEVELS,
             "walking_speed_m_per_min": cfg.walking_speed_m_per_min,
-            "sdwfcm": {"m": cfg.sdwfcm_m, "alpha": cfg.sdwfcm_alpha, "knn": cfg.sdwfcm_knn},
+            "sdwfcm": {"m": cfg.sdwfcm_m, "alpha": cfg.sdwfcm_alpha, "knn": cfg.sdwfcm_knn,
+                       "impact_weight": cfg.sdwfcm_impact_weight},
+            "sfcm": {"m": cfg.sfcm_m, "alpha": cfg.sfcm_alpha},
             "pca_variance": T.PCA_VARIANCE,
             "iqr_factor": T.IQR_FACTOR,
             "capped_columns": T.CAPPED_COLUMNS,
+            "fitur_klasterisasi": T.feature_columns(cfg),
             "sdwfcm_n_init": T.SDWFCM_N_INIT,
             "feature_labels": T.FEATURE_LABELS,
+            "tas_status": T.TAS_STATUS,
         },
         "data_summary": {
             "n_grid": int(len(gdf)),
@@ -160,81 +172,113 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
         },
         "levels": {},
     }
+
+    # ── 1. Aksesibilitas + TAS per level ─────────────────────────────────────
+    t_pen, preps = None, {}
+    for lv in T.LEVELS:
+        logger.info(f"===== AKSESIBILITAS {lv['label_lengkap'].upper()} =====")
+        prep = T.prepare_level(gdf, roads, tes, lv["intensity"], cfg, t_pen=t_pen)
+        t_pen = prep["t_pen"]
+        prep.pop("graph")                  # graf tidak diperlukan lagi (hemat memori)
+        preps[lv["key"]] = prep
+    results["t_pen"] = t_pen
+    results["baseline_time_stats"] = T.describe_times(preps["baseline"]["df"], cfg)
+    t = _tick("aksesibilitas_dan_tas", t)
+
+    # ── 2. Data gabungan, praproses, W blok-diagonal ─────────────────────────
+    pool = T.build_pooled({k: p["df"] for k, p in preps.items()}, gdf)
+    pre = T.Preprocessor.fit(pool, cfg)
+    X = pre.transform(pool)
+    coords = pool[["cx", "cy"]].values
+    groups = pool["level"].values
+    W, sigmas = T.block_knn_weights(coords, groups, cfg.sdwfcm_knn)
+    grid_idx = pool["id_grid"].values.astype(int)
+    A_pool = T.block_adjacency(A_rook, grid_idx, groups)
+    results["preprocessing"] = pre.to_dict()
+    results["data_gabungan"] = {
+        "n_baris": int(len(pool)),
+        "n_baris_per_level": {k: int((groups == k).sum()) for k in T.LEVEL_KEYS},
+        "sigma_per_level": sigmas,
+        "knn": cfg.sdwfcm_knn,
+    }
+    t = _tick("data_gabungan_praproses_W", t)
+
+    # ── 3. Pemilihan K (stabilitas) ──────────────────────────────────────────
+    k_rows, k_summary, solutions = T.evaluate_k_stability(X, W, pool, A_pool, cfg, B=subsample_b)
+    k_final = k_summary["k_terpilih"]
+    results["k"] = k_final
+    results["k_selection"] = {"candidates": k_rows, **k_summary}
+    t = _tick("pemilihan_k", t)
+
+    # ── 4. Model final: solusi J terkecil (seed 42–51) untuk K terpilih ──────
+    sol = solutions[k_final]
+    labels, U = T.number_by_travel_time(sol["labels"], sol["U"], pool["waktu_tes_min"].values)
+    centers = T.fuzzy_centers(X, U, cfg.sdwfcm_m)
+    desc, pesc = T.desc_pesc(X, labels, A_pool, coords)
+    results["model_final"] = {
+        "seed_terbaik": sol["seed"], "objective": sol["objective"], "time_sec": sol["time"],
+        "pusat_klaster_pca": centers.tolist(),
+        "validity": {
+            "iidx": T.i_index(X, labels, centers=centers),
+            "ketegasan_partisi": T.ketegasan_partisi(U, X, cfg.sdwfcm_m),
+            "dunn": T.dunn_multi(X, labels),
+            "desc": desc,
+            "pesc": pesc,
+            "silhouette_sampel": T.silhouette_sampled(X, labels),
+            "size_entropy": T.size_entropy(labels),
+            "proporsi_tetangga_sama": T.same_label_neighbor_share(labels, A_pool),
+        },
+    }
+    results["cluster_profile"] = T.cluster_profile(pool, labels, k_final)
+    results["cluster_names"] = {str(r["klaster"]): r["deskripsi"] for r in results["cluster_profile"]}
+    membership_pool = U.max(axis=1)
+    t = _tick("model_final", t)
+
+    # ── 5. State per level, transisi ─────────────────────────────────────────
+    states = {}
     grid_parts = [pd.DataFrame({
         "id_grid": gdf["id_grid"].values,
         "id_grid_asli": gdf["id_grid_asli"].values,
         "Road_Density_mean": gdf["Road_Density_mean"].values,
         T.SKENARIO: gdf[T.SKENARIO].values,
     })]
-
-    t_pen = None
-    preprocessor = None          # di-fit pada Baseline, dipakai ulang di level lain
-    baseline_centers = None      # pusat fuzzy Baseline (ruang PCA bersama)
-    labels_by_level = {}
     for lv in T.LEVELS:
         key = lv["key"]
-        logger.info(f"===== LEVEL {lv['label'].upper()} (intensitas {lv['intensity']}) =====")
-        prep = T.prepare_level(gdf, roads, tes, lv["intensity"], cfg, t_pen=t_pen,
-                               preprocessor=preprocessor)
-        t_pen = prep["t_pen"]
-        preprocessor = prep["preprocessor"]
-        X, df = prep["X"], prep["df"]
-
-        if key == "baseline":
-            results["t_pen"] = t_pen
-            results["preprocessing"] = preprocessor.to_dict()
-            results["baseline_time_stats"] = T.describe_times(df, cfg)
-            logger.info("Evaluasi kandidat K (2–10) pada Baseline...")
-            k_rows, k_summary = T.evaluate_k_candidates(X, gdf, prep["mask"], A, xy, cfg)
-            k_final = k_summary["k_terpilih"]
-            results["k"] = k_final
-            results["k_selection"] = {
-                "candidates": k_rows,
-                **k_summary,
-                "k_composite_best": k_final,
-                "k_selected": k_final,
-            }
-
-        cl = T.cluster_level(prep, gdf, cfg, k=k_final, baseline_centers=baseline_centers)
-        if key == "baseline":
-            baseline_centers = cl["centers"]          # acuan penyelarasan level lain
-            results["pusat_baseline_pca"] = np.asarray(baseline_centers).tolist()
-        labels_by_level[key] = cl["labels"]
-
-        if key == "baseline" and not skip_comparison:
-            logger.info("Perbandingan algoritma (SDWFCM, SFCM, REDCAP, SKATER)...")
-            results["algorithm_comparison"] = T.compare_algorithms(
-                X, gdf, w, k_final, prep["mask"], df["waktu_tes_min"].values, cfg,
-                # waktu per inisialisasi agar setara dengan algoritma lain (satu kali jalan)
-                sdwfcm_result={"labels": cl["labels"], "time": cl["time"] / T.SDWFCM_N_INIT},
-            )
-
-        desc, pesc = T.desc_pesc(X, cl["labels"], A, xy)
-        summary = T.level_summary(key, prep, cl, cfg)
-        summary["validity"] = {
-            "iidx": T.i_index(X, cl["labels"], centers=T.fuzzy_centers(X, cl["U"], cfg.sdwfcm_m)),
-            "ketegasan_partisi": T.ketegasan_partisi(cl["U"], X, cfg.sdwfcm_m),
-            "dunn": T.dunn_index(X, cl["labels"]),
-            "desc": desc,
-            "pesc": pesc,
-            "size_entropy": T.size_entropy(cl["labels"]),
-            "proporsi_tetangga_sama": T.same_label_neighbor_share(cl["labels"], A_rook),
-        }
-        summary["diagnostik"] = T.level_diagnostics(prep, cl, gdf, roads, cfg, k_final)
+        prep = preps[key]
+        sel = groups == key
+        st = T.states_for_level(prep["df"], labels[sel], k_final)
+        states[key] = st
+        lab = np.where(st < k_final, st, -1)
+        mem = np.full(len(st), np.nan)
+        mem[prep["df"]["tergenang"].values == 0] = membership_pool[sel]
+        summary = T.level_summary(key, prep, st, k_final, cfg)
+        summary["diagnostik"] = T.level_diagnostics(prep, gdf, roads, cfg)
         results["levels"][key] = summary
-        grid_parts.append(T.level_grid_frame(key, df, cl, cfg))
-
+        frame = T.level_grid_frame(key, prep["df"], lab, mem, prep["tas"], cfg)
+        frame[f"state_{key}"] = st
+        grid_parts.append(frame)
     trans = []
-    for a, b in zip(T.LEVEL_KEYS[:-1], T.LEVEL_KEYS[1:]):
-        tr = T.transition_analysis(labels_by_level[a], labels_by_level[b], k_final)
+    for a, b in T.TRANSITION_PAIRS:
+        tr = T.transition_analysis(states[a], states[b], k_final)
         tr.update({"from_level": a, "to_level": b})
         trans.append(tr)
     results["transitions"] = trans
     results["cdvm_vs_baseline"] = {
-        key: T.cdvm_distribution(labels_by_level["baseline"], labels_by_level[key], k_final)
-        for key in T.LEVEL_KEYS
-    }
-    results["elapsed_sec"] = time.time() - t_start
+        key: T.cdvm_distribution(states["baseline"], states[key], k_final + 1) for key in T.LEVEL_KEYS}
+    t = _tick("transisi_dan_ringkasan_level", t)
+
+    # ── 6. Perbandingan algoritma di Baseline ────────────────────────────────
+    if not skip_comparison:
+        sel = groups == "baseline"
+        Wb = W[sel][:, sel]
+        logger.info("Perbandingan algoritma (FCM, SFCM, SDWFCM, REDCAP, SKATER) di Baseline...")
+        results["algorithm_comparison"] = T.compare_algorithms(
+            X[sel], Wb, w, A_rook, k_final, pool.loc[sel, "waktu_tes_min"].values, cfg)
+        t = _tick("perbandingan_algoritma", t)
+
+    timing["total"] = time.time() - t_start
+    results["waktu_komputasi"] = timing
+    results["elapsed_sec"] = timing["total"]
 
     out_json = Path(data_dir) / RESULTS_FILE
     out_json.write_text(json.dumps(clean_json(results), ensure_ascii=False, indent=1), encoding="utf-8")

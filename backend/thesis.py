@@ -1,15 +1,19 @@
 """Pipeline analisis penelitian: aksesibilitas spasial TES banjir Kulon Progo.
 
 Ringkasan alur (rincian dan persamaan: docs/METODOLOGI.md):
-  1. Simulasi 4 level intensitas banjir (Baseline, Rendah, Sedang, Tinggi) pada
-     grid 100 × 100 m; waktu tempuh jaringan jalan ke TES per kategori (80 m/menit).
-  2. Pra-pemrosesan fitur (Langkah 3 rekonstruksi): di-fit pada Baseline, lalu
-     diterapkan (transform) ke level lain.
-  3. SDWFCM multi-start; K dipilih pada Baseline dengan skor komposit.
-  4. Penomoran klaster, analisis transisi antarlevel, dan deteksi Titik Aman Semu.
+  1. Empat level banjir berdasarkan kelas bahaya yang ditutup (Baseline, Rendah, Sedang,
+     Tinggi) pada grid 100 × 100 m; grid terdampak berstatus "Tergenang". Waktu tempuh
+     centroid → titik TES per kategori (ruas snapping + jaringan jalan, 80 m/menit).
+  2. Data gabungan: semua pasangan (grid, level) non-Tergenang; praproses di-fit sekali
+     pada data gabungan.
+  3. SDWFCM dengan W KNN-Gaussian blok-diagonal per level; K dipilih dengan stabilitas
+     subsampel; klaster dinomori menurut rata-rata waktu tempuh minimum.
+  4. Analisis transisi antarlevel (state tipologi + Tergenang), perbandingan algoritma
+     di Baseline, dan deteksi Titik Aman Semu (TAS, Non-TAS, Terputus, Tergenang).
 """
 import logging
 import time
+from itertools import combinations
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -29,6 +33,7 @@ from sklearn.metrics import (
     davies_bouldin_score,
     silhouette_score,
 )
+from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import PowerTransformer, RobustScaler
 from esda.moran import Moran
 
@@ -44,6 +49,8 @@ from .engine import (
     sdwfcm_objective_value,
     compute_distances,
     filter_tes,
+    fuzzy_membership_update,
+    neighbor_mean_operator,
     graph_csr,
     run_skater,
     simulate_hazard,
@@ -80,10 +87,21 @@ PCA_VARIANCE = 0.80       # proporsi varians kumulatif yang dipertahankan PCA
 IQR_FACTOR = 3.0          # pagar pencilan ekstrem Tukey: [Q1 − 3·IQR, Q3 + 3·IQR]
 VARIANCE_MIN = 1e-3
 IINDEX_P = 2
-SDWFCM_N_INIT = 10        # jumlah inisialisasi acak SDWFCM
+SDWFCM_N_INIT = 10        # jumlah inisialisasi acak SDWFCM (semua algoritma fuzzy)
 SDWFCM_SEED = 42          # seed awal; inisialisasi ke-i memakai SDWFCM_SEED + i
-DUNN_SAMPLE = 2000        # sampel grid untuk Dunn titik-ke-titik (O(n²))
+STABILITY_SEEDS = [SDWFCM_SEED + i for i in range(SDWFCM_N_INIT)]   # 42–51
+SUBSAMPLE_B = 10          # jumlah subsampel stabilitas K (diturunkan ke 5 hanya bila estimasi > 3 jam)
+SUBSAMPLE_FRAC = 0.80     # proporsi id_grid unik per subsampel
+SUBSAMPLE_N_INIT = 3      # inisialisasi per subsampel (seed 42–44), diambil J terkecil
+SUBSAMPLE_SEED = 20240    # seed pemilihan subsampel ke-b = SUBSAMPLE_SEED + b
+K_ARI_TOLERANCE = 0.01    # K dengan rerata ARI subsampel ≥ maksimum − 0,01 dianggap setara → K terkecil
+DUNN_SAMPLE = 2000        # ukuran sampel grid untuk Dunn titik-ke-titik (O(n²))
+DUNN_SEEDS = [42, 43, 44, 45, 46]
+SILHOUETTE_SAMPLE = 10000
+SILHOUETTE_SEED = 42
+MORAN_PERMUTATIONS = 999
 MORAN_PERMUTATION_SEED = 42   # esda.Moran tidak punya parameter seed → seed global di-set sebelum dipanggil
+DEGENERATE_MAX_SHARE = 0.90   # partisi degeneratif: klaster terbesar > 90% grid
 TAS_MIN_EUCLID_M = 50.0   # jarak minimum (setengah lebar grid 100 m) untuk T_ideal DAN T_aktual
 TAS_DI_ABSOLUTE = 2.0     # ambang absolut DI_t pada uji sensitivitas TAS
 TAS_STATUS = {0: "Non-TAS", 1: "TAS", 2: "Terputus", 3: "Tergenang"}
@@ -212,18 +230,19 @@ def road_class_rule_mask(roads, level: dict) -> np.ndarray:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 3. PRA-PEMROSESAN — DI-FIT PADA BASELINE, DITERAPKAN KE SEMUA LEVEL
+# 3. PRA-PEMROSESAN — DI-FIT SEKALI PADA DATA GABUNGAN
 # ══════════════════════════════════════════════════════════════════════════════
 CAPPED_COLUMNS = ["Road_Density_mean"]   # satu-satunya variabel yang di-capping (Tukey 3 × IQR)
 
 
 class Preprocessor:
-    """Pra-pemrosesan fitur yang di-fit SEKALI pada Baseline lalu diterapkan ke level lain.
+    """Pra-pemrosesan fitur yang di-fit SEKALI pada data gabungan (semua pasangan grid–level
+    non-Tergenang).
 
-    Tahapan (semua parameter diestimasi dari Baseline):
+    Tahapan (semua parameter diestimasi dari data fit):
       1. nilai pengisi median per kolom;
       2. capping Tukey [Q1 − 3·IQR, Q3 + 3·IQR] hanya untuk CAPPED_COLUMNS
-         (waktu_tes_*, jumlah_opsi_rute, is_isolated, dan kelas banjir tidak di-capping);
+         (waktu_tes_*, jumlah_opsi_rute, dan is_isolated tidak di-capping);
       3. seleksi fitur: pertahankan kolom dengan varians > VARIANCE_MIN (setelah capping);
       4. Yeo-Johnson (λ per kolom) + standardisasi (mean, simpangan baku populasi);
       5. RobustScaler (median, IQR);
@@ -261,7 +280,8 @@ class Preprocessor:
             "caps": caps,
             "iqr_factor": IQR_FACTOR,
             "variance_min": VARIANCE_MIN,
-            "variances_baseline": variances,
+            "variances_fit": variances,
+            "n_baris_fit": int(len(F)),
             "features_kept": kept,
             "features_dropped": [c for c in cols if c not in kept],
             "yeojohnson_lambdas": [float(v) for v in pt.lambdas_],
@@ -278,7 +298,7 @@ class Preprocessor:
         return cls(params)
 
     def transform(self, df: pd.DataFrame) -> np.ndarray:
-        """Terapkan parameter Baseline (tanpa fit ulang)."""
+        """Terapkan parameter hasil fit (tanpa fit ulang)."""
         from scipy.stats import yeojohnson
         p = self.params
         F = df[p["features_in"]].astype(float).fillna(p["medians"])
@@ -306,44 +326,95 @@ class Preprocessor:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 4. SDWFCM + PELABELAN
+# 4. DATA GABUNGAN, BOBOT SPASIAL BLOK-DIAGONAL, SDWFCM, PENOMORAN
 # ══════════════════════════════════════════════════════════════════════════════
-def sdwfcm_objective(model: SpatialDistanceWeightedFCM, X: np.ndarray, coords_gdf, mask,
-                     cfg: Cfg) -> float:
-    """J = Σ_i Σ_k u_ik^m · d_t,ik untuk keanggotaan akhir model, memakai fungsi jarak
-    yang sama dengan iterasi (engine.sdwfcm_distances) dan cfg.sdwfcm_impact_weight."""
-    W = model._build_W(coords_gdf)
-    dw = impact_weights(len(X), mask, cfg.sdwfcm_impact_weight)
-    return sdwfcm_objective_value(X, model.U_, W, dw, model.m, model.alpha)
+def build_pooled(level_frames: Dict[str, pd.DataFrame], gdf_base) -> pd.DataFrame:
+    """Data gabungan: satu baris per pasangan (grid, level) yang BUKAN Tergenang, untuk keempat
+    level (urutan: level lalu id_grid). Kolom tambahan: id_grid_asli, level, cx, cy."""
+    parts = []
+    for lv in LEVELS:
+        df = level_frames[lv["key"]]
+        keep = df["tergenang"].values == 0
+        part = df.loc[keep].copy()
+        part.insert(1, "id_grid_asli", gdf_base["id_grid_asli"].values[keep])
+        part.insert(2, "level", lv["key"])
+        part["cx"] = gdf_base["cx"].values[keep]
+        part["cy"] = gdf_base["cy"].values[keep]
+        parts.append(part)
+    return pd.concat(parts, ignore_index=True)
 
 
-def run_sdwfcm(X: np.ndarray, coords_gdf, k: int, mask, cfg: Cfg, fast: bool = False,
-               n_init: int = SDWFCM_N_INIT, seeds: Optional[List[int]] = None) -> dict:
-    """SDWFCM multi-start: beberapa inisialisasi acak, dipilih J terkecil
-    (praktik umum FCM/K-Means untuk menghindari optimum lokal)."""
+def block_knn_weights(coords: np.ndarray, groups: np.ndarray, knn: int,
+                      sigma: Optional[float] = None) -> Tuple[csr_matrix, Dict[str, float]]:
+    """Matriks bobot spasial blok-diagonal: KNN-`knn` dengan kernel Gaussian
+    w_ij = exp(−d_ij² / 2σ²), dinormalisasi per baris (Σ_j W_ij = 1), dihitung HANYA di antara
+    baris dengan `groups` sama (level yang sama). σ = median jarak ke tetangga dalam blok
+    tersebut (bila tidak diberikan). Tidak ada tetangga lintas level."""
+    n = len(coords)
+    rows, cols, data, sigmas = [], [], [], {}
+    for g in pd.unique(groups):
+        idx = np.where(groups == g)[0]
+        kk = min(knn + 1, len(idx))
+        if kk < 2:
+            continue
+        nn = NearestNeighbors(n_neighbors=kk, algorithm="ball_tree").fit(coords[idx])
+        d, j = nn.kneighbors(coords[idx])
+        d, j = d[:, 1:], j[:, 1:]
+        sg = float(sigma) if sigma else float(np.median(d))
+        w = np.exp(-d ** 2 / (2.0 * sg ** 2))
+        w /= w.sum(axis=1, keepdims=True)
+        rows.append(np.repeat(idx, kk - 1))
+        cols.append(idx[j].ravel())
+        data.append(w.ravel())
+        sigmas[str(g)] = sg
+    W = csr_matrix((np.concatenate(data), (np.concatenate(rows), np.concatenate(cols))), shape=(n, n))
+    return W, sigmas
+
+
+def block_adjacency(A_full: csr_matrix, grid_idx: np.ndarray, groups: np.ndarray) -> csr_matrix:
+    """Ketetanggaan rook biner pada baris data gabungan: dua baris bertetangga ⇔ grid-nya
+    bertetangga rook DAN berada pada level yang sama."""
+    A = A_full[grid_idx][:, grid_idx].tocoo()
+    same = groups[A.row] == groups[A.col]
+    return csr_matrix((A.data[same], (A.row[same], A.col[same])), shape=A.shape)
+
+
+def run_sdwfcm(X: np.ndarray, W: csr_matrix, k: int, cfg: Cfg, seeds: Optional[List[int]] = None,
+               n_init: int = SDWFCM_N_INIT, alpha: Optional[float] = None,
+               keep_runs: bool = False) -> dict:
+    """SDWFCM multi-start dengan W yang sudah dihitung: beberapa inisialisasi acak (seed
+    SDWFCM_SEED + i), dipilih J terkecil. `alpha=0` = FCM non-spasial."""
     t0 = time.time()
     seeds = list(seeds) if seeds else [SDWFCM_SEED + i for i in range(max(1, n_init))]
-    best = None
+    a = cfg.sdwfcm_alpha if alpha is None else alpha
+    best, runs = None, []
     for rs in seeds:
+        t1 = time.time()
         model = SpatialDistanceWeightedFCM(
-            k=k, m=cfg.sdwfcm_m, alpha=cfg.sdwfcm_alpha, sigma=cfg.sdwfcm_sigma,
-            knn=cfg.sdwfcm_knn,
-            max_iter=min(cfg.sdwfcm_max_iter, 40) if fast else cfg.sdwfcm_max_iter,
-            tol=max(cfg.sdwfcm_tol, 1e-3) if fast else cfg.sdwfcm_tol,
-            rs=rs, impact_weight=cfg.sdwfcm_impact_weight,
-        ).fit(X, coords_gdf, mask_dampak=mask)
-        J = sdwfcm_objective(model, X, coords_gdf, mask, cfg)
+            k=k, m=cfg.sdwfcm_m, alpha=a, sigma=None, knn=cfg.sdwfcm_knn,
+            max_iter=cfg.sdwfcm_max_iter, tol=cfg.sdwfcm_tol, rs=rs,
+            impact_weight=cfg.sdwfcm_impact_weight,
+        ).fit(X, W=W)
+        J = float(model.objective_)
+        runs.append({"seed": int(rs), "objective": J, "n_iter": int(model.n_iter_),
+                     "time_sec": time.time() - t1, "labels": model.labels_.astype(int)})
         if best is None or J < best[0]:
             best = (J, rs, model)
     J, rs, model = best
-    return {
+    out = {
         "labels": model.labels_.astype(int),
         "U": model.U_,
         "max_membership": model.max_membership_,
+        "centers": model.centers_,
         "objective": J,
         "seed": int(rs),
         "time": time.time() - t0,
+        "time_per_init": float(np.mean([r["time_sec"] for r in runs])),
+        "objectives": {r["seed"]: r["objective"] for r in runs},
     }
+    if keep_runs:
+        out["runs"] = runs
+    return out
 
 
 def relabel_by_metric(labels: np.ndarray, metric: np.ndarray) -> np.ndarray:
@@ -367,56 +438,35 @@ def _permute(labels: np.ndarray, U: np.ndarray, mapping: Dict[int, int]) -> Tupl
 
 
 def number_by_travel_time(labels: np.ndarray, U: np.ndarray, waktu_min: np.ndarray):
-    """Aturan penomoran Baseline: urut naik rata-rata waktu_tes_min (menit asli);
-    klaster 0 = akses tercepat. Klaster kosong (tanpa anggota hard) diletakkan terakhir."""
+    """Aturan penomoran: urut naik rata-rata waktu_tes_min (menit, termasuk ruas snapping) pada
+    data gabungan; klaster 0 = akses terbaik. Klaster kosong diletakkan terakhir."""
     k = U.shape[1]
     means = [float(waktu_min[labels == c].mean()) if np.any(labels == c) else np.inf for c in range(k)]
     order = sorted(range(k), key=lambda c: (means[c], c))
     return _permute(labels, U, {old: new for new, old in enumerate(order)})
 
 
-def baseline_center_scale(base_centers: np.ndarray) -> float:
-    """Median jarak Euclidean antarpusat Baseline (pasangan i < j)."""
-    D = cdist(base_centers, base_centers)
-    iu = np.triu_indices(len(base_centers), k=1)
-    return float(np.median(D[iu]))
-
-
-def align_to_baseline(X: np.ndarray, labels: np.ndarray, U: np.ndarray, m: float,
-                      base_centers: np.ndarray) -> Tuple[np.ndarray, np.ndarray, dict]:
-    """Aturan penomoran level non-Baseline.
-
-    Pusat fuzzy level ini (ruang PCA bersama) dipasangkan ke pusat Baseline dengan
-    Hungarian (scipy.optimize.linear_sum_assignment) berbiaya jarak Euclidean kuadrat.
-    Klaster yang jarak Euclidean ke pasangannya > 2 × median jarak antarpusat Baseline
-    ditandai sebagai tipologi baru/tidak berpadanan.
-    """
-    C = fuzzy_centers(X, U, m)
-    cost = cdist(C, base_centers, "sqeuclidean")
-    rows, cols = linear_sum_assignment(cost)
-    mapping = {int(r): int(c) for r, c in zip(rows, cols)}
-    new_labels, new_U = _permute(labels, U, mapping)
-    scale = baseline_center_scale(base_centers)
-    batas = 2.0 * scale
-    pasangan = []
-    for r, c in sorted(zip(rows, cols), key=lambda t: t[1]):
-        d = float(np.sqrt(cost[r, c]))
-        pasangan.append({"klaster": int(c), "jarak_ke_pusat_baseline": d,
-                         "tipologi_baru": bool(d > batas)})
-    info = {"median_jarak_antarpusat_baseline": scale, "batas_tipologi_baru": batas,
-            "pasangan": pasangan}
-    return new_labels, new_U, info
+def assign_to_centers(X: np.ndarray, W: csr_matrix, centers: np.ndarray, m: float, alpha: float,
+                      max_iter: int = 150, tol: float = 1e-4) -> np.ndarray:
+    """Keanggotaan SDWFCM dengan pusat klaster TETAP (dipakai simulasi blokir jalan di dashboard,
+    bukan hasil skripsi): U diiterasi dengan d_t = (1 − α) d_a + α d_s sampai konvergen."""
+    da = cdist(X, centers) ** 2 + 1e-10
+    U = fuzzy_membership_update(da, m)
+    for _ in range(max_iter):
+        Um = U ** m
+        ds = np.column_stack([(W @ (da[:, c] * Um[:, c])) / ((W @ Um[:, c]) + 1e-10)
+                              for c in range(centers.shape[0])])
+        Un = fuzzy_membership_update(np.clip((1 - alpha) * da + alpha * ds, 1e-10, None), m)
+        diff = np.linalg.norm(Un - U)
+        U = Un
+        if diff < tol:
+            break
+    return U
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 5. METRIK EVALUASI
 # ══════════════════════════════════════════════════════════════════════════════
-def queen_adjacency(gdf) -> csr_matrix:
-    """Ketetanggaan queen murni untuk pembentukan blok spasial DESC/PESC."""
-    from libpysal.weights import Queen
-    return rook_adjacency(Queen.from_dataframe(gdf.reset_index(drop=True), silence_warnings=True))
-
-
 def rook_adjacency(w) -> csr_matrix:
     """Pola ketetanggaan (biner, simetris) dari libpysal W."""
     A = w.sparse.tocsr().copy()
@@ -438,12 +488,10 @@ def wcss(X, labels) -> float:
 def ketegasan_partisi(U: np.ndarray, X: Optional[np.ndarray] = None,
                       m: Optional[float] = None) -> float:
     """Ketegasan partisi = 1 − PE / ln K, dengan PE = partition entropy keanggotaan
-    fuzzy (0 = keanggotaan merata, 1 = partisi tegas). Dipakai pada pemilihan K.
-    (Nama "cdvm" hanya dipakai untuk total variation distance antarlevel.)
+    fuzzy (0 = keanggotaan merata, 1 = partisi tegas).
 
     Bila X dan m diberikan, keanggotaan dihitung ulang di ruang atribut
-    (rumus FCM standar pada pusat fuzzy akhir, tanpa suku spasial) sehingga
-    validitas dinilai pada ruang fitur yang sama dengan metrik lain."""
+    (rumus FCM standar pada pusat fuzzy akhir, tanpa suku spasial)."""
     K = U.shape[1]
     if K < 2:
         return 0.0
@@ -476,9 +524,8 @@ def i_index(X, labels, p: int = IINDEX_P, centers: Optional[np.ndarray] = None) 
 
 
 def dunn_index(X, labels, sample: int = DUNN_SAMPLE, rs: int = 42) -> float:
-    """Dunn (1974): min jarak antaranggota klaster berbeda / max diameter klaster.
-    Dihitung pada sampel acak grid (seed tetap) karena bentuk titik-ke-titik
-    membutuhkan O(n²) pasangan jarak."""
+    """Dunn (1974): min jarak antaranggota klaster berbeda / max diameter klaster,
+    pada satu sampel acak grid (seed rs) karena bentuk titik-ke-titik O(n²)."""
     n = len(X)
     idx = np.random.RandomState(rs).permutation(n)[:min(sample, n)]
     Xs, ls = X[idx], np.asarray(labels)[idx]
@@ -491,6 +538,21 @@ def dunn_index(X, labels, sample: int = DUNN_SAMPLE, rs: int = 42) -> float:
     return float(D[~same].min() / diam) if diam > 0 else 0.0
 
 
+def dunn_multi(X, labels, seeds=DUNN_SEEDS, sample: int = DUNN_SAMPLE) -> dict:
+    """Dunn pada beberapa sampel acak (seed 42–46): rerata dan simpangan baku (ddof = 1)."""
+    vals = [dunn_index(X, labels, sample=sample, rs=s) for s in seeds]
+    return {"mean": float(np.mean(vals)), "sd": float(np.std(vals, ddof=1)), "nilai": vals,
+            "seeds": list(seeds), "ukuran_sampel": sample}
+
+
+def silhouette_sampled(X, labels, sample: int = SILHOUETTE_SAMPLE, rs: int = SILHOUETTE_SEED) -> float:
+    """Silhouette pada sampel acak (seed tetap) bila n > sample."""
+    n = len(X)
+    if n <= sample:
+        return float(silhouette_score(X, labels))
+    return float(silhouette_score(X, labels, sample_size=sample, random_state=rs))
+
+
 def _spatial_blocks(labels: np.ndarray, A: csr_matrix) -> np.ndarray:
     """Blok spasial = komponen terhubung (rook) dari grid pada klaster yang sama."""
     coo = A.tocoo()
@@ -501,7 +563,7 @@ def _spatial_blocks(labels: np.ndarray, A: csr_matrix) -> np.ndarray:
 
 
 def desc_pesc(X, labels, A: csr_matrix, coords: np.ndarray) -> Tuple[float, float]:
-    """DESC & PESC (Guo dkk., 2015).
+    """DESC & PESC (Guo dkk., 2015), blok spasial dari ketetanggaan ROOK `A`.
 
     DESC = Σ_i V_i² / d_i²      (blok berukuran ≥ 2)
     PESC = Σ_k Σ_{i<j} V_i V_j / (D_ij · d_ij · B_nk)
@@ -538,8 +600,7 @@ def desc_pesc(X, labels, A: csr_matrix, coords: np.ndarray) -> Tuple[float, floa
         V = (sizes[idx] / cl_size[lab]).values
         P = Xs.loc[idx].values[:, :n_attr]
         Q = Cs.loc[idx].values / 1000.0          # meter → km
-        # batasi jumlah blok (blok terbesar) agar pasangan tetap terkelola
-        if Bn > 3000:
+        if Bn > 3000:                            # batasi pasangan: 3.000 blok terbesar
             top = np.argsort(-V)[:3000]
             V, P, Q = V[top], P[top], Q[top]
         for s in range(0, len(V), 500):
@@ -564,191 +625,354 @@ def same_label_neighbor_share(labels, A: csr_matrix) -> float:
 
 
 def size_entropy(labels) -> float:
+    labels = np.asarray(labels)
     p = pd.Series(labels[labels >= 0]).value_counts(normalize=True).values
     return float(-(p * np.log(p + 1e-12)).sum())
 
 
-def moran_labels(labels, w) -> Tuple[Optional[float], Optional[float]]:
-    """Moran's I pada label klaster (99 permutasi; p-value pseudo dengan seed tetap)."""
+def largest_cluster_share(labels) -> float:
+    labels = np.asarray(labels)
+    return float(np.bincount(labels[labels >= 0]).max() / (labels >= 0).sum() * 100)
+
+
+def moran_labels(labels, w, permutations: int = MORAN_PERMUTATIONS) -> Tuple[Optional[float], Optional[float]]:
+    """Moran's I pada label klaster (p-value pseudo dengan seed permutasi tetap)."""
     try:
         np.random.seed(MORAN_PERMUTATION_SEED)
-        mi = Moran(labels.astype(float), w, permutations=99)
+        mi = Moran(np.asarray(labels).astype(float), w, permutations=permutations)
         return float(mi.I), float(mi.p_sim)
     except Exception as e:
         logger.warning(f"[moran_labels] gagal: {e}")
         return None, None
 
 
-def cdvm_distribution(labels_a, labels_b, k: int) -> float:
-    """CDVM (Subbab 2.1.32): ½ Σ |p_k(s) − p_k(0)| (total variation distance)."""
-    pa = np.bincount(labels_a, minlength=k) / len(labels_a)
-    pb = np.bincount(labels_b, minlength=k) / len(labels_b)
+def cdvm_distribution(states_a, states_b, n_states: int) -> float:
+    """CDVM: total variation distance ½ Σ_s |p_s(b) − p_s(a)| antara distribusi state dua level."""
+    pa = np.bincount(states_a, minlength=n_states) / len(states_a)
+    pb = np.bincount(states_b, minlength=n_states) / len(states_b)
     return float(0.5 * np.abs(pb - pa).sum())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 6. PENENTUAN K OPTIMAL (Subbab 3.2.7)
+# 6. PEMILIHAN K BERBASIS STABILITAS (data gabungan)
 # ══════════════════════════════════════════════════════════════════════════════
-K_SCORE_METRICS = ["iidx", "dunn", "desc", "ketegasan_partisi"]
+K_SCORE_METRICS = ["iidx", "dunn", "desc", "ketegasan_partisi"]   # skor komposit lama (sensitivitas)
 
 
-def evaluate_k_candidates(X, coords_gdf, mask, A, coords, cfg: Cfg,
-                          k_range=K_RANGE) -> Tuple[List[dict], dict]:
-    """Evaluasi K kandidat pada Baseline.
+def subsample_masks(ids: np.ndarray, B: int, frac: float = SUBSAMPLE_FRAC,
+                    seed0: int = SUBSAMPLE_SEED) -> List[np.ndarray]:
+    """B subsampel: 80% id_grid unik dipilih tanpa pengembalian (seed seed0 + b); semua baris
+    (level) dari grid terpilih ikut masuk."""
+    uniq = np.unique(ids)
+    n_sub = int(round(frac * len(uniq)))
+    out = []
+    for b in range(B):
+        chosen = np.random.RandomState(seed0 + b).choice(uniq, size=n_sub, replace=False)
+        out.append(np.isin(ids, chosen))
+    return out
 
-    Tiap K memakai SDWFCM multi-start dengan SDWFCM_N_INIT inisialisasi (sama dengan model
-    final); solusi dengan J terkecil dinilai. Skor komposit = rata-rata (bobot sama) dari
-    percentile rank I-Index, Dunn, DESC, ketegasan partisi (semakin besar semakin baik) dan
-    skor parsimoni linear 1 − (K − K_min)/(K_max − K_min). K final = skor tertinggi.
+
+def composite_scores(df: pd.DataFrame, metrics: List[str]) -> pd.Series:
+    """Skor komposit lama: rerata percentile rank metrik (besar = baik) + parsimoni linear."""
+    ranks = [df[c].rank(pct=True) for c in metrics]
+    kmin, kmax = df["k"].min(), df["k"].max()
+    pars = 1.0 - (df["k"] - kmin) / max(kmax - kmin, 1)
+    return pd.concat(ranks + [pars], axis=1).mean(axis=1)
+
+
+def evaluate_k_stability(X: np.ndarray, W: csr_matrix, pool: pd.DataFrame, A_pool: csr_matrix,
+                         cfg: Cfg, k_range=K_RANGE, B: int = SUBSAMPLE_B) -> Tuple[List[dict], dict, dict]:
+    """Pemilihan K pada data gabungan (aturan ditetapkan sebelum melihat hasil).
+
+    (a) stabilitas inisialisasi: 10 run (seed 42–51), rerata ARI berpasangan antar-run;
+    (b) stabilitas subsampel: B subsampel 80% id_grid, tiap subsampel 3 inisialisasi (seed 42–44)
+        diambil J terkecil; ARI terhadap solusi data penuh (J terkecil dari (a)) pada baris yang
+        beririsan; rerata dan simpangan baku.
+    K terpilih = K dengan rerata ARI subsampel tertinggi; bila beberapa K berselisih ≤ 0,01 dari
+    nilai tertinggi, dipilih K terkecil di antaranya. Metrik pendukung hanya dilaporkan.
+    Returns: (rows, ringkasan, solusi_penuh_per_K)
     """
-    rows = []
+    coords = pool[["cx", "cy"]].values
+    groups = pool["level"].values
+    masks = subsample_masks(pool["id_grid"].values, B)
+    sub_W = [block_knn_weights(coords[mk], groups[mk], cfg.sdwfcm_knn)[0] for mk in masks]
+    rows, solutions = [], {}
     for k in k_range:
-        res = run_sdwfcm(X, coords_gdf, k, mask, cfg, n_init=SDWFCM_N_INIT)
-        labels = res["labels"]
-        desc, pesc = desc_pesc(X, labels, A, coords)
+        t0 = time.time()
+        full = run_sdwfcm(X, W, k, cfg, seeds=STABILITY_SEEDS, keep_runs=True)
+        labs = [r["labels"] for r in full["runs"]]
+        ari_init = [adjusted_rand_score(a, b) for a, b in combinations(labs, 2)]
+        t_init = time.time() - t0
+        t1 = time.time()
+        ari_sub, sub_seeds = [], []
+        for mk, Wb in zip(masks, sub_W):
+            r = run_sdwfcm(X[mk], Wb, k, cfg, n_init=SUBSAMPLE_N_INIT)
+            ari_sub.append(adjusted_rand_score(full["labels"][mk], r["labels"]))
+            sub_seeds.append(r["seed"])
+        t_sub = time.time() - t1
+        t2 = time.time()
+        labels = full["labels"]
+        desc, pesc = desc_pesc(X, labels, A_pool, coords)
+        dn = dunn_multi(X, labels)
         row = {
-            "k": k, "m": cfg.sdwfcm_m, "alpha": cfg.sdwfcm_alpha, "knn": cfg.sdwfcm_knn,
-            "n_init": SDWFCM_N_INIT, "seed_terbaik": res["seed"], "objective": res["objective"],
-            "iidx": i_index(X, labels, centers=fuzzy_centers(X, res["U"], cfg.sdwfcm_m)),
-            "ketegasan_partisi": ketegasan_partisi(res["U"], X, cfg.sdwfcm_m),
-            "dunn": dunn_index(X, labels),
+            "k": k,
+            "ari_subsampel_mean": float(np.mean(ari_sub)),
+            "ari_subsampel_sd": float(np.std(ari_sub, ddof=1)),
+            "ari_subsampel": [float(v) for v in ari_sub],
+            "ari_inisialisasi_mean": float(np.mean(ari_init)),
+            "ari_inisialisasi_sd": float(np.std(ari_init, ddof=1)),
+            "seed_terbaik": full["seed"],
+            "objective": full["objective"],
+            "objective_per_seed": {str(s): v for s, v in full["objectives"].items()},
+            "seed_terbaik_subsampel": sub_seeds,
+            "iidx": i_index(X, labels, centers=fuzzy_centers(X, full["U"], cfg.sdwfcm_m)),
+            "dunn": dn["mean"],
+            "dunn_sd": dn["sd"],
+            "ketegasan_partisi": ketegasan_partisi(full["U"], X, cfg.sdwfcm_m),
             "desc": desc,
             "pesc": pesc,
+            "silhouette": silhouette_sampled(X, labels),
             "size_entropy": size_entropy(labels),
-            "time_sec": res["time"],
+            "klaster_terbesar_persen": largest_cluster_share(labels),
+            "time_sec": time.time() - t0,
+            "waktu_inisialisasi_sec": t_init,
+            "waktu_subsampel_sec": t_sub,
+            "waktu_metrik_sec": time.time() - t2,
         }
-        logger.info(f"[K={k}] IIdx={row['iidx']:.3f} Ketegasan={row['ketegasan_partisi']:.3f} "
-                    f"Dunn={row['dunn']:.4f} DESC={row['desc']:.3f} PESC={row['pesc']:.3g}")
+        logger.info(f"[K={k}] ARI subsampel={row['ari_subsampel_mean']:.4f}±{row['ari_subsampel_sd']:.4f} "
+                    f"ARI init={row['ari_inisialisasi_mean']:.4f} IIdx={row['iidx']:.3f} "
+                    f"Dunn={row['dunn']:.4f} DESC={row['desc']:.3f} Sil={row['silhouette']:.3f} "
+                    f"({row['time_sec']:.0f} s)")
         rows.append(row)
+        solutions[k] = {key: full[key] for key in ("labels", "U", "centers", "objective", "seed",
+                                                    "time", "time_per_init")}
 
     df = pd.DataFrame(rows)
-    for c in K_SCORE_METRICS:
-        df[f"rank_{c}"] = df[c].rank(pct=True)
-    kmin, kmax = df["k"].min(), df["k"].max()
-    df["parsimoni"] = 1.0 - (df["k"] - kmin) / max(kmax - kmin, 1)
-    df["composite"] = df[[f"rank_{c}" for c in K_SCORE_METRICS] + ["parsimoni"]].mean(axis=1)
-    for row, (_, r) in zip(rows, df.iterrows()):
-        row.update({f"rank_{c}": float(r[f"rank_{c}"]) for c in K_SCORE_METRICS})
-        row["parsimoni"] = float(r["parsimoni"])
-        row["composite"] = float(r["composite"])
-    ordered = df.sort_values(["composite", "k"], ascending=[False, True]).reset_index(drop=True)
-    best, runner = ordered.iloc[0], ordered.iloc[1]
-    ties = df.loc[np.isclose(df["composite"], best["composite"]), "k"].astype(int).tolist()
+    comp_desc = composite_scores(df, K_SCORE_METRICS)
+    comp_nodesc = composite_scores(df, [c for c in K_SCORE_METRICS if c != "desc"])
+    for row, a, b in zip(rows, comp_desc, comp_nodesc):
+        row["komposit_dengan_desc"] = float(a)
+        row["komposit_tanpa_desc"] = float(b)
+
+    best = float(df["ari_subsampel_mean"].max())
+    cands = df.loc[df["ari_subsampel_mean"] >= best - K_ARI_TOLERANCE, "k"].astype(int).tolist()
+    k_sel = int(min(cands))
+    ordered = df.sort_values(["ari_subsampel_mean", "k"], ascending=[False, True])
+    runner = ordered[ordered["k"] != k_sel].iloc[0]
     summary = {
-        "k_terpilih": int(best["k"]),
-        "skor_terpilih": float(best["composite"]),
+        "k_terpilih": k_sel,
+        "ari_subsampel_tertinggi": best,
+        "k_ari_tertinggi": int(ordered.iloc[0]["k"]),
+        "k_dalam_toleransi": cands,
+        "toleransi": K_ARI_TOLERANCE,
         "k_runner_up": int(runner["k"]),
-        "skor_runner_up": float(runner["composite"]),
-        "selisih_skor": float(best["composite"] - runner["composite"]),
-        "k_dengan_skor_sama": ties,
-        "aturan": "K dengan skor komposit tertinggi; bila seri, K terkecil (parsimoni)",
+        "ari_runner_up": float(runner["ari_subsampel_mean"]),
+        "selisih_ari_terpilih_vs_runner_up": float(
+            df.loc[df["k"] == k_sel, "ari_subsampel_mean"].iloc[0] - runner["ari_subsampel_mean"]),
+        "k_komposit_dengan_desc": int(df.loc[comp_desc.idxmax(), "k"]),
+        "k_komposit_tanpa_desc": int(df.loc[comp_nodesc.idxmax(), "k"]),
+        "B": B,
+        "fraksi_subsampel": SUBSAMPLE_FRAC,
+        "n_init_subsampel": SUBSAMPLE_N_INIT,
+        "seed_subsampel": [SUBSAMPLE_SEED + b for b in range(B)],
+        "seed_inisialisasi": STABILITY_SEEDS,
+        "aturan": ("K dengan rerata ARI subsampel tertinggi; bila beberapa K berselisih ≤ 0,01 dari "
+                   "nilai tertinggi, dipilih K terkecil di antaranya. Metrik pendukung dan skor "
+                   "komposit lama hanya dilaporkan."),
     }
-    return rows, summary
+    return rows, summary, solutions
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 7. PERBANDINGAN ALGORITMA (Subbab 3.2.9)
+# 7. PERBANDINGAN ALGORITMA (level Baseline, data non-Tergenang = semua grid)
 # ══════════════════════════════════════════════════════════════════════════════
-def compare_algorithms(X, gdf_coords, w, k, mask, net_time, cfg: Cfg,
-                       sdwfcm_result: Optional[dict] = None) -> List[dict]:
+def compare_algorithms(X: np.ndarray, W: csr_matrix, w_rook, A_rook: csr_matrix, k: int,
+                       waktu_min: np.ndarray, cfg: Cfg) -> List[dict]:
+    """FCM (α = 0), SFCM, SDWFCM (masing-masing 10 inisialisasi, J terkecil), REDCAP, SKATER.
+    Semua memakai praproses, K, dan aturan penomoran yang sama (urut rata-rata waktu_tes_min).
+    Partisi dengan klaster terbesar > 90% grid ditandai degeneratif (tidak layak dibandingkan)."""
+    import copy
     runs = {}
-    if sdwfcm_result is not None:
-        runs["SDWFCM"] = (sdwfcm_result["labels"], sdwfcm_result["time"])
-    else:
-        r = run_sdwfcm(X, gdf_coords, k, mask, cfg)
-        runs["SDWFCM"] = (r["labels"], r["time"])
+
+    fcm = run_sdwfcm(X, W, k, cfg, alpha=0.0)
+    runs["FCM"] = {"labels": fcm["labels"], "time_per_init": fcm["time_per_init"], "n_init": SDWFCM_N_INIT,
+                   "seed_terbaik": fcm["seed"], "objective": fcm["objective"]}
+
+    op = neighbor_mean_operator(w_rook, len(X))
+    best, times = None, []
+    for rs in [SDWFCM_SEED + i for i in range(SDWFCM_N_INIT)]:
+        t0 = time.time()
+        sf = SpatialFuzzyCMeans(k=k, m=cfg.sfcm_m, alpha=cfg.sfcm_alpha, max_iter=cfg.sfcm_max_iter,
+                                tol=cfg.sfcm_tol, rs=rs).fit(X, w_rook, operator=op)
+        times.append(time.time() - t0)
+        if best is None or sf.objective_ < best.objective_:
+            best = sf
+    runs["SFCM"] = {"labels": best.labels_.astype(int), "time_per_init": float(np.mean(times)),
+                    "n_init": SDWFCM_N_INIT, "seed_terbaik": int(best.rs), "objective": best.objective_}
+
+    sd = run_sdwfcm(X, W, k, cfg)
+    runs["SDWFCM"] = {"labels": sd["labels"], "time_per_init": sd["time_per_init"], "n_init": SDWFCM_N_INIT,
+                      "seed_terbaik": sd["seed"], "objective": sd["objective"]}
 
     t0 = time.time()
-    sf = SpatialFuzzyCMeans(k=k, m=cfg.sfcm_m, alpha=cfg.sfcm_alpha,
-                            max_iter=cfg.sfcm_max_iter, tol=cfg.sfcm_tol, rs=42).fit(X, w)
-    runs["SFCM"] = (sf.labels_.astype(int), time.time() - t0)
+    try:
+        rc = REDCAPManual(X, copy.deepcopy(w_rook), k=k, linkage=cfg.redcap_linkage,
+                          size_alpha=cfg.size_alpha, net_dist=waktu_min,
+                          iso_pen=cfg.isolation_penalty_weight, iso_thr=cfg.isolation_time_threshold)
+        rc.solve()
+        runs["REDCAP"] = {"labels": np.asarray(rc.labels_, dtype=int), "time_per_init": time.time() - t0,
+                          "n_init": 1}
+    except Exception as e:
+        runs["REDCAP"] = {"error": f"{type(e).__name__}: {e}", "time_per_init": time.time() - t0, "n_init": 1}
 
     t0 = time.time()
-    rc = REDCAPManual(X, w, k=k, linkage=cfg.redcap_linkage, size_alpha=cfg.size_alpha,
-                      net_dist=net_time, iso_pen=cfg.isolation_penalty_weight,
-                      iso_thr=cfg.isolation_time_threshold)
-    rc.solve()
-    runs["REDCAP"] = (np.asarray(rc.labels_, dtype=int), time.time() - t0)
-
-    t0 = time.time()
-    sk_labels = run_skater(gdf_coords, w, X, k, cfg)
-    runs["SKATER"] = (np.asarray(sk_labels, dtype=int), time.time() - t0)
-
-    # Semua algoritma (termasuk SDWFCM) dinomori ulang dengan aturan yang sama:
-    # urut naik rata-rata waktu_tes_min (klaster 0 = tercepat). Moran's I pada label
-    # kategorik bergantung pada penomoran.
-    for algo in list(runs):
-        labels, t = runs[algo]
-        runs[algo] = (relabel_by_metric(labels, net_time), t)
-    A_rook = rook_adjacency(w)
+    try:
+        runs["SKATER"] = {"labels": run_skater(A_rook, X, k, cfg), "time_per_init": time.time() - t0,
+                          "n_init": 1}
+    except Exception as e:
+        logger.warning(f"[SKATER] gagal: {type(e).__name__}: {e}")
+        runs["SKATER"] = {"error": f"{type(e).__name__}: {e}", "time_per_init": time.time() - t0, "n_init": 1}
 
     rows = []
-    for algo, (labels, t) in runs.items():
-        valid = labels >= 0
-        Xv, Lv = X[valid], labels[valid]
-        mi, mp = moran_labels(np.where(labels < 0, 0, labels), w)
-        rows.append({
-            "algoritma": algo,
-            "n_cluster": int(len(np.unique(Lv))),
-            "silhouette": float(silhouette_score(Xv, Lv)),
-            "calinski_harabasz": float(calinski_harabasz_score(Xv, Lv)),
-            "davies_bouldin": float(davies_bouldin_score(Xv, Lv)),
-            "moran_i": mi,
-            "moran_p": mp,
-            "size_entropy": size_entropy(labels),
-            "proporsi_tetangga_sama": same_label_neighbor_share(labels, A_rook),
-            "wcss": wcss(Xv, Lv),
-            "time_sec": float(t),
-        })
-        logger.info(f"[compare] {algo}: sil={rows[-1]['silhouette']:.3f} "
-                    f"CH={rows[-1]['calinski_harabasz']:.1f} DB={rows[-1]['davies_bouldin']:.3f} "
-                    f"t={t:.1f}s")
+    for algo, r in runs.items():
+        base = {"algoritma": algo, "n_init": r["n_init"], "time_per_init_sec": float(r["time_per_init"])}
+        if "error" in r:
+            rows.append({**base, "status": "gagal", "layak_dibandingkan": False, "galat": r["error"]})
+            continue
+        labels = relabel_by_metric(r["labels"], waktu_min)
+        big = largest_cluster_share(labels)
+        n_cl = int(len(np.unique(labels)))
+        degenerate = big > DEGENERATE_MAX_SHARE * 100
+        row = {**base,
+               "status": "degeneratif" if degenerate else "ok",
+               "layak_dibandingkan": not degenerate,
+               "n_cluster": n_cl,
+               "klaster_terbesar_persen": big,
+               "size_entropy": size_entropy(labels),
+               "seed_terbaik": r.get("seed_terbaik"),
+               "objective": r.get("objective")}
+        if n_cl >= 2:
+            mi, mp = moran_labels(labels, w_rook)
+            row.update({
+                "silhouette": float(silhouette_score(X, labels)),
+                "calinski_harabasz": float(calinski_harabasz_score(X, labels)),
+                "davies_bouldin": float(davies_bouldin_score(X, labels)),
+                "moran_i": mi, "moran_p": mp, "moran_permutasi": MORAN_PERMUTATIONS,
+                "proporsi_tetangga_sama": same_label_neighbor_share(labels, A_rook),
+            })
+        rows.append(row)
+        logger.info(f"[compare] {algo}: status={row['status']} sil={row.get('silhouette')} "
+                    f"terbesar={big:.1f}% t/init={row['time_per_init_sec']:.1f}s")
     return rows
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 8. PROFIL KLASTER
+# 8. PROFIL KLASTER (data gabungan) DAN DISTRIBUSI TIPOLOGI PER LEVEL
 # ══════════════════════════════════════════════════════════════════════════════
 PROFILE_COLS = (
     ["Road_Density_mean", SKENARIO]
     + ["waktu_tes_pendidikan", "waktu_tes_kesehatan", "waktu_tes_pemerintahan",
-       "waktu_tes_ibadah", "waktu_tes_gor", "waktu_tes_min", "jumlah_opsi_rute"]
+       "waktu_tes_ibadah", "waktu_tes_gor", "waktu_tes_min", "jumlah_opsi_rute", "is_isolated"]
     + ["is_isolated_pendidikan", "is_isolated_kesehatan", "is_isolated_pemerintahan",
        "is_isolated_ibadah", "is_isolated_gor"]
 )
 
 
 def cluster_profile(df: pd.DataFrame, labels: np.ndarray, k: int) -> List[dict]:
+    """Rata-rata variabel per klaster pada data gabungan (kelas bahaya banjir = deskriptif)."""
     rows = []
     n = len(labels)
     for c in range(k):
         sel = labels == c
-        row = {"klaster": c, "jumlah_grid": int(sel.sum()),
-               "persen_grid": float(sel.sum() / n * 100)}
+        row = {"klaster": c, "jumlah_baris": int(sel.sum()),
+               "persen_baris": float(sel.sum() / n * 100)}
         for col in PROFILE_COLS:
             row[col] = float(df.loc[sel, col].mean()) if sel.any() else None
+        row["deskripsi"] = describe_cluster(row) if sel.any() else None
         rows.append(row)
     return rows
 
 
+def level_distribution(states: np.ndarray, k: int) -> List[dict]:
+    """Distribusi state satu level: jumlah grid per tipologi dan Tergenang (state k)."""
+    n = len(states)
+    cnt = np.bincount(states, minlength=k + 1)
+    non = int(cnt[:k].sum())
+    out = [{"state": int(c), "nama": f"Klaster {c}", "jumlah_grid": int(cnt[c]),
+            "persen_semua_grid": float(cnt[c] / n * 100),
+            "persen_non_tergenang": float(cnt[c] / non * 100) if non else None} for c in range(k)]
+    out.append({"state": k, "nama": TERGENANG, "jumlah_grid": int(cnt[k]),
+                "persen_semua_grid": float(cnt[k] / n * 100), "persen_non_tergenang": None})
+    return out
+
+
+def describe_cluster(row: dict) -> str:
+    """Deskripsi singkat tipologi berdasarkan profil klaster."""
+    iso = np.mean([row[f"is_isolated_{k}"] for k in
+                   ["pendidikan", "kesehatan", "pemerintahan", "ibadah", "gor"]])
+    t = row["waktu_tes_min"]
+    if iso >= 0.5 or row["jumlah_opsi_rute"] < 3:
+        akses = "Terisolasi"
+    elif iso >= 0.05 or t > 30:
+        akses = "Akses Kritis"
+    elif t > 10:
+        akses = "Akses Rendah"
+    elif t > 5:
+        akses = "Akses Sedang"
+    else:
+        akses = "Akses Baik"
+    b = row[SKENARIO]
+    bahaya = "Bahaya Tinggi" if b >= 1.0 else ("Bahaya Sedang" if b >= 0.5 else "Bahaya Rendah")
+    return f"{akses} · {bahaya}"
+
+
 # ══════════════════════════════════════════════════════════════════════════════
-# 9. ANALISIS TRANSISI (Subbab 3.2.10)
+# 9. ANALISIS TRANSISI DENGAN STATE TERGENANG
 # ══════════════════════════════════════════════════════════════════════════════
-def transition_analysis(labels_from, labels_to, k: int) -> dict:
-    M = np.zeros((k, k), dtype=int)
-    np.add.at(M, (labels_from, labels_to), 1)
+TRANSITION_PAIRS = [("baseline", "rendah"), ("rendah", "sedang"), ("sedang", "tinggi"),
+                    ("baseline", "tinggi")]
+
+
+def transition_analysis(states_from: np.ndarray, states_to: np.ndarray, k: int) -> dict:
+    """Transisi antar dua level. State: 0..K−1 = tipologi, K = Tergenang.
+
+    - matriks (K+1) × (K+1) jumlah grid;
+    - grid yang masuk Tergenang (non-Tergenang → Tergenang), jumlah dan persentase;
+    - stability rate dan ARI HANYA pada grid non-Tergenang di kedua level;
+    - transisi dominan di luar diagonal (menuju Tergenang atau tipologi lain);
+    - active edges = jumlah sel di luar diagonal yang > 0;
+    - CDVM = total variation distance distribusi state (K+1 state).
+    """
+    a, b = np.asarray(states_from), np.asarray(states_to)
+    S = k + 1
+    M = np.zeros((S, S), dtype=int)
+    np.add.at(M, (a, b), 1)
+    both = (a < k) & (b < k)
+    Mt = M[:k, :k]
+    into = int(((a < k) & (b == k)).sum())
+    out_of = int(((a == k) & (b < k)).sum())
     off = M.copy()
     np.fill_diagonal(off, 0)
-    dom = np.unravel_index(int(off.argmax()), off.shape) if off.sum() > 0 else (0, 0)
+    dom = np.unravel_index(int(off.argmax()), off.shape) if off.sum() > 0 else None
+    n = len(a)
     return {
         "matrix": M.tolist(),
-        "stability_rate": float(np.trace(M) / M.sum() * 100),
-        "ari": float(adjusted_rand_score(labels_from, labels_to)),
-        "dominant_transition": {"from": int(dom[0]), "to": int(dom[1]),
-                                "count": int(off[dom])},
+        "state_labels": [f"Klaster {c}" for c in range(k)] + [TERGENANG],
+        "n_grid": int(n),
+        "masuk_tergenang": into,
+        "persen_masuk_tergenang_semua_grid": float(into / n * 100),
+        "persen_masuk_tergenang_dari_non_tergenang_awal": float(into / (a < k).sum() * 100) if (a < k).any() else None,
+        "keluar_tergenang": out_of,
+        "n_non_tergenang_kedua_level": int(both.sum()),
+        "stability_rate": float(np.trace(Mt) / Mt.sum() * 100) if Mt.sum() else None,
+        "ari": float(adjusted_rand_score(a[both], b[both])) if both.sum() > 1 else None,
+        "dominant_transition": None if dom is None else {
+            "from": int(dom[0]), "to": int(dom[1]), "count": int(off[dom]),
+            "menuju": TERGENANG if dom[1] == k else "tipologi lain"},
         "active_edges": int((off > 0).sum()),
-        "active_edges_total": int((M > 0).sum()),
-        "n_moved": int(off.sum()),
+        "active_edges_antar_tipologi": int((off[:k, :k] > 0).sum()),
+        "n_berpindah": int(off.sum()),
+        "cdvm": cdvm_distribution(a, b, S),
     }
 
 
@@ -875,6 +1099,8 @@ def detect_tas_detour(
             "jumlah_tas": int(is_tas_abs.sum()),
             "persen_tas": float(is_tas_abs.sum() / n * 100),
             "mean_di_tas": float(di[is_tas_abs].mean()) if is_tas_abs.any() else None,
+            "persen_tas_juga_lolos_absolut": (float((is_tas & (di >= TAS_DI_ABSOLUTE)).sum() / is_tas.sum() * 100)
+                                              if is_tas.any() else None),
         },
         "jarak_euclid_min_m": TAS_MIN_EUCLID_M,
     }
@@ -885,82 +1111,53 @@ def detect_tas_detour(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 11. PIPELINE PER LEVEL (dipakai analisis offline & simulasi blokir jalan)
+# 11. PIPELINE PER LEVEL (aksesibilitas + TAS) DAN KELUARAN
 # ══════════════════════════════════════════════════════════════════════════════
-def describe_cluster(row: dict) -> str:
-    """Deskripsi singkat tipologi berdasarkan profil klaster."""
-    iso = np.mean([row[f"is_isolated_{k}"] for k in
-                   ["pendidikan", "kesehatan", "pemerintahan", "ibadah", "gor"]])
-    t = row["waktu_tes_min"]
-    if iso >= 0.5 or row["jumlah_opsi_rute"] < 3:
-        akses = "Terisolasi"
-    elif iso >= 0.05 or t > 30:
-        akses = "Akses Kritis"
-    elif t > 10:
-        akses = "Akses Rendah"
-    elif t > 5:
-        akses = "Akses Sedang"
-    else:
-        akses = "Akses Baik"
-    b = row[SKENARIO]
-    bahaya = "Bahaya Tinggi" if b >= 1.0 else ("Bahaya Sedang" if b >= 0.5 else "Bahaya Rendah")
-    return f"{akses} · {bahaya}"
-
-
 def prepare_level(gdf_base, roads_raw, tes_raw, intensity: float, cfg: Cfg,
-                  t_pen: Optional[float] = None, graph_pack: Optional[tuple] = None,
-                  preprocessor: Optional[Preprocessor] = None) -> dict:
-    """Aksesibilitas satu level + matriks fitur X di ruang PCA bersama.
-
-    `preprocessor` = pra-pemrosesan hasil fit Baseline. Bila None (hanya untuk Baseline),
-    pra-pemrosesan di-fit pada level ini dan dikembalikan di hasil.
-    """
+                  t_pen: Optional[float] = None, graph_pack: Optional[tuple] = None) -> dict:
+    """Aksesibilitas + deteksi TAS satu level (tidak bergantung pada klasterisasi)."""
     acc = compute_level_accessibility(gdf_base, roads_raw, tes_raw, intensity, cfg,
                                       t_pen=t_pen, graph_pack=graph_pack)
-    if preprocessor is None:
-        preprocessor = Preprocessor.fit(acc["df"], cfg)
-    X = preprocessor.transform(acc["df"])
-    return {**acc, "X": X, "preprocessor": preprocessor, "preprocessing": preprocessor.info(),
-            "level_key": level_from_intensity(intensity)["key"]}
-
-
-def cluster_level(prep: dict, gdf_base, cfg: Cfg, k: int, fast: bool = False,
-                  seeds: Optional[List[int]] = None,
-                  baseline_centers: Optional[np.ndarray] = None) -> dict:
-    """SDWFCM satu level + penomoran klaster.
-
-    baseline_centers None  → aturan Baseline (urut rata-rata waktu_tes_min);
-    baseline_centers given → diselaraskan ke pusat Baseline (Hungarian).
-    `seeds` (mis. seed terbaik hasil offline) mempercepat simulasi blokir jalan.
-    """
-    df = prep["df"]
-    res = run_sdwfcm(prep["X"], gdf_base, k, prep["mask"], cfg, fast=fast, seeds=seeds)
-    if baseline_centers is None:
-        labels, U = number_by_travel_time(res["labels"], res["U"], df["waktu_tes_min"].values)
-        alignment = None
-    else:
-        labels, U, alignment = align_to_baseline(prep["X"], res["labels"], res["U"], cfg.sdwfcm_m,
-                                                 np.asarray(baseline_centers))
-    centers = fuzzy_centers(prep["X"], U, cfg.sdwfcm_m)
-    membership = U.max(axis=1) if U is not None else res["max_membership"]
     xy = np.column_stack([gdf_base["cx"].values, gdf_base["cy"].values])
-    tas = detect_tas_detour(df, xy, prep["tes_v"], prep["graph"], prep["t_pen"], cfg,
-                            tergenang=df["tergenang"].values)
-    profile = cluster_profile(df, labels, k)
-    for row in profile:
-        row["deskripsi"] = describe_cluster(row)
-    return {"labels": labels, "U": U, "membership": membership, "time": res["time"],
-            "objective": res["objective"], "seed": res["seed"], "tas": tas, "profile": profile,
-            "centers": centers, "alignment": alignment}
+    tas = detect_tas_detour(acc["df"], xy, acc["tes_v"], acc["graph"], acc["t_pen"], cfg,
+                            tergenang=acc["df"]["tergenang"].values)
+    return {**acc, "tas": tas, "level_key": level_from_intensity(intensity)["key"]}
 
 
-def level_grid_frame(key: str, df: pd.DataFrame, cl: dict, cfg: Cfg) -> pd.DataFrame:
-    """Atribut per grid dengan sufiks level (format file hasil offline)."""
-    tas = cl["tas"]
+def states_for_level(df: pd.DataFrame, pool_labels_level: np.ndarray, k: int) -> np.ndarray:
+    """State per grid satu level: label tipologi (0..K−1) atau K = Tergenang."""
+    st = np.full(len(df), k, dtype=int)
+    st[df["tergenang"].values == 0] = pool_labels_level
+    return st
+
+
+def simulate_level(prep: dict, preprocessor: Preprocessor, centers: np.ndarray, gdf_base,
+                   cfg: Cfg) -> dict:
+    """Simulasi blokir jalan (dashboard, bukan hasil skripsi): fitur level disimulasikan ulang,
+    ditransformasi dengan praproses data gabungan, lalu keanggotaan dihitung terhadap pusat
+    klaster final yang TETAP (assign_to_centers) dengan W KNN-Gaussian level tersebut."""
+    df = prep["df"]
+    keep = df["tergenang"].values == 0
+    X = preprocessor.transform(df.loc[keep])
+    coords = np.column_stack([gdf_base["cx"].values[keep], gdf_base["cy"].values[keep]])
+    W, _ = block_knn_weights(coords, np.zeros(int(keep.sum()), dtype=int), cfg.sdwfcm_knn)
+    U = assign_to_centers(X, W, np.asarray(centers), cfg.sdwfcm_m, cfg.sdwfcm_alpha)
+    k = len(centers)
+    labels = np.full(len(df), -1, dtype=int)
+    labels[keep] = U.argmax(axis=1)
+    membership = np.full(len(df), np.nan)
+    membership[keep] = U.max(axis=1)
+    return {"labels": labels, "membership": membership, "states": np.where(keep, labels, k)}
+
+
+def level_grid_frame(key: str, df: pd.DataFrame, labels: np.ndarray, membership: np.ndarray,
+                     tas: dict, cfg: Cfg) -> pd.DataFrame:
+    """Atribut per grid dengan sufiks level (format file hasil offline).
+    cl = −1 untuk grid Tergenang; mem = kosong untuk grid Tergenang."""
     out = pd.DataFrame({
-        f"cl_{key}": cl["labels"],
-        f"mem_{key}": np.round(cl["membership"], 4),
-        f"terdampak_{key}": df["tergenang"].values,
+        f"cl_{key}": labels,
+        f"mem_{key}": np.round(membership, 4),
+        f"tergenang_{key}": df["tergenang"].values,
     })
     for k in cfg.kategori_fac:
         out[f"waktu_{k}_{key}"] = np.round(df[f"waktu_tes_{k}"].values, 3)
@@ -981,7 +1178,7 @@ def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg) -> List[dict]:
         "id_grid_asli": "id_grid_asli",
         f"cl_{key}": "cluster_sdwfcm",
         f"mem_{key}": "membership_max",
-        f"terdampak_{key}": "terdampak",
+        f"tergenang_{key}": "tergenang",
         f"waktu_min_{key}": "waktu_tes_min",
         f"opsi_{key}": "jumlah_opsi_rute",
         f"t_ideal_{key}": "t_ideal",
@@ -996,36 +1193,35 @@ def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg) -> List[dict]:
         cols[f"waktu_{k}_{key}"] = f"waktu_tes_{k}"
     sub = grid[list(cols)].rename(columns=cols).copy()
     sub["is_isolated"] = (sub["jumlah_opsi_rute"] == 0).astype(int)
-    for c in ["id_grid", "cluster_sdwfcm", "terdampak", "jumlah_opsi_rute",
+    for c in ["id_grid", "cluster_sdwfcm", "tergenang", "jumlah_opsi_rute",
               "titik_aman_semu", "status_tas", "is_isolated"]:
         sub[c] = sub[c].astype(int)
+    sub["id_grid_asli"] = sub["id_grid_asli"].astype(str)
     sub["road_density"] = sub["road_density"].round(3)
     sub = sub.astype(object).where(pd.notna(sub), None)
     return sub.to_dict(orient="records")
 
 
-def level_summary(key: str, prep: dict, cl: dict, cfg: Cfg) -> dict:
+def level_summary(key: str, prep: dict, states: np.ndarray, k: int, cfg: Cfg) -> dict:
     df = prep["df"]
     lv = LEVEL_BY_KEY[key]
+    non = df["tergenang"].values == 0
     return {
         **lv,
-        "n_grid_terdampak": int(prep["mask"].sum()),
-        "persen_grid_terdampak": float(prep["mask"].mean() * 100),
+        "n_grid": int(len(df)),
+        "n_grid_tergenang": int((~non).sum()),
+        "persen_grid_tergenang": float((~non).mean() * 100),
+        "n_grid_non_tergenang": int(non.sum()),
         "n_roads_closed": prep["n_roads_closed"],
-        "tes_valid": {k: v["valid"] for k, v in prep["tes_stats"].items()},
-        "mean_waktu_min": float(df["waktu_tes_min"].mean()),
-        "median_waktu_min": float(df["waktu_tes_min"].median()),
-        "mean_waktu": {k: float(df[f"waktu_tes_{k}"].mean()) for k in cfg.kategori_fac},
-        "n_isolated_total": int(df["is_isolated"].sum()),
-        "preprocessing": prep["preprocessing"],
-        "sdwfcm_time_sec": float(cl["time"]),
-        "sdwfcm_objective": float(cl["objective"]),
-        "sdwfcm_seed": int(cl["seed"]),
-        "cluster_profile": cl["profile"],
-        "cluster_names": {str(r["klaster"]): r["deskripsi"] for r in cl["profile"]},
-        "tas": cl["tas"]["summary"],
-        "pusat_fuzzy_pca": np.asarray(cl["centers"]).tolist(),
-        "penyelarasan_label": cl["alignment"],
+        "tes_valid": {kk: v["valid"] for kk, v in prep["tes_stats"].items()},
+        "mean_waktu_min": float(df.loc[non, "waktu_tes_min"].mean()),
+        "median_waktu_min": float(df.loc[non, "waktu_tes_min"].median()),
+        "mean_waktu_min_semua_grid": float(df["waktu_tes_min"].mean()),
+        "mean_waktu_min_tergenang": float(df.loc[~non, "waktu_tes_min"].mean()) if (~non).any() else None,
+        "mean_waktu": {kk: float(df.loc[non, f"waktu_tes_{kk}"].mean()) for kk in cfg.kategori_fac},
+        "n_isolated_non_tergenang": int(df.loc[non, "is_isolated"].sum()),
+        "distribusi_tipologi": level_distribution(states, k),
+        "tas": prep["tas"]["summary"],
     }
 
 
@@ -1050,34 +1246,22 @@ def hazard_classes_affected(level: dict, gdf_base, roads_raw, cfg: Cfg, mask) ->
     }
 
 
-def level_diagnostics(prep: dict, cl: dict, gdf_base, roads_raw, cfg: Cfg, k: int) -> dict:
+def level_diagnostics(prep: dict, gdf_base, roads_raw, cfg: Cfg) -> dict:
     """Diagnostik per level (tidak memengaruhi model)."""
     df = prep["df"]
     iso = df["jumlah_opsi_rute"].values == 0
-    terdampak = np.asarray(prep["mask"], bool)
-    labels = cl["labels"]
-    per_klaster = []
-    for c in range(k):
-        sel = labels == c
-        per_klaster.append({
-            "klaster": c,
-            "jumlah_grid": int(sel.sum()),
-            "jumlah_terdampak": int((sel & terdampak).sum()),
-            "proporsi_terdampak": float((sel & terdampak).sum() / sel.sum()) if sel.any() else None,
-        })
+    wet = df["tergenang"].values == 1
     tes_stats = prep["tes_stats"]
     return {
-        "grid_terisolasi": int(iso.sum()),
-        "grid_terisolasi_terdampak": int((iso & terdampak).sum()),
-        "grid_terisolasi_tidak_terdampak": int((iso & ~terdampak).sum()),
-        "grid_terdampak": int(terdampak.sum()),
+        "grid_tergenang": int(wet.sum()),
+        "grid_terisolasi_non_tergenang": int((iso & ~wet).sum()),
+        "grid_terisolasi_tergenang": int((iso & wet).sum()),
         "ruas_jalan_ditutup": int(prep["n_roads_closed"]),
         "tes_valid_per_kategori": {kat: int(v["valid"]) for kat, v in tes_stats.items()},
         "tes_total_per_kategori": {kat: int(v["total"]) for kat, v in tes_stats.items()},
         "tes_valid_total": int(sum(v["valid"] for v in tes_stats.values())),
-        "proporsi_terdampak_per_klaster": per_klaster,
         "kelas_bahaya": hazard_classes_affected(LEVEL_BY_KEY[prep["level_key"]],
-                                                gdf_base, roads_raw, cfg, terdampak),
+                                                gdf_base, roads_raw, cfg, wet),
     }
 
 

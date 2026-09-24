@@ -129,7 +129,10 @@ class Cfg:
     sdwfcm_knn: int = 8
     sdwfcm_max_iter: int = 150
     sdwfcm_tol: float = 1e-4
-    sdwfcm_impact_weight: float = 2.0   # bobot tetangga yang terdampak banjir pada suku spasial d_s
+    # Bobot tetangga terdampak banjir pada suku spasial d_s. 1,0 = nonaktif: pada desain data
+    # gabungan grid terdampak (Tergenang) dikeluarkan dari klasterisasi, sehingga tidak ada
+    # tetangga terdampak yang perlu dibobot khusus. Parameter dipertahankan untuk dokumentasi.
+    sdwfcm_impact_weight: float = 1.0
 
     # ── SFCM — Pembanding 1 ───────────────────────────────────────────────────
     sfcm_m: float = 2.0
@@ -837,16 +840,22 @@ class SpatialDistanceWeightedFCM:
         _SDWFCM_SIGMA_CACHE[cache_key] = sigma
         return W
 
-    def fit(self, X, gdf_or_coords, mask_dampak=None):
+    def fit(self, X, gdf_or_coords=None, mask_dampak=None, W: Optional[csr_matrix] = None):
         """Iterasi: d_t(U) → U_baru = fuzzy_membership_update(d_t, m), sampai ‖U_baru − U‖_F < tol.
 
         Inisialisasi: np.random.seed(rs); U ~ Dirichlet(1,…,1).
+        W: matriks bobot spasial yang sudah dihitung (mis. blok-diagonal per level pada data
+        gabungan); bila None, W KNN-Gaussian dibangun dari koordinat `gdf_or_coords`.
         objective_ = J(U_akhir); objective_history_ berisi J(U_t) per iterasi bila
         track_objective=True.
         """
         np.random.seed(self.rs)
         n, _ = X.shape; k = self.k; m = self.m
-        W  = self._build_W(gdf_or_coords)
+        if W is None:
+            W = self._build_W(gdf_or_coords)
+        else:
+            self._sigma = self.sigma
+        self.W_ = W
         dw = impact_weights(n, mask_dampak, self.impact_weight)
         U = np.random.dirichlet(np.ones(k), size=n)
         self.objective_history_ = []
@@ -869,8 +878,35 @@ class SpatialDistanceWeightedFCM:
         self.max_membership_  = U.max(axis=1)
         self.centers_         = centers
         self.objective_       = sdwfcm_objective_value(X, U, W, dw, m, self.alpha)
-        logger.info(f"[SDWFCM] {len(set(self.labels_))} klaster | σ={self._sigma:.2f} | J={self.objective_:.4f}")
+        sig = f"{self._sigma:.2f}" if self._sigma else "W eksternal"
+        logger.info(f"[SDWFCM] {len(set(self.labels_))} klaster | σ={sig} | J={self.objective_:.4f}")
         return self
+
+
+def neighbor_mean_operator(w, n: int) -> Tuple[csr_matrix, np.ndarray]:
+    """Operator rata-rata tetangga R (R_ij = 1/|N_i| untuk j ∈ N_i) dari libpysal W, dan
+    penanda grid yang punya tetangga."""
+    rows, cols = [], []
+    for i in range(n):
+        for j in w.neighbors.get(i, []):
+            rows.append(i); cols.append(int(j))
+    B = csr_matrix((np.ones(len(rows)), (rows, cols)), shape=(n, n))
+    deg = np.asarray(B.sum(axis=1)).ravel()
+    has = deg > 0
+    R = sp.diags(np.where(has, 1.0 / np.maximum(deg, 1), 0.0)) @ B
+    return R.tocsr(), has
+
+
+def sfcm_distances(X, U, R, has_nb, m: float, alpha: float):
+    """Jarak SFCM: d_s,ik = (rata-rata d_a,jk tetangga) × (rata-rata u_jk tetangga);
+    grid tanpa tetangga memakai d_s = d_a. d_t = (1 − α) d_a + α d_s."""
+    Um = U ** m
+    centers = (Um.T @ X) / (Um.sum(axis=0)[:, None] + 1e-10)
+    da = cdist(X, centers) ** 2 + 1e-10
+    ds = (R @ da) * (R @ U)
+    ds[~has_nb] = da[~has_nb]
+    dt = np.clip((1 - alpha) * da + alpha * ds, 1e-10, None)
+    return centers, dt
 
 
 class SpatialFuzzyCMeans:
@@ -878,44 +914,33 @@ class SpatialFuzzyCMeans:
 
     Jarak FCM standar dimodifikasi dengan suku spasial dari tetangga rook:
     d_t = (1 − α)·d_a + α·d_s, d_s,ik = rata-rata d_a tetangga × rata-rata u_k tetangga.
+    Fungsi objektif (untuk memilih inisialisasi terbaik): J = Σ_i Σ_k u_ik^m · d_t,ik.
     """
     def __init__(self, k=5, m=2.0, alpha=0.5, max_iter=150, tol=1e-4, rs=42):
         self.k = k; self.m = m; self.alpha = alpha
         self.max_iter = max_iter; self.tol = tol; self.rs = rs
         self.labels_ = self.U_ = self.max_membership_ = None
+        self.objective_ = None
 
-    def fit(self, X, w):
+    def fit(self, X, w, operator: Optional[Tuple[csr_matrix, np.ndarray]] = None):
         np.random.seed(self.rs)
         n, _ = X.shape; k = self.k; m = self.m
-        adj = [list(w.neighbors.get(i, [])) for i in range(n)]
+        R, has_nb = operator if operator is not None else neighbor_mean_operator(w, n)
         U   = np.random.dirichlet(np.ones(k), size=n)
         for it in range(self.max_iter):
-            Um      = U ** m
-            centers = (Um.T @ X) / (Um.sum(axis=0)[:, None] + 1e-10)
-            da      = cdist(X, centers) ** 2 + 1e-10
-            Us      = np.array([
-                U[adj[i]].mean(0) if adj[i] else U[i]
-                for i in range(n)
-            ])
-            ds = np.zeros((n, k))
-            for ci in range(k):
-                dnb = np.sum((X - centers[ci]) ** 2, axis=1) + 1e-10
-                for i in range(n):
-                    ds[i, ci] = (
-                        (np.mean(dnb[adj[i]]) * Us[i, ci])
-                        if adj[i] else da[i, ci]
-                    )
-            dt  = np.clip((1 - self.alpha) * da + self.alpha * ds, 1e-10, None)
+            _, dt = sfcm_distances(X, U, R, has_nb, m, self.alpha)
             Un  = fuzzy_membership_update(dt, m)
             diff = np.linalg.norm(Un - U)
             U    = Un
             if diff < self.tol:
                 logger.info(f"[SFCM] konvergen pada iterasi {it} | diff={diff:.6f}")
                 break
+        _, dt = sfcm_distances(X, U, R, has_nb, m, self.alpha)
+        self.objective_      = float(((U ** m) * dt).sum())
         self.U_              = U
         self.labels_         = np.argmax(U, axis=1)
         self.max_membership_ = U.max(axis=1)
-        logger.info(f"[SFCM] {len(set(self.labels_))} klaster")
+        logger.info(f"[SFCM] {len(set(self.labels_))} klaster | J={self.objective_:.4f}")
         return self
 
 
@@ -1060,51 +1085,23 @@ class REDCAPManual:
         logger.info(f"[REDCAP] {len(np.unique(self.labels_))} klaster")
 
 
-def run_skater(gdf: gpd.GeoDataFrame, w, X_pca: np.ndarray, k: int, cfg: Cfg) -> np.ndarray:
-    """SKATER (pemangkasan pohon rentang minimum), algoritma pembanding.
+def run_skater(adjacency: csr_matrix, X_pca: np.ndarray, k: int, cfg: Cfg) -> np.ndarray:
+    """SKATER (Assunção dkk., 2006) via spopt.region.Skater, algoritma pembanding.
 
-    Memakai spopt.region.Skater bila tersedia; jika gagal, fallback: MST pada graf
-    ketetanggaan berbobot jarak atribut, lalu K − 1 sisi terberat dipotong.
+    adjacency: ketetanggaan biner simetris (rook). Ukuran minimum region = `floor`
+    (cfg.skater_min_region). Tidak ada fallback: bila spopt gagal, galat diteruskan ke
+    pemanggil agar dilaporkan apa adanya.
     """
-    if SKATER_OK:
-        try:
-            skater = Skater(gdf, w, attrs_name=None, n_clusters=k,
-                            min_region=cfg.skater_min_region)
-            skater.solve()
-            labs = np.array(skater.labels_)
-            logger.info(f"[SKATER] spopt: {len(np.unique(labs))} klaster")
-            return labs
-        except Exception as e:
-            logger.warning(f"[SKATER] spopt gagal ({e}), pakai fallback manual")
-
-    # ── Fallback manual: MST edge removal ────────────────────────────────────
-    n = len(X_pca)
-    G = nx.Graph()
-    G.add_nodes_from(range(n))
-    for i in range(n):
-        for j in w.neighbors.get(i, []):
-            if i < j:
-                dist = float(np.linalg.norm(X_pca[i] - X_pca[j]))
-                G.add_edge(i, j, weight=dist)
-    if not nx.is_connected(G):
-        comps = list(nx.connected_components(G))
-        for c1, c2 in zip(comps[:-1], comps[1:]):
-            c1, c2 = list(c1), list(c2)
-            best_d, bu, bv = np.inf, c1[0], c2[0]
-            for u in c1:
-                for v in c2:
-                    d = float(np.linalg.norm(X_pca[u] - X_pca[v]))
-                    if d < best_d: best_d, bu, bv = d, u, v
-            G.add_edge(bu, bv, weight=best_d)
-    mst   = nx.minimum_spanning_tree(G, weight="weight")
-    edges = sorted(mst.edges(data=True), key=lambda e: e[2]["weight"], reverse=True)
-    for u, v, _ in edges[:k - 1]:
-        mst.remove_edge(u, v)
-    comps = list(nx.connected_components(mst))
-    labs  = np.zeros(n, int)
-    for ci, comp in enumerate(comps):
-        for node in comp: labs[node] = ci
-    logger.info(f"[SKATER] manual: {len(np.unique(labs))} klaster")
+    if not SKATER_OK:
+        raise ImportError("spopt tidak terpasang")
+    from libpysal.weights import W as _W
+    w = _W.from_sparse(csr_matrix(adjacency, dtype=float))
+    cols = [f"pc{i + 1}" for i in range(X_pca.shape[1])]
+    frame = gpd.GeoDataFrame(pd.DataFrame(X_pca, columns=cols))
+    model = Skater(frame, w, cols, n_clusters=k, floor=cfg.skater_min_region)
+    model.solve()
+    labs = np.asarray(model.labels_, dtype=int)
+    logger.info(f"[SKATER] spopt: {len(np.unique(labs))} klaster")
     return labs
 
 
@@ -1180,7 +1177,8 @@ def run_all_clustering(
         return m.labels_
 
     def _skater():
-        return run_skater(gdf, w, X_pca, k, cfg)
+        from .thesis import rook_adjacency
+        return run_skater(rook_adjacency(w), X_pca, k, cfg)
 
     # HANYA JALANKAN SDWFCM AGAR API WEB MERESPONS DALAM < 10 DETIK
     for name, fn in [("SDWFCM", _sdwfcm)]:
