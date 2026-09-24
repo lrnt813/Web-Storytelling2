@@ -38,6 +38,8 @@ RESULTS_FILE = "thesis_results.json"
 GRID_FILE = "thesis_grid_results.csv.gz"
 POOLED_FILE = "thesis_pooled_results.csv.gz"     # data gabungan (grid × level non-Tergenang)
 RESULT_FILES = (RESULTS_FILE, GRID_FILE, POOLED_FILE)
+# Pemilihan K tidak dijalankan ulang pada putaran 4: tabel stabilitas diambil dari hasil v3 terkunci.
+K_SELECTION_V3 = PROJECT_ROOT / "data" / "locked" / "arsip_v3" / RESULTS_FILE
 LOCK_DIR = "locked"
 LOCK_FILE = "LOCK.json"
 
@@ -153,7 +155,8 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     results = {
         "meta": {
             "git": git_info(),
-            "versi_desain": "v3 (kelas bahaya dari raster InaRisk, TAS aturan absolut, keluaran K = 2 dan 3)",
+            "versi_desain": ("v4 (kelas bahaya dari raster InaRisk; pemilihan K dari v3; keluaran K = 2, 3, 4; "
+                             "TAS dengan syarat T_aktual ≥ batas waktu evakuasi; kategori akses)"),
             "sumber_kelas_bahaya": "data/Kulonprogo_Banjir.tif (grid mayoritas, ruas maksimum, TES titik)",
             "skenario": T.SKENARIO,
             "levels": T.LEVELS,
@@ -169,10 +172,11 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
             "feature_labels": T.FEATURE_LABELS,
             "tas_status": T.TAS_STATUS,
             "tas_aturan_utama": {"di_min": T.TAS_DI_ABSOLUTE, "t_ideal_maks_menit": T.TAS_T_IDEAL_MAX,
-                                 "jarak_min_m": T.TAS_MIN_EUCLID_M},
-            "label_interpretasi": {"terisolasi_proporsi_penalti_lebih_dari": T.LABEL_TERISOLASI_MIN,
-                                   "akses_baik_median_maks": T.LABEL_BAIK_MAX,
-                                   "akses_sedang_median_maks": T.LABEL_SEDANG_MAX},
+                                 "t_aktual_min_menit": T.TAS_T_AKTUAL_MIN, "jarak_min_m": T.TAS_MIN_EUCLID_M},
+            "batas_waktu_evakuasi_menit": T.EVAC_TIME_MIN,
+            "sensitivitas_batas_waktu_menit": list(T.EVAC_TIME_SENS),
+            "akses_status": T.AKSES_STATUS,
+            "label_tipologi": "peringkat menurut rata-rata waktu_tes_min: Tipologi 1 (terbaik) … Tipologi K (terburuk)",
         },
         "data_summary": {
             "n_grid": int(len(gdf)),
@@ -213,12 +217,24 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     }
     t = _tick("data_gabungan_praproses_W", t)
 
-    # ── 3. Pemilihan K (stabilitas, dihitung ulang pada data v3) ─────────────
-    k_rows, k_summary, solutions = T.evaluate_k_stability(X, W, pool, A_pool, cfg, B=subsample_b)
-    results["k_selection"] = {"candidates": k_rows, **k_summary}
-    results["k_terpilih_aturan"] = k_summary["k_terpilih"]
+    # ── 3. Pemilihan K: TIDAK dijalankan ulang (hasil stabilitas v3) ─────────
+    #    Data gabungan diverifikasi identik dengan v3 sebelum tabel stabilitas v3 dipakai.
+    v3 = json.loads(K_SELECTION_V3.read_text(encoding="utf-8"))
+    v3_pool = pd.read_csv(K_SELECTION_V3.parent / POOLED_FILE)
+    pc_cols = [c for c in v3_pool.columns if c.startswith("pc")]
+    same_rows = (len(v3_pool) == len(pool)
+                 and np.array_equal(v3_pool["id_grid"].values, pool["id_grid"].values)
+                 and np.array_equal(v3_pool["level"].values, pool["level"].values))
+    same_x = same_rows and len(pc_cols) == X.shape[1] and np.allclose(v3_pool[pc_cols].values, X, atol=2e-6)
+    if not same_x:
+        raise SystemExit("Data gabungan tidak identik dengan v3; tabel pemilihan K v3 tidak boleh dipakai.")
+    results["k_selection"] = {**v3["k_selection"], "sumber": "hasil v3 (tidak dijalankan ulang)",
+                              "fingerprint_sumber": v3.get("meta", {}).get("git", {}).get("commit")}
+    results["k_terpilih_aturan"] = v3["k_selection"]["k_terpilih"]
     results["k_keluaran"] = list(T.K_OUTPUT)
-    t = _tick("pemilihan_k", t)
+    solutions = {K: T.run_sdwfcm(X, W, K, cfg, seeds=T.STABILITY_SEEDS) for K in T.K_OUTPUT}
+    results["verifikasi_v3"] = {"data_gabungan_identik": bool(same_x)}
+    t = _tick("model_k_keluaran", t)
 
     # ── 4. Keluaran tingkat grid yang tidak bergantung K ─────────────────────
     grid_parts = [pd.DataFrame({
@@ -228,12 +244,28 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
         T.SKENARIO: gdf[T.SKENARIO].values,
         f"{T.SKENARIO}_atribut_lama": gdf[f"{T.SKENARIO}_atribut_lama"].values,
     })]
+    akses = {}
+    base_status = preps["baseline"]["tas"]["status"]
     for lv in T.LEVELS:
         key = lv["key"]
+        df = preps[key]["df"]
         summary = T.level_summary(key, preps[key], cfg)
         summary["diagnostik"] = T.level_diagnostics(preps[key], gdf, roads, cfg)
+        summary["kategori_akses"] = {
+            f"{thr:g}": T.access_summary(T.access_category(df["waktu_tes_min"].values, df["tergenang"].values,
+                                                           t_pen, thr))
+            for thr in (T.EVAC_TIME_MIN,) + tuple(T.EVAC_TIME_SENS)}
+        summary["tas_perubahan_vs_baseline"] = T.tas_change(base_status, preps[key]["tas"]["status"])
         results["levels"][key] = summary
-        grid_parts.append(T.level_grid_frame(key, preps[key]["df"], preps[key]["tas"], cfg))
+        frame = T.level_grid_frame(key, df, preps[key]["tas"], cfg)
+        akses[key] = T.access_category(df["waktu_tes_min"].values, df["tergenang"].values, t_pen)
+        frame[f"akses_{key}"] = akses[key]
+        grid_parts.append(frame)
+    results["transisi_akses"] = []
+    for a, b in T.TRANSITION_PAIRS:
+        tr = T.access_transition(akses[a], akses[b])
+        tr.update({"from_level": a, "to_level": b})
+        results["transisi_akses"].append(tr)
     pooled_out = pool[["id_grid", "id_grid_asli", "level"] + pre.params["features_in"]].copy()
     for i in range(X.shape[1]):
         pooled_out[f"pc{i + 1}"] = np.round(X[:, i], 6)
@@ -296,8 +328,15 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
         model["cdvm_vs_baseline"] = {key: T.cdvm_distribution(states["baseline"], states[key], K + 1)
                                      for key in T.LEVEL_KEYS}
         results["model"][str(K)] = model
+    results["tabulasi_silang"] = {}
+    ks = list(T.K_OUTPUT)
+    for i, ka in enumerate(ks):
+        for kb in ks[i + 1:]:
+            results["tabulasi_silang"][f"k{ka}_k{kb}"] = T.crosstab_labels(pool_labels[ka], pool_labels[kb], ka, kb)
     if 2 in pool_labels and 3 in pool_labels:
-        results["tabulasi_silang_k2_k3"] = T.crosstab_labels(pool_labels[2], pool_labels[3], 2, 3)
+        results["verifikasi_v3"]["label_k2_k3_identik_v3"] = bool(
+            np.array_equal(v3_pool["klaster_k2"].values, pool_labels[2])
+            and np.array_equal(v3_pool["klaster_k3"].values, pool_labels[3]))
     t = _tick("model_final_dan_transisi", t)
 
     # ── 6. Perbandingan algoritma di Baseline untuk setiap K keluaran ─────────

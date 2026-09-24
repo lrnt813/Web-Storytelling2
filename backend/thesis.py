@@ -38,6 +38,8 @@ from sklearn.preprocessing import PowerTransformer, RobustScaler
 from esda.moran import Moran
 
 from .engine import (
+    EVAC_TIME_MIN,
+    EVAC_TIME_SENS,
     Cfg,
     REDCAPManual,
     SpatialDistanceWeightedFCM,
@@ -102,13 +104,12 @@ SILHOUETTE_SEED = 42
 MORAN_PERMUTATIONS = 999
 MORAN_PERMUTATION_SEED = 42   # esda.Moran tidak punya parameter seed → seed global di-set sebelum dipanggil
 DEGENERATE_MAX_SHARE = 0.90   # partisi degeneratif: klaster terbesar > 90% grid
-K_OUTPUT = (2, 3)             # keluaran lengkap disusun untuk kedua K (model utama diputuskan peneliti)
-LABEL_TERISOLASI_MIN = 0.50   # label "Terisolasi": proporsi baris waktu minimum = penalti > 50%
-LABEL_BAIK_MAX = 10.0         # "Akses Baik": median waktu minimum ≤ 10 menit
-LABEL_SEDANG_MAX = 30.0       # "Akses Sedang": 10 < median ≤ 30 menit; "Akses Kritis": > 30 menit
+K_OUTPUT = (2, 3, 4)          # keluaran lengkap disusun untuk K ini (model utama diputuskan peneliti)
+AKSES_STATUS = {0: "Terjangkau", 1: "Jauh", 2: "Terputus", 3: "Tergenang"}   # padanan Li dkk. (2026)
 TAS_MIN_EUCLID_M = 50.0   # jarak minimum (setengah lebar grid 100 m) untuk T_ideal DAN T_aktual
 TAS_DI_ABSOLUTE = 2.0     # aturan utama TAS: DI_t ≥ 2 …
-TAS_T_IDEAL_MAX = 5.0     # … dan T_ideal ≤ 5 menit (garis lurus ≤ 400 m pada 80 m/menit)
+TAS_T_IDEAL_MAX = 5.0     # … dan T_ideal ≤ 5 menit (garis lurus ≤ 400 m pada 80 m/menit) …
+TAS_T_AKTUAL_MIN = EVAC_TIME_MIN   # … dan T_aktual ≥ batas waktu evakuasi (30 menit)
 TAS_STATUS = {0: "Non-TAS", 1: "TAS", 2: "Terputus", 3: "Tergenang"}
 TERGENANG = "Tergenang"   # status grid yang terdampak (mask simulasi) pada suatu level
 
@@ -899,23 +900,21 @@ TIME_COLS = ["waktu_tes_pendidikan", "waktu_tes_kesehatan", "waktu_tes_pemerinta
              "waktu_tes_ibadah", "waktu_tes_gor", "waktu_tes_min"]
 
 
-def interpret_cluster(prop_penalti_min: float, median_min: float) -> str:
-    """Label netral (aturan ditetapkan sebelum melihat hasil, Putaran 3):
-    "Terisolasi" bila proporsi baris dengan waktu minimum = penalti > 50%; selain itu
-    "Akses Baik" (median waktu minimum ≤ 10 menit), "Akses Sedang" (10–30), "Akses Kritis" (> 30)."""
-    if prop_penalti_min > LABEL_TERISOLASI_MIN:
-        return "Terisolasi"
-    if median_min <= LABEL_BAIK_MAX:
-        return "Akses Baik"
-    if median_min <= LABEL_SEDANG_MAX:
-        return "Akses Sedang"
-    return "Akses Kritis"
+def rank_label(c: int, k: int) -> str:
+    """Label peringkat (Putaran 4; penyajian, bukan perubahan model): klaster diurutkan naik menurut
+    rata-rata waktu_tes_min, sehingga klaster c = "Tipologi c+1"; 1 = terbaik, K = terburuk."""
+    if c == 0:
+        return "Tipologi 1 (terbaik)"
+    if c == k - 1:
+        return f"Tipologi {k} (terburuk)"
+    return f"Tipologi {c + 1}"
 
 
 def cluster_profile(df: pd.DataFrame, labels: np.ndarray, k: int, t_pen: float) -> List[dict]:
     """Profil klaster pada data gabungan: rerata semua variabel profil; untuk variabel waktu juga
-    median, P25, P75; jumlah dan persentase baris bernilai penalti (per kategori dan waktu minimum);
-    proporsi grid terisolasi; label interpretasi otomatis (interpret_cluster).
+    median, P25, P75, P90; jumlah dan persentase baris bernilai penalti (per kategori dan waktu
+    minimum); proporsi baris dengan waktu minimum > batas waktu evakuasi (dan nilai sensitivitas);
+    proporsi baris Terputus (waktu minimum = penalti); proporsi grid terisolasi; label peringkat.
     Kelas bahaya banjir = variabel deskriptif (bukan fitur)."""
     rows = []
     n = len(labels)
@@ -927,14 +926,19 @@ def cluster_profile(df: pd.DataFrame, labels: np.ndarray, k: int, t_pen: float) 
             row[col] = float(df.loc[sel, col].mean()) if m else None
         for col in TIME_COLS:
             v = df.loc[sel, col].values.astype(float)
-            q = np.percentile(v, [50, 25, 75]) if m else [None] * 3
-            row[f"{col}_median"], row[f"{col}_p25"], row[f"{col}_p75"] = (float(x) if m else None for x in q)
+            q = np.percentile(v, [50, 25, 75, 90]) if m else [None] * 4
+            (row[f"{col}_median"], row[f"{col}_p25"], row[f"{col}_p75"],
+             row[f"{col}_p90"]) = (float(x) if m else None for x in q)
             pen = int((v >= t_pen - 1e-9).sum()) if m else 0
             row[f"{col}_n_penalti"] = pen
             row[f"{col}_persen_penalti"] = float(pen / m * 100) if m else None
+        wmin = df.loc[sel, "waktu_tes_min"].values.astype(float)
+        for thr in (EVAC_TIME_MIN,) + tuple(EVAC_TIME_SENS):
+            row[f"proporsi_waktu_min_lebih_{thr:g}"] = float((wmin > thr).mean()) if m else None
+        row["proporsi_waktu_min_lebih_batas"] = row[f"proporsi_waktu_min_lebih_{EVAC_TIME_MIN:g}"]
+        row["proporsi_terputus"] = float((wmin >= t_pen - 1e-9).mean()) if m else None
         row["proporsi_terisolasi"] = float(df.loc[sel, "is_isolated"].mean()) if m else None
-        row["deskripsi"] = (interpret_cluster(row["waktu_tes_min_persen_penalti"] / 100,
-                                              row["waktu_tes_min_median"]) if m else None)
+        row["deskripsi"] = rank_label(c, k)
         rows.append(row)
     return rows
 
@@ -946,6 +950,49 @@ def crosstab_labels(a: np.ndarray, b: np.ndarray, ka: int, kb: int) -> dict:
     return {"matrix": M.tolist(), "baris": [f"K{ka}-{i}" for i in range(ka)],
             "kolom": [f"K{kb}-{j}" for j in range(kb)],
             "ari": float(adjusted_rand_score(a, b))}
+
+
+def access_category(waktu_min: np.ndarray, tergenang: np.ndarray, t_pen: float,
+                    threshold: float = EVAC_TIME_MIN) -> np.ndarray:
+    """Kategori akses per grid (padanan Li dkk. 2026, hlm. 2919; tidak mengubah klasterisasi):
+    3 = Tergenang (flooded), 2 = Terputus (isolated: waktu minimum = penalti),
+    1 = Jauh (remote: terhubung, waktu minimum > threshold), 0 = Terjangkau (≤ threshold)."""
+    w = np.asarray(waktu_min, float)
+    wet = np.asarray(tergenang, bool)
+    cut = w >= t_pen - 1e-9
+    return np.select([wet, cut, w > threshold], [3, 2, 1], default=0).astype(int)
+
+
+def access_summary(cat: np.ndarray) -> dict:
+    n = len(cat)
+    cnt = np.bincount(cat, minlength=4)
+    return {AKSES_STATUS[c]: {"jumlah_grid": int(cnt[c]), "persen": float(cnt[c] / n * 100)} for c in range(4)}
+
+
+def access_transition(a: np.ndarray, b: np.ndarray) -> dict:
+    """Matriks transisi kategori akses 4 × 4 (urutan AKSES_STATUS) antar dua level."""
+    M = np.zeros((4, 4), dtype=int)
+    np.add.at(M, (np.asarray(a), np.asarray(b)), 1)
+    return {"matrix": M.tolist(), "state_labels": [AKSES_STATUS[c] for c in range(4)],
+            "tetap": int(np.trace(M)), "berubah": int(M.sum() - np.trace(M))}
+
+
+def tas_change(status_base: np.ndarray, status_level: np.ndarray) -> dict:
+    """Perubahan TAS terhadap Baseline (aturan utama).
+    TAS baru akibat banjir = bukan TAS di Baseline dan TAS di level ini.
+    TAS hilang = TAS di Baseline dan bukan TAS di level ini, dipecah menurut status di level ini."""
+    b, l = np.asarray(status_base), np.asarray(status_level)
+    new = (b != 1) & (l == 1)
+    lost = (b == 1) & (l != 1)
+    return {
+        "tas_baru": int(new.sum()),
+        "tas_baru_dari_status_baseline": {TAS_STATUS[c]: int((new & (b == c)).sum()) for c in (0, 2)},
+        "tas_hilang": int(lost.sum()),
+        "tas_hilang_jadi_tergenang": int((lost & (l == 3)).sum()),
+        "tas_hilang_jadi_terputus": int((lost & (l == 2)).sum()),
+        "tas_hilang_lainnya": int((lost & (l == 0)).sum()),
+        "tas_tetap": int(((b == 1) & (l == 1)).sum()),
+    }
 
 
 def level_distribution(states: np.ndarray, k: int) -> List[dict]:
@@ -1102,9 +1149,21 @@ def detect_tas_detour(
     di[reach] = t_akt[reach] / t_ideal[reach]
     kat = tes_v["kategori"].values[tes_idx] if "kategori" in tes_v.columns else np.full(n, None)
 
-    # aturan utama (absolut)
-    is_tas = reach & (di >= TAS_DI_ABSOLUTE) & (t_ideal <= TAS_T_IDEAL_MAX)
+    # aturan utama (Putaran 4): DI ≥ 2, T_ideal ≤ 5 menit, T_aktual ≥ batas waktu evakuasi
+    base_rule = reach & (di >= TAS_DI_ABSOLUTE) & (t_ideal <= TAS_T_IDEAL_MAX)
+    is_tas = base_rule & (t_akt >= TAS_T_AKTUAL_MIN)
     status = np.select([wet, cut, is_tas], [3, 2, 1], default=0).astype(int)
+    # sensitivitas ambang T_aktual (20 dan 40 menit) dan aturan absolut v3 (tanpa syarat T_aktual)
+    sens_waktu = {}
+    for thr in EVAC_TIME_SENS:
+        m = base_rule & (t_akt >= thr)
+        sens_waktu[f"{thr:g}"] = {
+            "ambang_t_aktual_menit": thr,
+            "jumlah_tas": int(m.sum()),
+            "persen_tas_non_tergenang": float(m.sum() / (~wet).sum() * 100) if (~wet).any() else None,
+            "jumlah_tas_utama_yang_tetap_tas": int((is_tas & m).sum()),
+            "proporsi_tas_utama_yang_tetap_tas": float((is_tas & m).sum() / is_tas.sum()) if is_tas.any() else None,
+        }
     # sensitivitas (persentil, aturan v2)
     p25 = float(np.percentile(t_ideal[reach], 25))
     p75 = float(np.percentile(di[reach], 75))
@@ -1115,7 +1174,8 @@ def detect_tas_detour(
     n_reach = int(reach.sum())
     n_dry = int((~wet).sum())
     summary = {
-        "aturan": f"DI_t ≥ {TAS_DI_ABSOLUTE:g} dan T_ideal ≤ {TAS_T_IDEAL_MAX:g} menit (grid non-Tergenang terjangkau)",
+        "aturan": (f"DI_t ≥ {TAS_DI_ABSOLUTE:g}, T_ideal ≤ {TAS_T_IDEAL_MAX:g} menit, dan T_aktual ≥ "
+                   f"{TAS_T_AKTUAL_MIN:g} menit (grid non-Tergenang terjangkau)"),
         "jumlah_tas": int(is_tas.sum()),
         "jumlah_non_tas": int(non.sum()),
         "jumlah_terputus": int(cut.sum()),
@@ -1133,6 +1193,13 @@ def detect_tas_detour(
         "median_t_aktual_tas": float(np.median(t_akt[is_tas])) if is_tas.any() else None,
         "tas_per_kategori_tes_terdekat": {str(k): int(v) for k, v in
                                            pd.Series(kat[is_tas]).value_counts().sort_index().items()},
+        "sensitivitas_ambang_waktu": sens_waktu,
+        "sensitivitas_absolut_v3": {
+            "aturan": f"DI_t ≥ {TAS_DI_ABSOLUTE:g} dan T_ideal ≤ {TAS_T_IDEAL_MAX:g} menit (tanpa syarat T_aktual)",
+            "jumlah_tas": int(base_rule.sum()),
+            "persen_tas_non_tergenang": float(base_rule.sum() / n_dry * 100) if n_dry else None,
+            "sebaran_di_tas": _quantiles(di[base_rule]),
+        },
         "sensitivitas_persentil": {
             "aturan": "T_ideal ≤ P25(T_ideal) dan DI_t ≥ P75(DI_t) pada grid non-Tergenang terjangkau",
             "p25_t_ideal": p25,
@@ -1246,6 +1313,7 @@ def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg, k: int) -> List[di
         f"tas_status_{key}": "status_tas",
         f"tas_status_persentil_{key}": "status_tas_persentil",
         f"tes_terdekat_{key}": "tes_terdekat",
+        f"akses_{key}": "kategori_akses",
         SKENARIO: "indeks_bahaya",
         "Road_Density_mean": "road_density",
     }
@@ -1254,7 +1322,7 @@ def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg, k: int) -> List[di
     sub = grid[list(cols)].rename(columns=cols).copy()
     sub["is_isolated"] = (sub["jumlah_opsi_rute"] == 0).astype(int)
     for c in ["id_grid", "cluster_sdwfcm", "tergenang", "jumlah_opsi_rute",
-              "titik_aman_semu", "status_tas", "status_tas_persentil", "is_isolated"]:
+              "titik_aman_semu", "status_tas", "status_tas_persentil", "kategori_akses", "is_isolated"]:
         sub[c] = sub[c].astype(int)
     sub["id_grid_asli"] = sub["id_grid_asli"].astype(str)
     sub["road_density"] = sub["road_density"].round(3)

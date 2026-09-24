@@ -8,7 +8,7 @@ from scipy.spatial import cKDTree
 from shapely.geometry import Point
 
 from backend.engine import Cfg
-from backend.thesis import TAS_DI_ABSOLUTE, TAS_MIN_EUCLID_M, TAS_T_IDEAL_MAX, detect_tas_detour
+from backend.thesis import TAS_DI_ABSOLUTE, TAS_MIN_EUCLID_M, TAS_T_AKTUAL_MIN, TAS_T_IDEAL_MAX, detect_tas_detour
 
 
 def _setup():
@@ -41,16 +41,19 @@ def test_terputus_dikeluarkan_dan_jarak_minimum():
     assert s["jumlah_tas"] + s["jumlah_non_tas"] + s["jumlah_terputus"] == len(grid_xy)
     # jarak Euclidean minimum 50 m
     assert res["t_ideal"].min() >= TAS_MIN_EUCLID_M / cfg.walking_speed_m_per_min - 1e-12
-    # grid di seberang (dekat secara Euclidean, jalur memutar jauh) terdeteksi TAS (aturan utama)
-    assert st[len(grid_xy) - 3] == 1
     reach = st != 2
-    di, ti = res["detour_index"], res["t_ideal"]
-    expect = reach & (di >= TAS_DI_ABSOLUTE) & (ti <= TAS_T_IDEAL_MAX)
+    di, ti, ta = res["detour_index"], res["t_ideal"], res["t_aktual"]
+    # grid di seberang (dekat secara Euclidean, jalur memutar ±26 menit): TAS pada aturan absolut v3,
+    # bukan TAS pada aturan utama v4 karena T_aktual < 30 menit
+    i = len(grid_xy) - 3
+    assert di[i] >= TAS_DI_ABSOLUTE and ti[i] <= TAS_T_IDEAL_MAX and ta[i] < TAS_T_AKTUAL_MIN and st[i] == 0
+    assert s["sensitivitas_absolut_v3"]["jumlah_tas"] >= 1
+    expect = reach & (di >= TAS_DI_ABSOLUTE) & (ti <= TAS_T_IDEAL_MAX) & (ta >= TAS_T_AKTUAL_MIN)
     np.testing.assert_array_equal(st == 1, expect)
     # sensitivitas persentil dihitung hanya dari grid terjangkau
     sp = s["sensitivitas_persentil"]
     assert np.isclose(sp["p25_t_ideal"], np.percentile(ti[reach], 25))
     assert np.isclose(sp["p75_di"], np.percentile(di[reach], 75))
     np.testing.assert_array_equal(res["status_persentil"] == 1, reach & (ti <= sp["p25_t_ideal"]) & (di >= sp["p75_di"]))
-    assert s["tas_per_kategori_tes_terdekat"] == {"ibadah": s["jumlah_tas"]}
+    assert sum(s["tas_per_kategori_tes_terdekat"].values()) == s["jumlah_tas"]
     assert "delta_di" not in s and "mean_di_tas" not in s

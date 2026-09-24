@@ -1,4 +1,4 @@
-"""Putaran 3: label interpretasi, profil diperkaya, PC/PE, tabulasi silang, m SFCM seragam."""
+"""Putaran 3–4: label peringkat, profil diperkaya, PC/PE, tabulasi silang, m SFCM seragam."""
 import numpy as np
 import pandas as pd
 
@@ -6,13 +6,10 @@ from backend import thesis as T
 from backend.engine import Cfg, SpatialFuzzyCMeans
 
 
-def test_label_interpretasi():
-    assert T.interpret_cluster(0.51, 3.0) == "Terisolasi"
-    assert T.interpret_cluster(0.50, 3.0) == "Akses Baik"          # tepat 50% bukan "> 50%"
-    assert T.interpret_cluster(0.0, 10.0) == "Akses Baik"
-    assert T.interpret_cluster(0.0, 10.01) == "Akses Sedang"
-    assert T.interpret_cluster(0.0, 30.0) == "Akses Sedang"
-    assert T.interpret_cluster(0.0, 30.5) == "Akses Kritis"
+def test_label_peringkat():
+    assert T.rank_label(0, 4) == "Tipologi 1 (terbaik)"
+    assert T.rank_label(1, 4) == "Tipologi 2"
+    assert T.rank_label(3, 4) == "Tipologi 4 (terburuk)"
 
 
 def test_profil_penalti_dan_kuantil():
@@ -29,8 +26,11 @@ def test_profil_penalti_dan_kuantil():
     assert a["waktu_tes_min_median"] == 2.5 and a["waktu_tes_min_n_penalti"] == 0
     assert b["waktu_tes_min_n_penalti"] == 3 and np.isclose(b["waktu_tes_min_persen_penalti"], 75.0)
     assert np.isclose(b["proporsi_terisolasi"], 0.75)
-    assert a["deskripsi"] == "Akses Baik" and b["deskripsi"] == "Terisolasi"
+    assert a["deskripsi"] == "Tipologi 1 (terbaik)" and b["deskripsi"] == "Tipologi 2 (terburuk)"
     assert a["waktu_tes_min_p25"] == np.percentile([1, 2, 3, 4], 25)
+    assert b["waktu_tes_min_p90"] == np.percentile([t_pen, t_pen, t_pen, 5.0], 90)
+    assert np.isclose(b["proporsi_waktu_min_lebih_batas"], 0.75) and a["proporsi_waktu_min_lebih_batas"] == 0
+    assert np.isclose(b["proporsi_terputus"], 0.75)
 
 
 def test_pc_pe():
@@ -51,4 +51,4 @@ def test_m_sfcm_seragam():
     cfg = Cfg()
     assert not hasattr(cfg, "sfcm_m")
     assert SpatialFuzzyCMeans().m == cfg.sdwfcm_m == 1.7
-    assert tuple(T.K_OUTPUT) == (2, 3)
+    assert tuple(T.K_OUTPUT) == (2, 3, 4)
