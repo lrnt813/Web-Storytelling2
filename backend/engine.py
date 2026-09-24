@@ -10,7 +10,6 @@ disusun di backend/thesis.py; persamaan lengkap di docs/METODOLOGI.md.
 # ══════════════════════════════════════════════════════════════════════════════
 import logging
 import math
-import time
 import heapq
 import warnings
 from dataclasses import dataclass, field
@@ -24,22 +23,9 @@ import scipy.sparse as sp
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
 from scipy.sparse import csr_matrix
-from shapely.geometry import LineString, Point
-from shapely.ops import unary_union
-
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-from sklearn.metrics import (
-    calinski_harabasz_score,
-    davies_bouldin_score,
-    silhouette_score,
-)
 from sklearn.neighbors import NearestNeighbors
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import PowerTransformer, RobustScaler
 
 from libpysal.weights import KNN, Queen, Rook
-from esda.moran import Moran
 
 warnings.filterwarnings("ignore")
 _SDWFCM_W_CACHE: Dict[tuple, csr_matrix] = {}
@@ -57,26 +43,18 @@ except ImportError:
         def d(fn): return fn
         return d
 
-PANDANA_OK = False
-
 try:
     from spopt.region import Skater
     SKATER_OK = True
 except ImportError:
     SKATER_OK = False
 
-try:
-    from tqdm import tqdm
-except ImportError:
-    def tqdm(iterable, *a, **k): return iterable  # silent fallback
-
 logger = logging.getLogger(__name__)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 2. KONFIGURASI (Cfg)
-#    Semua path file dan hyperparameter algoritma ada di sini.
-#    Sesuaikan DATA_DIR di main.py saat startup.
+#    Lokasi berkas data dan seluruh parameter model.
 # ══════════════════════════════════════════════════════════════════════════════
 @dataclass
 class Cfg:
@@ -92,10 +70,6 @@ class Cfg:
         "tanah_longsor":   "tanah_longsor",
     })
     # Skripsi: hanya bencana banjir, 4 level (Baseline, Rendah, Sedang, Tinggi)
-    skenario_list: List[str] = field(default_factory=lambda: ["banjir"])
-    intensity_levels: List[float] = field(default_factory=lambda: [
-        0.0, 0.25, 0.50, 0.75,
-    ])
     indeks_bahaya: Dict[str, str] = field(default_factory=lambda: {
         "banjir":         "banjir",
         "banjir_bandang": "banjir_bandang",
@@ -103,9 +77,6 @@ class Cfg:
     })
     kategori_fac: List[str] = field(default_factory=lambda: [
         "pendidikan", "kesehatan", "pemerintahan", "ibadah", "gor",
-    ])
-    variabel_dasar: List[str] = field(default_factory=lambda: [
-        "Road_Density_mean",
     ])
     hazard_normalize_map: Dict[int, float] = field(default_factory=lambda: {
         0: 0.00, 1: 0.33, 2: 0.67, 3: 1.00,
@@ -115,9 +86,7 @@ class Cfg:
     impact_closure_threshold: float = 0.20
     tes_hazard_threshold: int = 2
     road_break_threshold: int = 3
-    road_damaged_weight_multiplier: float = 3.0
     walking_speed_m_per_min: float = 80.0
-    golden_time_min: float = 15.0
     isolation_time_threshold: float = 30.0
     isolation_penalty_weight: float = 10.0
     unreachable_time: float = 9999.0
@@ -125,7 +94,6 @@ class Cfg:
     # ── SDWFCM — Algoritma Utama ──────────────────────────────────────────────
     sdwfcm_m: float = 1.7
     sdwfcm_alpha: float = 0.5
-    sdwfcm_sigma: Optional[float] = None
     sdwfcm_knn: int = 8
     sdwfcm_max_iter: int = 150
     sdwfcm_tol: float = 1e-4
@@ -134,8 +102,7 @@ class Cfg:
     # tetangga terdampak yang perlu dibobot khusus. Parameter dipertahankan untuk dokumentasi.
     sdwfcm_impact_weight: float = 1.0
 
-    # ── SFCM — Pembanding 1 ───────────────────────────────────────────────────
-    sfcm_m: float = 2.0
+    # ── SFCM — pembanding (m sama dengan FCM/SDWFCM: sdwfcm_m) ─────────────────
     sfcm_alpha: float = 0.5
     sfcm_max_iter: int = 150
     sfcm_tol: float = 1e-4
@@ -146,19 +113,6 @@ class Cfg:
 
     # ── SKATER — Pembanding 3 ─────────────────────────────────────────────────
     skater_min_region: int = 10
-
-    # ── K-Optimal ────────────────────────────────────────────────────────────
-    k_range: range = field(default_factory=lambda: range(2, 11))
-    k_min_parsimony: int = 2
-    elbow_n_init: int = 5
-    elbow_max_iter: int = 100
-
-    # ── Titik Aman Semu (Academic Version) ───────────────────────────────────
-    psi_threshold_fragile: float = 0.25
-    psi_threshold_robust: float = 0.1
-    alr_threshold_severe: float = 0.75
-    alr_threshold_minor: float = 0.25
-    threshold_n_classes: int = 3
 
     def __post_init__(self):
         b = self.base_dir
@@ -220,24 +174,17 @@ def original_grid_ids(gdf: gpd.GeoDataFrame) -> pd.Series:
 
 
 def load_data(cfg: Cfg) -> gpd.GeoDataFrame:
-    """
-    Baca GeoPackage grid utama Kulon Progo.
+    """Baca GeoPackage grid Kulon Progo.
 
-    PERUBAHAN v2: Tambah kolom `id_grid` sebagai primary key integer urut 0..N-1.
-    Urutan operasi IDENTIK dengan export_geometry.py untuk menjamin sinkronisasi:
-      1. _read_gpkg  (baca + reproject ke ENGINE_CRS=EPSG:32749)
-      2. filter: notna() & ~is_empty()
-      3. reset_index(drop=True)
-      4. id_grid = range(N)   <-- BARU
+    `id_grid` = indeks baris 0..N−1 setelah reproyeksi ke EPSG:32749 dan pembuangan geometri
+    kosong; urutan operasi sama dengan scripts/export_geometry.py agar `id_grid` sinkron dengan
+    geometri statis dashboard. `id_grid_asli` = ID grid di GPKG (lihat original_grid_ids).
+    Kelas bahaya banjir diturunkan dari raster InaRisk (_apply_hazard_raster).
     """
     gdf = _read_gpkg(cfg.input_file, cfg.target_crs)
 
-    # Filter geometri null/empty — IDENTIK dengan export_geometry.py
     gdf = gdf[gdf.geometry.notna() & ~gdf.geometry.is_empty].reset_index(drop=True)
 
-    # ── BARU: id_grid sebagai primary key JOIN antara API dan geometri statis ──
-    # PERINGATAN: Jangan ubah urutan operasi di atas baris ini.
-    # Perubahan urutan = id_grid tidak sinkron dengan static_grid_kulonprogo.geojson.
     if "id_grid" in gdf.columns:
         logger.warning(
             "[load_data] Kolom 'id_grid' sudah ada di GPKG -> ditimpa ulang "
@@ -248,8 +195,7 @@ def load_data(cfg: Cfg) -> gpd.GeoDataFrame:
     gdf["id_grid_asli"] = original_grid_ids(gdf)
     _apply_hazard_raster(cfg, gdf=gdf)
 
-    # ── BARU: Precompute centroid untuk mempercepat routing ──
-    logger.info("[load_data] Precomputing centroids...")
+    logger.info("[load_data] Menghitung centroid...")
     centroids = gdf.geometry.centroid
     gdf["cx"] = centroids.x
     gdf["cy"] = centroids.y
@@ -936,7 +882,7 @@ class SpatialFuzzyCMeans:
     d_t = (1 − α)·d_a + α·d_s, d_s,ik = rata-rata d_a tetangga × rata-rata u_k tetangga.
     Fungsi objektif (untuk memilih inisialisasi terbaik): J = Σ_i Σ_k u_ik^m · d_t,ik.
     """
-    def __init__(self, k=5, m=2.0, alpha=0.5, max_iter=150, tol=1e-4, rs=42):
+    def __init__(self, k=5, m=1.7, alpha=0.5, max_iter=150, tol=1e-4, rs=42):
         self.k = k; self.m = m; self.alpha = alpha
         self.max_iter = max_iter; self.tol = tol; self.rs = rs
         self.labels_ = self.U_ = self.max_membership_ = None
@@ -1123,149 +1069,3 @@ def run_skater(adjacency: csr_matrix, X_pca: np.ndarray, k: int, cfg: Cfg) -> np
     labs = np.asarray(model.labels_, dtype=int)
     logger.info(f"[SKATER] spopt: {len(np.unique(labs))} klaster")
     return labs
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 14. CLUSTERING PIPELINE
-# ══════════════════════════════════════════════════════════════════════════════
-def _run(name: str, fn):
-    """Wrapper aman untuk menjalankan satu algoritma clustering."""
-    logger.info(f"[_run] {name} dimulai...")
-    t0 = time.time()
-    try:
-        r    = fn()
-        t    = time.time() - t0
-        labs = r if isinstance(r, np.ndarray) else r.get("labels")
-        nc   = len(set(labs[labs >= 0])) if labs is not None else 0
-        logger.info(f"[_run] {name} selesai {t:.1f}s → {nc} klaster")
-        if isinstance(r, np.ndarray):
-            return {"labels": r, "time": t}
-        r["time"] = t
-        return r
-    except Exception as e:
-        logger.error(f"[_run] {name} gagal: {e}")
-        return None
-
-
-def run_all_clustering(
-    gdf: gpd.GeoDataFrame,
-    w,
-    X_pca: np.ndarray,
-    k: int,
-    skenario: str,
-    cfg: Cfg,
-    mask_dampak=None,
-    fast_mode: bool = False,
-) -> Dict[str, Optional[dict]]:
-    """Jalankan semua algoritma clustering.
-    Returns: dict {"SDWFCM": {...}, "SFCM": {...}, "REDCAP": {...}, "SKATER": {...}}
-    """
-    logger.info(f"[run_all_clustering] [{skenario.upper()}] K={k}")
-    nda = (gdf[f"waktu_tes_min_{skenario}"].values
-           if f"waktu_tes_min_{skenario}" in gdf.columns else None)
-    results = {}
-
-    sdwfcm_max_iter = min(cfg.sdwfcm_max_iter, 30) if fast_mode else cfg.sdwfcm_max_iter
-    sdwfcm_tol = max(cfg.sdwfcm_tol, 2e-3) if fast_mode else cfg.sdwfcm_tol
-
-    def _sdwfcm():
-        m = SpatialDistanceWeightedFCM(
-            k=k, m=cfg.sdwfcm_m, alpha=cfg.sdwfcm_alpha,
-            sigma=cfg.sdwfcm_sigma, knn=cfg.sdwfcm_knn,
-            max_iter=sdwfcm_max_iter, tol=sdwfcm_tol, rs=42,
-        ).fit(X_pca, gdf, mask_dampak=mask_dampak)
-        return {"labels": m.labels_, "U": m.U_,
-                "max_membership": m.max_membership_,
-                "centers": m.centers_, "sigma": m._sigma}
-
-    def _sfcm():
-        m = SpatialFuzzyCMeans(
-            k=k, m=cfg.sfcm_m, alpha=cfg.sfcm_alpha,
-            max_iter=cfg.sfcm_max_iter, tol=cfg.sfcm_tol, rs=42,
-        ).fit(X_pca, w)
-        return {"labels": m.labels_, "U": m.U_,
-                "max_membership": m.max_membership_}
-
-    def _redcap():
-        m = REDCAPManual(
-            X_pca, w, k=k, linkage=cfg.redcap_linkage,
-            size_alpha=cfg.size_alpha, net_dist=nda,
-            iso_pen=cfg.isolation_penalty_weight,
-            iso_thr=cfg.isolation_time_threshold,
-        )
-        m.solve()
-        return m.labels_
-
-    def _skater():
-        from .thesis import rook_adjacency
-        return run_skater(rook_adjacency(w), X_pca, k, cfg)
-
-    # HANYA JALANKAN SDWFCM AGAR API WEB MERESPONS DALAM < 10 DETIK
-    for name, fn in [("SDWFCM", _sdwfcm)]:
-        r = _run(name, fn)
-        if r:
-            results[name] = r
-
-    logger.info(f"[run_all_clustering] {len(results)}/4 algoritma berhasil")
-    return results
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 15. EVALUASI MODEL
-# ══════════════════════════════════════════════════════════════════════════════
-def _size_entropy(labs: np.ndarray) -> float:
-    lv = labs[labs >= 0]
-    if len(lv) == 0: return 0.0
-    sz = pd.Series(lv).value_counts(); p = sz / sz.sum()
-    return float(-(p * np.log(p + 1e-10)).sum())
-
-
-def eval_one(X_pca, res, gdf, w, algo: str, skenario: str, cfg: Cfg) -> dict:
-    """Evaluasi satu algoritma: Silhouette, Davies-Bouldin, Calinski-Harabasz, Moran."""
-    labs = res.get("labels") if isinstance(res, dict) else res
-    if labs is None:
-        return {"algoritma": algo, "error": "no labels"}
-    lv = labs[labs >= 0]
-    if len(set(lv)) < 2:
-        return {"algoritma": algo, "error": "<2 cluster"}
-    m  = {"algoritma": algo, "n_cluster": len(set(lv)),
-          "n_noise": int((labs == -1).sum())}
-    Xv = X_pca[labs >= 0]; Lv = labs[labs >= 0]
-    for fn, key in [(silhouette_score,         "silhouette"),
-                    (calinski_harabasz_score,   "calinski_harabasz"),
-                    (davies_bouldin_score,      "davies_bouldin")]:
-        try:    m[key] = round(fn(Xv, Lv), 4)
-        except: m[key] = float("nan")
-    try:
-        y = np.array(np.where(labs < 0, 0, labs), dtype=np.float64)
-        if len(y) == w.n:
-            mi = Moran(y, w, permutations=99)
-            m["moran_cluster"] = round(mi.I, 4)
-            m["moran_p"]       = round(mi.p_sim, 4)
-        else:
-            m["moran_cluster"] = m["moran_p"] = float("nan")
-    except Exception:
-        m["moran_cluster"] = m["moran_p"] = float("nan")
-    m["size_entropy"] = round(_size_entropy(labs), 4)
-    nc = f"waktu_tes_min_{skenario}"
-    if nc in gdf.columns:
-        nd  = gdf[nc].values
-        m["waktu_tes_mean"] = round(
-            float(np.array([nd[labs == c].mean() for c in np.unique(lv)]).mean()), 1
-        )
-    mm = res.get("max_membership") if isinstance(res, dict) else None
-    if mm is not None:
-        m["ambig_pct"]       = round(float((mm < 0.6).sum() / len(mm) * 100), 2)
-        m["membership_mean"] = round(float(np.mean(mm)), 4)
-    return m
-
-
-def evaluate_all(results: dict, X_pca, gdf, w, k: int, skenario: str, cfg: Cfg) -> pd.DataFrame:
-    """Evaluasi semua algoritma, kembalikan DataFrame metrik."""
-    rows = [eval_one(X_pca, res, gdf, w, algo, skenario, cfg)
-            for algo, res in results.items()]
-    df   = pd.DataFrame(rows)
-    logger.info(f"[evaluate_all] selesai | {len(df)} baris")
-    return df
-
-

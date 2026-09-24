@@ -28,7 +28,7 @@ from scripts.thesis_analysis import (GRID_FILE, LOCK_DIR, LOCK_FILE, POOLED_FILE
 
 RESULT_PATHS = ("data/thesis_results.json", "data/thesis_grid_results.csv.gz",
                 "data/thesis_pooled_results.csv.gz", "data/locked/", "output_bab4/", "scratch/")
-PIPELINE_FILES = ["backend/engine.py", "backend/thesis.py", "backend/config.py",
+PIPELINE_FILES = ["backend/engine.py", "backend/thesis.py", "backend/config.py", "backend/hazard_raster.py",
                   "scripts/thesis_analysis.py"]
 LIBRARIES = ["numpy", "pandas", "scipy", "scikit-learn", "geopandas", "networkx", "libpysal",
              "esda", "shapely", "pyproj", "pyogrio", "spopt", "numba", "rasterio"]
@@ -62,7 +62,6 @@ def _cfg_params() -> dict:
     from backend.engine import Cfg
     cfg = Cfg(base_dir="./data")
     d = dataclasses.asdict(cfg)
-    d["k_range"] = list(cfg.k_range)
     d["input_file"], d["roads_file"], d["tes_files"] = cfg.input_file, cfg.roads_file, cfg.tes_files
     return d
 
