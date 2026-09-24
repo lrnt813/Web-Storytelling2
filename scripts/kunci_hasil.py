@@ -42,7 +42,7 @@ def _git(*args) -> str:
 def _uncommitted_code() -> list:
     out = []
     for line in _git("status", "--porcelain").splitlines():
-        path = line[3:].strip().strip('"')
+        path = line.split(maxsplit=1)[1].split(" -> ")[-1].strip('"')   # format: "XY path"
         if not path.startswith(RESULT_PATHS):
             out.append(line)
     return out
