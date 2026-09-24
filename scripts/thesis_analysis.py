@@ -54,7 +54,8 @@ def restore_locked(data_dir) -> bool:
     return all((Path(data_dir) / f).exists() for f in (RESULTS_FILE, GRID_FILE))
 
 
-TIME_KEYS = {"elapsed_sec", "time_sec", "sdwfcm_time_sec"}   # dibuang sebelum hashing
+TIME_KEYS = {"elapsed_sec", "time_sec", "sdwfcm_time_sec",   # dibuang sebelum hashing
+             "git"}                                           # identitas commit (bukan hasil)
 
 
 def _strip_time(obj):
@@ -103,6 +104,23 @@ def clean_json(obj, key=None):
     return obj
 
 
+CODE_PATHS = ["backend", "scripts", "tests", "requirements.txt", ".python-version"]
+
+
+def git_info(root=PROJECT_ROOT) -> dict:
+    """Commit, branch, dan status perubahan kode (hanya CODE_PATHS) saat analisis dijalankan."""
+    import subprocess
+    def _git(*args):
+        try:
+            return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
+                                  check=True).stdout.strip()
+        except Exception:
+            return None
+    dirty = _git("status", "--porcelain", "--", *CODE_PATHS)
+    return {"commit": _git("rev-parse", "HEAD"), "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
+            "kode_berubah_belum_commit": bool(dirty) if dirty is not None else None}
+
+
 def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: bool = False) -> dict:
     t_start = time.time()
     data_dir = data_dir or os.environ.get("SDWFCM_DATA_DIR", str(PROJECT_ROOT / "data"))
@@ -123,6 +141,7 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
 
     results = {
         "meta": {
+            "git": git_info(),
             "skenario": T.SKENARIO,
             "levels": T.LEVELS,
             "walking_speed_m_per_min": cfg.walking_speed_m_per_min,
