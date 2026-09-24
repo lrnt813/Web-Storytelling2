@@ -1,0 +1,6 @@
+﻿Algoritma,Status,Inisialisasi,Jumlah klaster,Silhouette,Calinski-Harabasz,Davies-Bouldin,Moran's I,p (Moran),Proporsi tetangga sama,Size entropy,Klaster terbesar (%),Waktu per inisialisasi (detik),Galat
+FCM,layak,10,2.0,0.324999,11876.012183,1.170973,0.76758,0.001,0.884701,0.684018,56.745909,0.26608,
+SFCM,layak,10,2.0,0.317047,11729.322785,1.177533,0.783038,0.001,0.891013,0.690189,53.843779,0.116712,
+SDWFCM,layak,10,2.0,0.318885,11502.236496,1.184347,0.832341,0.001,0.916515,0.678546,58.523354,0.274771,
+REDCAP,degeneratif — tidak layak dibandingkan,1,2.0,0.060409,209.478235,2.199826,1.0,0.001,1.0,0.089953,98.204913,23.579275,
+SKATER,gagal — tidak layak dibandingkan,1,,,,,,,,,,8.103466,"ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field."

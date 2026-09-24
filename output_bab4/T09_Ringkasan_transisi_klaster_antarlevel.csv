@@ -1,4 +1,0 @@
-﻿Transisi,Stability rate (%),ARI,Grid berpindah,Transisi dominan,Jumlah (dominan),Active edges,Edge mungkin,CDVM vs Baseline
-Baseline → Rendah,74.458607,0.453314,5791,K0 → K2,1245,11,12,0.020774
-Rendah → Sedang,39.117011,0.118584,13804,K1 → K0,3791,12,12,0.348035
-Sedang → Tinggi,43.011511,0.156168,12921,K2 → K0,4518,12,12,0.286288
