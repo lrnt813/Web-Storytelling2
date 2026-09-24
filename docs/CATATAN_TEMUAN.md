@@ -291,3 +291,26 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
 - **P3-14. Waktu komputasi.** Dua run bersamaan tanpa jeda sleep (dicegah `SetThreadExecutionState`
   selama run). Run A 7.743 detik (pemilihan K 7.505 detik), run B 7.800 detik. Fingerprint identik.
   — *DICATAT*
+
+---
+
+# Putaran 4 (branch `revisi-v4`)
+
+- **P4-1. Placeholder ambang T_aktual di instruksi.** Instruksi awal memuat "[X]" dan "[isi rujukan]".
+  Pengguna menetapkan X = 30 menit (Li dkk., 2026; Park dkk., 2020) sebelum hasil v4 terlihat. Rujukan
+  dan status verifikasinya ada di `docs/RUJUKAN_PARAMETER.md`. — *DIPUTUSKAN pengguna*
+- **P4-2. Pemilihan K tidak dijalankan ulang.** Pipeline memakai tabel stabilitas v3
+  (`data/locked/arsip_v3/thesis_results.json`) setelah memverifikasi bahwa data gabungan identik
+  (baris, level, skor PCA; toleransi 2·10⁻⁶ karena pembulatan 6 desimal di berkas v3). Label K = 2 dan
+  K = 3 diverifikasi identik dengan v3 (`verifikasi_v3`). — *SELESAI*
+- **P4-3. Satu konstanta batas waktu evakuasi** (`EVAC_TIME_MIN = 30`, `EVAC_TIME_SENS = (20, 40)`)
+  dipakai oleh aturan TAS, kategori akses "Jauh", dan ambang isolasi REDCAP. Test `tokenize`
+  memastikan tidak ada literal 30 lain di `backend/` dan `scripts/`. Kelas waktu tempuh di legenda
+  dashboard (≤ 5, 5–10, …, 15–30, 30–60 menit) adalah penyajian warna frontend dan tidak diikat ke
+  konstanta ini. — *SELESAI*
+- **P4-4. Sensitivitas 15 menit** tidak pernah ada di kode, jadi tidak ada yang diganti; sensitivitas
+  20 dan 40 menit ditambahkan. — *DICATAT*
+- **P4-5. Kecepatan 80 m/menit ≈ 4,8 km/jam**, sedikit di bawah asumsi 5 km/jam pada Li dkk. (2026).
+  Parameter tidak diubah (di luar instruksi); dicatat untuk verifikasi peneliti. — *DICATAT*
+- **P4-6. Label tipologi diganti label peringkat** (penyajian, bukan perubahan model), menjawab P3-9.
+  — *SELESAI*

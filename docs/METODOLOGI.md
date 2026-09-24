@@ -1,11 +1,12 @@
-# Metodologi — sebagaimana diimplementasikan (desain v3)
+# Metodologi — sebagaimana diimplementasikan (desain v4)
 
 Dokumen ini menjelaskan pipeline analisis **persis seperti kode** di `backend/engine.py`,
 `backend/hazard_raster.py`, `backend/thesis.py`, dan `scripts/thesis_analysis.py` (tag
-`hasil-skripsi-v3`). Nilai parameter yang dipakai pada run final tercatat di `data/locked/LOCK.json`.
+`hasil-skripsi-v4`). Rujukan setiap parameter beserta status verifikasinya: `docs/RUJUKAN_PARAMETER.md`. Nilai parameter yang dipakai pada run final tercatat di `data/locked/LOCK.json`.
 Hal yang masih perlu diputuskan tercatat di `docs/CATATAN_TEMUAN.md`. Versi sebelumnya diarsipkan:
 v1 di `data/locked/arsip_v1/` (model per level + Hungarian) dan v2 di `data/locked/arsip_v2/`
-(kelas bahaya grid dari atribut GPKG, aturan TAS persentil, keluaran K = 2 saja).
+(kelas bahaya grid dari atribut GPKG, aturan TAS persentil, keluaran K = 2 saja), dan v3 di
+`data/locked/arsip_v3/` (keluaran K = 2 dan 3, label ambang median, TAS tanpa syarat T_aktual).
 
 ## 1. Unit analisis dan data
 
@@ -185,13 +186,19 @@ peneliti, karena data gabungan berubah.
   0,949 ± 0,003 (setara, selisih ≤ 0,01), dan K = 3 0,940 ± 0,006 (tidak setara, selisih 0,017).
   Aturan tetap memilih K = 2. Kesetaraan K = 2 dan K = 3 yang menjadi alasan membandingkan keduanya
   hanya berlaku untuk data v2.
-- **(c) Model utama ditetapkan kemudian.** Keputusan model utama (K = 2 atau K = 3) diambil peneliti
-  bersama pembimbing **setelah** hasil v2 terlihat, berdasarkan metrik pendukung dan interpretasi
-  tipologi. Keputusan ini bukan bagian dari rencana awal. Karena itu v3 menghasilkan keluaran lengkap
-  dengan struktur identik untuk **K = 2 dan K = 3**. K utama dicatat di `pengaturan_hasil.json`
-  (dibaca `scripts/export_bab4.py` dan dashboard); K lainnya dilaporkan sebagai sensitivitas. Tabel
-  stabilitas v3 memuat kolom "setara secara stabilitas dengan K terbaik" (selisih rerata ARI subsampel
-  ≤ 0,01).
+- **(c) Model utama ditetapkan kemudian.** Keputusan model utama diambil peneliti bersama pembimbing
+  **setelah** hasil terlihat. Keputusan ini bukan bagian dari rencana awal. Setelah hasil v2 terlihat,
+  v3 menyusun keluaran lengkap untuk K = 2 dan K = 3. Setelah hasil v3 terlihat, himpunan K yang
+  **setara secara stabilitas** dengan K terbaik (selisih rerata ARI subsampel ≤ 0,01) adalah {2, 4}.
+  Dari himpunan itu, peneliti memilih model utama berdasarkan metrik pendukung dan interpretasi
+  tipologi. Putaran 4 menyusun keluaran lengkap dengan struktur identik untuk **K = 2, 3, dan 4**.
+  K = 3 dipertahankan sebagai pembanding dari v3, meskipun tidak setara secara stabilitas. K utama
+  dicatat di `pengaturan_hasil.json` (dibaca `scripts/export_bab4.py` dan dashboard); K lainnya
+  dilaporkan sebagai sensitivitas.
+- **(d) Pemilihan K tidak dijalankan ulang pada Putaran 4.** Tabel stabilitas v3 dipakai apa adanya,
+  setelah pipeline memverifikasi bahwa data gabungan (baris, level, dan skor PCA) identik dengan v3
+  (`verifikasi_v3` di hasil). Model K = 2, 3, dan 4 adalah solusi J terkecil dari seed 42–51 pada data
+  gabungan, praproses, dan W yang sama; label K = 2 dan K = 3 diverifikasi identik dengan v3.
 
 **Metrik pendukung** pada \(\hat L_K\), ditampilkan di tabel utama: Silhouette (sampel 10.000 baris,
 seed 42), ketegasan partisi \(1 - \mathrm{PE}/\ln K\) (keanggotaan FCM dihitung ulang di ruang
@@ -219,28 +226,27 @@ K\ (\text{Tergenang}) & \text{bila } \text{Tergenang}_{i,s} = 1 \end{cases}.
 **Profil klaster** (untuk setiap K keluaran), dihitung atas seluruh baris data gabungan:
 
 - rerata semua variabel;
-- untuk setiap variabel waktu (lima kategori dan waktu minimum): median, P25, dan P75;
+- untuk setiap variabel waktu (lima kategori dan waktu minimum): median, P25, P75, dan P90;
 - jumlah dan persentase baris bernilai penalti \(t = T_{\text{pen}}\), per kategori dan untuk waktu
   minimum;
+- proporsi baris dengan \(t^{\min} >\) 30 menit (dan 20/40 menit) serta proporsi baris Terputus;
 - proporsi grid terisolasi (`is_isolated`).
 
 Kelas bahaya banjir hanya dilaporkan sebagai variabel deskriptif.
 
-**Label interpretasi otomatis** (aturan ditetapkan di Putaran 3 sebelum melihat hasil). Dengan
-\(\pi_k\) = proporsi baris klaster \(k\) yang waktu minimumnya = penalti, dan \(\tilde t_k\) = median
-waktu minimum klaster \(k\):
-\[
-\text{label}_k = \begin{cases}
-\text{Terisolasi} & \pi_k > 0{,}5 \\
-\text{Akses Baik} & \pi_k \le 0{,}5 \wedge \tilde t_k \le 10\ \text{menit} \\
-\text{Akses Sedang} & \pi_k \le 0{,}5 \wedge 10 < \tilde t_k \le 30 \\
-\text{Akses Kritis} & \pi_k \le 0{,}5 \wedge \tilde t_k > 30
-\end{cases}
-\]
+**Label tipologi (Putaran 4: perubahan penyajian, bukan perubahan model).** Klaster \(k\) (urutan
+rata-rata \(t^{\min}\) naik) diberi label peringkat **"Tipologi \(k+1\)"**, dengan Tipologi 1 =
+terbaik dan Tipologi K = terburuk. Label berbasis ambang median pada v3 ("Terisolasi" bila > 50%
+baris penalti; median ≤ 10 menit "Akses Baik", 10–30 "Akses Sedang", > 30 "Akses Kritis") diganti
+karena tidak membedakan klaster: kedua klaster K = 2 mendapat label "Akses Baik" (CATATAN P3-9).
+Model, keanggotaan, dan penomoran tidak berubah.
 
-Distribusi tipologi per level = jumlah grid per state \(z_{\cdot,s}\). Untuk K = 2 dan K = 3
-juga disusun tabulasi silang label pada baris data gabungan, yang menunjukkan bagaimana klaster
-K = 3 memecah klaster K = 2.
+Profil yang wajib dibaca bersama label peringkat: median, P75, dan P90 waktu minimum; persentase
+baris penalti; proporsi baris dengan \(t^{\min} >\) batas waktu evakuasi (30 menit; juga 20 dan 40);
+proporsi baris **Terputus** (\(t^{\min} = T_{\text{pen}}\)); dan proporsi grid terisolasi.
+
+Distribusi tipologi per level = jumlah grid per state \(z_{\cdot,s}\). Tabulasi silang label pada baris
+data gabungan disusun untuk setiap pasangan K keluaran (K = 2 × 3, 2 × 4, 3 × 4).
 
 ## 11. Titik Aman Semu (Detour Index)
 
@@ -258,20 +264,46 @@ Kategori per level:
 
 - **Tergenang**: \(\text{Tergenang}_{i,s} = 1\), dikeluarkan dari seluruh perhitungan TAS.
 - **Terputus**: non-Tergenang dengan \(T^{\text{aktual}} = T_{\text{pen}}\).
-- **Aturan utama (Putaran 3, absolut).** Untuk \(R\) = grid non-Tergenang yang terjangkau:
+- **Aturan utama (Putaran 4).** Untuk \(R\) = grid non-Tergenang yang terjangkau:
 \[
 \mathrm{TAS}_i \iff \mathrm{DI}_i \ge 2 \;\wedge\; T_i^{\text{ideal}} \le 5\ \text{menit}
-\quad (\text{jarak garis lurus} \le 400\ \text{m pada } 80\ \text{m/menit}),
+\;\wedge\; T_i^{\text{aktual}} \ge T_{\text{evak}},\qquad T_{\text{evak}} = 30\ \text{menit},
 \]
-  selebihnya **Non-TAS**. Batas minimum 50 m tetap berlaku pada kedua jarak.
-- **Sensitivitas (aturan persentil, aturan utama v2):**
-  \(T_i^{\text{ideal}} \le P_{25}(T^{\text{ideal}}_R) \wedge \mathrm{DI}_i \ge P_{75}(\mathrm{DI}_R)\).
-  Dilaporkan jumlah TAS menurut aturan ini dan irisannya dengan aturan utama.
+  selebihnya **Non-TAS**. \(T_{\text{evak}}\) adalah batas waktu evakuasi berjalan kaki (Li dkk.,
+  2026, hlm. 2915; Park dkk., 2020, hlm. 5). Semua ambang ditetapkan sebelum hasil v4 terlihat.
+  Artinya, TAS adalah grid yang TES-nya tampak dekat (garis lurus ≤ 400 m), tetapi perjalanan
+  jaringannya minimal dua kali garis lurus dan melebihi batas waktu evakuasi.
+- **Sensitivitas:** (i) \(T^{\text{aktual}} \ge 20\) dan \(\ge 40\) menit (Li dkk., 2026, hlm. 2920),
+  termasuk proporsi TAS utama yang tetap TAS pada kedua ambang (irisan); (ii) aturan absolut v3
+  (tanpa syarat \(T^{\text{aktual}}\)); (iii) aturan persentil v2
+  (\(T^{\text{ideal}} \le P_{25} \wedge \mathrm{DI} \ge P_{75}\) pada \(R\)).
+- **Perubahan TAS terhadap Baseline (aturan utama):** *TAS baru akibat banjir* = grid yang bukan TAS di
+  Baseline dan menjadi TAS di level \(s\); *TAS hilang* = grid TAS di Baseline yang tidak lagi TAS di
+  level \(s\), dipecah menjadi jadi Tergenang, jadi Terputus, dan lainnya (Non-TAS).
 - **Yang dilaporkan:** jumlah TAS, Non-TAS, Terputus, dan Tergenang per level; sebaran DI (median,
   P25, P75, P90) pada TAS dan Non-TAS; median \(T^{\text{ideal}}\) dan \(T^{\text{aktual}}\) TAS;
-  jumlah TAS per kategori TES terdekat (\(e(i)\)); dan peta TAS per level.
+  jumlah TAS per kategori TES terdekat (\(e(i)\)); peta TAS per level; dan peta TAS baru/hilang untuk
+  Sedang dan Tinggi.
 - **Batasan interpretasi.** Perbedaan DI antara TAS dan Non-TAS mengikuti langsung dari definisi
   aturan, sehingga tidak dipakai sebagai bukti keberhasilan deteksi. Tabel TAS tidak bergantung pada K.
+
+## 11b. Kategori akses per level (padanan Li dkk., 2026)
+
+Klasifikasi tambahan per grid per level. Klasterisasi tidak berubah. Istilah mengikuti kategori
+komunitas tanpa akses pada Li dkk. (2026, hlm. 2919):
+
+| Kategori | Padanan Li dkk. (2026) | Definisi |
+|---|---|---|
+| Tergenang | *flooded* | \(\text{Tergenang}_{i,s} = 1\) |
+| Terputus | *isolated* | non-Tergenang, \(t^{\min}_{i,s} = T_{\text{pen}}\) (tidak mencapai TES mana pun) |
+| Jauh | *remote* | non-Tergenang, terhubung, \(t^{\min}_{i,s} > T_{\text{evak}}\) |
+| Terjangkau | — | \(t^{\min}_{i,s} \le T_{\text{evak}}\) |
+
+Dilaporkan untuk \(T_{\text{evak}}\) = 30 menit (utama) serta 20 dan 40 menit (sensitivitas):
+jumlah dan persentase per level, peta untuk Baseline, Sedang, dan Tinggi, dan matriks transisi kategori
+akses 4 × 4 untuk empat pasangan level (pada 30 menit). Konstanta \(T_{\text{evak}}\) sama dengan
+ambang isolasi REDCAP dan syarat \(T^{\text{aktual}}\) TAS (`EVAC_TIME_MIN`; nilai sensitivitas dari
+`EVAC_TIME_SENS`).
 
 ## 12. Analisis transisi dengan state Tergenang
 
@@ -288,10 +320,10 @@ Untuk pasangan Baseline→Rendah, Rendah→Sedang, Sedang→Tinggi, dan Baseline
 - **CDVM** = total variation distance distribusi state:
   \(\tfrac12 \sum_{u=0}^{K} \lvert p_u^{(b)} - p_u^{(a)} \rvert\).
 
-## 13. Perbandingan algoritma (Baseline, K = 2 dan K = 3)
+## 13. Perbandingan algoritma (Baseline, K = 2, 3, dan 4)
 
 Data: baris Baseline dari data gabungan (semua grid; ruang PCA dan praproses yang sama). Perbandingan
-dijalankan untuk **K = 2 dan K = 3**. Algoritma fuzzy memakai \(m = 1{,}7\) yang sama, 10 inisialisasi
+dijalankan untuk **K = 2, 3, dan 4**. Algoritma fuzzy memakai \(m = 1{,}7\) yang sama, 10 inisialisasi
 (seed 42–51, \(J\) terkecil), dan aturan penomoran §10:
 
 - **FCM**: SDWFCM dengan \(\alpha = 0\) (\(m = 1{,}7\)).
@@ -330,3 +362,36 @@ pilihan untuk beralih ke K lainnya.
   Satu thread BLAS/OpenMP.
 - Hasil dianggap identik bila fingerprint `thesis_results.json` (tanpa field waktu dan `meta.git`)
   dan SHA-256 isi CSV grid dan data gabungan sama; lihat `scripts/cek_reproduksi.py` dan README.
+
+## 16. Alasan operasional parameter yang ditetapkan peneliti
+
+Parameter berikut belum punya rujukan (`docs/RUJUKAN_PARAMETER.md`: "ditetapkan peneliti"). Alasannya
+bersifat operasional:
+
+- **T_ideal ≤ 5 menit (garis lurus ≤ 400 m).** Membatasi TAS pada grid yang TES-nya secara kasat mata
+  dekat: empat lebar grid 100 m, atau sekitar satu blok permukiman. Hanya pada grid seperti ini
+  "rasa aman" karena kedekatan dapat menyesatkan.
+- **DI_t ≥ 2.** Jalur jaringan minimal dua kali jarak garis lurus, sehingga penyimpangan rute jelas
+  lebih besar dari variasi normal jaringan jalan. Pada Baseline v3, median DI grid Non-TAS ± 1,5.
+- **Snapping ≤ 300 m.** Tiga lebar grid. Menghubungkan centroid di area bangunan jarang ke jalan
+  terdekat tanpa menghubungkan grid yang jelas terpisah dari jaringan; grid di luar batas ini menjadi
+  Terputus.
+- **Jarak minimum 50 m pada T_ideal dan T_aktual.** Setengah lebar grid. Mencegah penyebut DI mendekati
+  nol ketika TES berada di dalam atau sangat dekat centroid grid. Dipasang pada kedua jarak agar
+  T_aktual ≥ T_ideal (CATATAN P2-B2).
+
+## 17. Keterbatasan
+
+- **Standar waktu evakuasi.** Batas 30 menit (dan sensitivitas 20/40 menit) berasal dari praktik
+  Korea (Park dkk., 2020) dan Tiongkok (Li dkk., 2026). Belum ditemukan standar waktu evakuasi banjir
+  nasional yang setara di Indonesia. Rujukan Indonesia yang ada (Palabuhanratu, Padang, pedoman BNPB
+  2013) berkonteks tsunami.
+- **Kecepatan berjalan seragam** (80 m/menit), tanpa pengaruh lereng dan tanpa perbedaan kelompok
+  rentan. Park dkk. (2020) memakai koreksi Naismith–Langmuir untuk lereng. Keterbatasan ini relevan
+  untuk wilayah Perbukitan Menoreh.
+- **Penutupan ruas berbasis kelas bahaya InaRisk, bukan kedalaman genangan.** Li dkk. (2026) memakai
+  ambang kedalaman 0,3 m. Tidak ada reduksi kecepatan parsial pada ruas yang tergenang dangkal.
+- **Kapasitas TES dan jumlah penduduk tidak diperhitungkan** (Li dkk., 2026, memakai G2SFCA). Tidak
+  ada validasi terhadap lokasi banjir historis.
+- **TES diasumsikan beroperasi penuh selama banjir**, kecuali yang tidak valid menurut kelas bahaya
+  dan radius 50 m dari grid Tergenang.
