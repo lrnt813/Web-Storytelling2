@@ -88,6 +88,7 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
             "sdwfcm": {"m": cfg.sdwfcm_m, "alpha": cfg.sdwfcm_alpha, "knn": cfg.sdwfcm_knn},
             "pca_variance": T.PCA_VARIANCE,
             "iqr_factor": T.IQR_FACTOR,
+            "capped_columns": T.CAPPED_COLUMNS,
             "sdwfcm_n_init": T.SDWFCM_N_INIT,
             "feature_labels": T.FEATURE_LABELS,
         },
@@ -106,16 +107,20 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     })]
 
     t_pen = None
+    preprocessor = None          # di-fit pada Baseline, dipakai ulang di level lain
     labels_by_level = {}
     for lv in T.LEVELS:
         key = lv["key"]
         logger.info(f"===== LEVEL {lv['label'].upper()} (intensitas {lv['intensity']}) =====")
-        prep = T.prepare_level(gdf, roads, tes, lv["intensity"], cfg, t_pen=t_pen)
+        prep = T.prepare_level(gdf, roads, tes, lv["intensity"], cfg, t_pen=t_pen,
+                               preprocessor=preprocessor)
         t_pen = prep["t_pen"]
+        preprocessor = prep["preprocessor"]
         X, df = prep["X"], prep["df"]
 
         if key == "baseline":
             results["t_pen"] = t_pen
+            results["preprocessing"] = preprocessor.to_dict()
             results["baseline_time_stats"] = T.describe_times(df, cfg)
             logger.info("Evaluasi kandidat K (2–10) pada Baseline...")
             k_rows, k_best = T.evaluate_k_candidates(X, gdf, prep["mask"], A, xy, cfg)

@@ -377,7 +377,9 @@ async def post_simulate(body: SimulateRequest):
                 G_cut = apply_road_cuts_to_graph(G, nl, tn, cuts, cfg)
                 prep = T.prepare_level(state.gdf_base, state.roads_raw, state.tes_raw,
                                        lv["intensity"], cfg, t_pen=state.t_pen,
-                                       graph_pack=(G_cut, nl, tn))
+                                       graph_pack=(G_cut, nl, tn),
+                                       preprocessor=T.Preprocessor.from_dict(
+                                           state.thesis_results["preprocessing"]))
                 seed = state.thesis_results.get("levels", {}).get(lv["key"], {}).get("sdwfcm_seed")
                 cl = T.cluster_level(prep, state.gdf_base, cfg,
                                      k=int(state.thesis_results["k"]), fast=False,

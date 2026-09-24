@@ -188,42 +188,97 @@ def _count_closed_roads(roads: gpd.GeoDataFrame, intensity: float, cfg: Cfg) -> 
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 3. PRA-PEMROSESAN (Subbab 3.2.5)
+# 3. PRA-PEMROSESAN — DI-FIT PADA BASELINE, DITERAPKAN KE SEMUA LEVEL
 # ══════════════════════════════════════════════════════════════════════════════
-def preprocess_features(df: pd.DataFrame, cfg: Cfg) -> Tuple[np.ndarray, dict]:
-    """IQR capping → seleksi fitur → Yeo-Johnson → RobustScaler → PCA (80%).
+CAPPED_COLUMNS = ["Road_Density_mean"]   # satu-satunya variabel yang di-capping (Tukey 3 × IQR)
 
-    Capping memakai pagar Tukey 3 × IQR pada seluruh variabel. Variabel yang
-    IQR-nya nol menjadi konstan setelah capping sehingga tersaring pada seleksi
-    fitur (mis. penanda isolasi pada Baseline–Sedang, ketika < 25% grid terisolasi).
+
+class Preprocessor:
+    """Pra-pemrosesan fitur yang di-fit SEKALI pada Baseline lalu diterapkan ke level lain.
+
+    Tahapan (semua parameter diestimasi dari Baseline):
+      1. nilai pengisi median per kolom;
+      2. capping Tukey [Q1 − 3·IQR, Q3 + 3·IQR] hanya untuk CAPPED_COLUMNS
+         (waktu_tes_*, jumlah_opsi_rute, is_isolated, dan kelas banjir tidak di-capping);
+      3. seleksi fitur: pertahankan kolom dengan varians > VARIANCE_MIN (setelah capping);
+      4. Yeo-Johnson (λ per kolom) + standardisasi (mean, simpangan baku populasi);
+      5. RobustScaler (median, IQR);
+      6. PCA dengan varians kumulatif ≥ PCA_VARIANCE.
+    Parameter disimpan sebagai dict JSON (`to_dict`) agar transformasi identik dapat
+    dipakai ulang (mis. oleh simulasi blokir jalan di dashboard).
     """
-    cols = feature_columns(cfg)
-    F = df[cols].astype(float).copy()
-    F = F.fillna(F.median())
 
-    for c in cols:
-        v = F[c].values
-        q1, q3 = np.percentile(v, [25, 75])
-        iqr = q3 - q1
-        F[c] = np.clip(v, q1 - IQR_FACTOR * iqr, q3 + IQR_FACTOR * iqr)
+    def __init__(self, params: Optional[dict] = None):
+        self.params = params
 
-    kept = [c for c in cols if float(F[c].var()) > VARIANCE_MIN]
-    X = PowerTransformer(method="yeo-johnson", standardize=True).fit_transform(F[kept].values)
-    X = RobustScaler().fit_transform(X)
-    vt = VarianceThreshold(threshold=VARIANCE_MIN)
-    X = vt.fit_transform(X)
-    kept = [c for c, keep in zip(kept, vt.get_support()) if keep]
+    @classmethod
+    def fit(cls, df: pd.DataFrame, cfg: Cfg) -> "Preprocessor":
+        cols = feature_columns(cfg)
+        F = df[cols].astype(float)
+        medians = {c: float(F[c].median()) for c in cols}
+        F = F.fillna(medians)
+        caps = {}
+        for c in CAPPED_COLUMNS:
+            q1, q3 = np.percentile(F[c].values, [25, 75])
+            iqr = q3 - q1
+            caps[c] = [float(q1 - IQR_FACTOR * iqr), float(q3 + IQR_FACTOR * iqr)]
+            F[c] = np.clip(F[c].values, *caps[c])
+        variances = {c: float(F[c].var()) for c in cols}
+        kept = [c for c in cols if variances[c] > VARIANCE_MIN]
 
-    pca = PCA(n_components=PCA_VARIANCE, random_state=42)
-    X_pca = pca.fit_transform(X)
-    info = {
-        "n_features_in": len(cols),
-        "features_kept": kept,
-        "features_dropped": [c for c in cols if c not in kept],
-        "n_components": int(X_pca.shape[1]),
-        "explained_variance": float(pca.explained_variance_ratio_.sum()),
-    }
-    return X_pca, info
+        pt = PowerTransformer(method="yeo-johnson", standardize=True).fit(F[kept].values)
+        Y = pt.transform(F[kept].values)
+        rs = RobustScaler().fit(Y)
+        Z = rs.transform(Y)
+        pca = PCA(n_components=PCA_VARIANCE, svd_solver="full").fit(Z)
+        params = {
+            "features_in": cols,
+            "medians": medians,
+            "caps": caps,
+            "iqr_factor": IQR_FACTOR,
+            "variance_min": VARIANCE_MIN,
+            "variances_baseline": variances,
+            "features_kept": kept,
+            "features_dropped": [c for c in cols if c not in kept],
+            "yeojohnson_lambdas": [float(v) for v in pt.lambdas_],
+            "yeojohnson_mean": [float(v) for v in pt._scaler.mean_],
+            "yeojohnson_scale": [float(v) for v in pt._scaler.scale_],
+            "robust_center": [float(v) for v in rs.center_],
+            "robust_scale": [float(v) for v in rs.scale_],
+            "pca_mean": [float(v) for v in pca.mean_],
+            "pca_components": pca.components_.tolist(),
+            "pca_explained_variance_ratio": [float(v) for v in pca.explained_variance_ratio_],
+            "n_components": int(pca.n_components_),
+            "explained_variance": float(pca.explained_variance_ratio_.sum()),
+        }
+        return cls(params)
+
+    def transform(self, df: pd.DataFrame) -> np.ndarray:
+        """Terapkan parameter Baseline (tanpa fit ulang)."""
+        from scipy.stats import yeojohnson
+        p = self.params
+        F = df[p["features_in"]].astype(float).fillna(p["medians"])
+        for c, (lo, hi) in p["caps"].items():
+            F[c] = np.clip(F[c].values, lo, hi)
+        cols = p["features_kept"]
+        Y = np.column_stack([yeojohnson(F[c].values, lmbda=lam)
+                             for c, lam in zip(cols, p["yeojohnson_lambdas"])])
+        Y = (Y - np.asarray(p["yeojohnson_mean"])) / np.asarray(p["yeojohnson_scale"])
+        Z = (Y - np.asarray(p["robust_center"])) / np.asarray(p["robust_scale"])
+        return (Z - np.asarray(p["pca_mean"])) @ np.asarray(p["pca_components"]).T
+
+    def info(self) -> dict:
+        p = self.params
+        return {k: p[k] for k in ("features_in", "features_kept", "features_dropped", "caps",
+                                  "n_components", "explained_variance",
+                                  "pca_explained_variance_ratio")}
+
+    def to_dict(self) -> dict:
+        return self.params
+
+    @classmethod
+    def from_dict(cls, params: dict) -> "Preprocessor":
+        return cls(params)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -703,11 +758,20 @@ def describe_cluster(row: dict) -> str:
 
 
 def prepare_level(gdf_base, roads_raw, tes_raw, intensity: float, cfg: Cfg,
-                  t_pen: Optional[float] = None, graph_pack: Optional[tuple] = None) -> dict:
+                  t_pen: Optional[float] = None, graph_pack: Optional[tuple] = None,
+                  preprocessor: Optional[Preprocessor] = None) -> dict:
+    """Aksesibilitas satu level + matriks fitur X di ruang PCA bersama.
+
+    `preprocessor` = pra-pemrosesan hasil fit Baseline. Bila None (hanya untuk Baseline),
+    pra-pemrosesan di-fit pada level ini dan dikembalikan di hasil.
+    """
     acc = compute_level_accessibility(gdf_base, roads_raw, tes_raw, intensity, cfg,
                                       t_pen=t_pen, graph_pack=graph_pack)
-    X, prep = preprocess_features(acc["df"], cfg)
-    return {**acc, "X": X, "preprocessing": prep, "level_key": level_from_intensity(intensity)["key"]}
+    if preprocessor is None:
+        preprocessor = Preprocessor.fit(acc["df"], cfg)
+    X = preprocessor.transform(acc["df"])
+    return {**acc, "X": X, "preprocessor": preprocessor, "preprocessing": preprocessor.info(),
+            "level_key": level_from_intensity(intensity)["key"]}
 
 
 def cluster_level(prep: dict, gdf_base, cfg: Cfg, k: int, fast: bool = False,
