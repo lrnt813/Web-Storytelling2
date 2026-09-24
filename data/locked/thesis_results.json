@@ -1,8 +1,8 @@
 {
  "meta": {
   "git": {
-   "commit": "01fe65b286723c3f24f5a1bf5afc2ea4fe2ded3d",
-   "branch": "revisi-v4",
+   "commit": "0bcb860004b90ed9bcf6ed4c09b27f7ff27d8432",
+   "branch": "revisi-v5",
    "kode_berubah_belum_commit": false
   },
   "versi_desain": "v4 (kelas bahaya dari raster InaRisk; pemilihan K dari v3; keluaran K = 2, 3, 4; TAS dengan syarat T_aktual ≥ batas waktu evakuasi; kategori akses)",
@@ -95,7 +95,7 @@
   "tas_status": {
    "0": "Non-TAS",
    "1": "TAS",
-   "2": "Terputus",
+   "2": "TES terdekat tidak terjangkau",
    "3": "Tergenang"
   },
   "tas_aturan_utama": {
@@ -164,14 +164,14 @@
     "aturan": "DI_t ≥ 2, T_ideal ≤ 5 menit, dan T_aktual ≥ 30 menit (grid non-Tergenang terjangkau)",
     "jumlah_tas": 62,
     "jumlah_non_tas": 22443,
-    "jumlah_terputus": 168,
+    "jumlah_tes_terdekat_tidak_terjangkau": 168,
     "jumlah_tergenang": 0,
     "jumlah_terjangkau": 22505,
     "jumlah_non_tergenang": 22673,
     "persen_tas": 0.273453,
     "persen_tas_non_tergenang": 0.273453,
     "persen_tas_terjangkau": 0.275494,
-    "persen_terputus": 0.740969,
+    "persen_tes_terdekat_tidak_terjangkau": 0.740969,
     "persen_tergenang": 0.0,
     "sebaran_di_tas": {
      "n": 62,
@@ -339,11 +339,11 @@
     "tas_baru": 0,
     "tas_baru_dari_status_baseline": {
      "Non-TAS": 0,
-     "Terputus": 0
+     "TES terdekat tidak terjangkau": 0
     },
     "tas_hilang": 0,
     "tas_hilang_jadi_tergenang": 0,
-    "tas_hilang_jadi_terputus": 0,
+    "tas_hilang_jadi_tes_terdekat_tidak_terjangkau": 0,
     "tas_hilang_lainnya": 0,
     "tas_tetap": 62
    }
@@ -384,14 +384,14 @@
     "aturan": "DI_t ≥ 2, T_ideal ≤ 5 menit, dan T_aktual ≥ 30 menit (grid non-Tergenang terjangkau)",
     "jumlah_tas": 70,
     "jumlah_non_tas": 22382,
-    "jumlah_terputus": 182,
+    "jumlah_tes_terdekat_tidak_terjangkau": 182,
     "jumlah_tergenang": 39,
     "jumlah_terjangkau": 22452,
     "jumlah_non_tergenang": 22634,
     "persen_tas": 0.308737,
     "persen_tas_non_tergenang": 0.309269,
     "persen_tas_terjangkau": 0.311776,
-    "persen_terputus": 0.802717,
+    "persen_tes_terdekat_tidak_terjangkau": 0.802717,
     "persen_tergenang": 0.172011,
     "sebaran_di_tas": {
      "n": 70,
@@ -565,11 +565,11 @@
     "tas_baru": 8,
     "tas_baru_dari_status_baseline": {
      "Non-TAS": 8,
-     "Terputus": 0
+     "TES terdekat tidak terjangkau": 0
     },
     "tas_hilang": 0,
     "tas_hilang_jadi_tergenang": 0,
-    "tas_hilang_jadi_terputus": 0,
+    "tas_hilang_jadi_tes_terdekat_tidak_terjangkau": 0,
     "tas_hilang_lainnya": 0,
     "tas_tetap": 62
    }
@@ -611,14 +611,14 @@
     "aturan": "DI_t ≥ 2, T_ideal ≤ 5 menit, dan T_aktual ≥ 30 menit (grid non-Tergenang terjangkau)",
     "jumlah_tas": 77,
     "jumlah_non_tas": 18621,
-    "jumlah_terputus": 600,
+    "jumlah_tes_terdekat_tidak_terjangkau": 600,
     "jumlah_tergenang": 3375,
     "jumlah_terjangkau": 18698,
     "jumlah_non_tergenang": 19298,
     "persen_tas": 0.339611,
     "persen_tas_non_tergenang": 0.399005,
     "persen_tas_terjangkau": 0.411809,
-    "persen_terputus": 2.646319,
+    "persen_tes_terdekat_tidak_terjangkau": 2.646319,
     "persen_tergenang": 14.885547,
     "sebaran_di_tas": {
      "n": 77,
@@ -794,11 +794,11 @@
     "tas_baru": 54,
     "tas_baru_dari_status_baseline": {
      "Non-TAS": 54,
-     "Terputus": 0
+     "TES terdekat tidak terjangkau": 0
     },
     "tas_hilang": 39,
     "tas_hilang_jadi_tergenang": 31,
-    "tas_hilang_jadi_terputus": 7,
+    "tas_hilang_jadi_tes_terdekat_tidak_terjangkau": 7,
     "tas_hilang_lainnya": 1,
     "tas_tetap": 23
    }
@@ -841,14 +841,14 @@
     "aturan": "DI_t ≥ 2, T_ideal ≤ 5 menit, dan T_aktual ≥ 30 menit (grid non-Tergenang terjangkau)",
     "jumlah_tas": 44,
     "jumlah_non_tas": 14503,
-    "jumlah_terputus": 951,
+    "jumlah_tes_terdekat_tidak_terjangkau": 951,
     "jumlah_tergenang": 7175,
     "jumlah_terjangkau": 14547,
     "jumlah_non_tergenang": 15498,
     "persen_tas": 0.194063,
     "persen_tas_non_tergenang": 0.283908,
     "persen_tas_terjangkau": 0.302468,
-    "persen_terputus": 4.194416,
+    "persen_tes_terdekat_tidak_terjangkau": 4.194416,
     "persen_tergenang": 31.64557,
     "sebaran_di_tas": {
      "n": 44,
@@ -1026,11 +1026,11 @@
     "tas_baru": 27,
     "tas_baru_dari_status_baseline": {
      "Non-TAS": 27,
-     "Terputus": 0
+     "TES terdekat tidak terjangkau": 0
     },
     "tas_hilang": 45,
     "tas_hilang_jadi_tergenang": 35,
-    "tas_hilang_jadi_terputus": 8,
+    "tas_hilang_jadi_tes_terdekat_tidak_terjangkau": 8,
     "tas_hilang_lainnya": 2,
     "tas_tetap": 17
    }
@@ -2066,7 +2066,7 @@
    "model_final": {
     "seed_terbaik": 50,
     "objective": 291364.801746,
-    "time_sec": 28.989874,
+    "time_sec": 28.352061,
     "pusat_klaster_pca": [
      [
       -0.885548,
@@ -2529,7 +2529,7 @@
     {
      "algoritma": "FCM",
      "n_init": 10,
-     "time_per_init_sec": 0.234632,
+     "time_per_init_sec": 0.237678,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 2,
@@ -2551,7 +2551,7 @@
     {
      "algoritma": "SFCM",
      "n_init": 10,
-     "time_per_init_sec": 0.150548,
+     "time_per_init_sec": 0.14909,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 2,
@@ -2573,7 +2573,7 @@
     {
      "algoritma": "SDWFCM",
      "n_init": 10,
-     "time_per_init_sec": 0.247992,
+     "time_per_init_sec": 0.256121,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 2,
@@ -2595,7 +2595,7 @@
     {
      "algoritma": "REDCAP",
      "n_init": 1,
-     "time_per_init_sec": 22.690262,
+     "time_per_init_sec": 22.44453,
      "status": "degeneratif",
      "layak_dibandingkan": false,
      "n_cluster": 2,
@@ -2615,7 +2615,7 @@
     {
      "algoritma": "SKATER",
      "n_init": 1,
-     "time_per_init_sec": 7.663747,
+     "time_per_init_sec": 6.149918,
      "status": "gagal",
      "layak_dibandingkan": false,
      "galat": "ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field."
@@ -2627,7 +2627,7 @@
    "model_final": {
     "seed_terbaik": 49,
     "objective": 216980.302887,
-    "time_sec": 82.481915,
+    "time_sec": 84.429394,
     "pusat_klaster_pca": [
      [
       -1.252896,
@@ -3229,7 +3229,7 @@
     {
      "algoritma": "FCM",
      "n_init": 10,
-     "time_per_init_sec": 1.90859,
+     "time_per_init_sec": 1.918023,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 3,
@@ -3251,7 +3251,7 @@
     {
      "algoritma": "SFCM",
      "n_init": 10,
-     "time_per_init_sec": 0.441956,
+     "time_per_init_sec": 0.438603,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 3,
@@ -3273,7 +3273,7 @@
     {
      "algoritma": "SDWFCM",
      "n_init": 10,
-     "time_per_init_sec": 1.099928,
+     "time_per_init_sec": 1.115208,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 3,
@@ -3295,7 +3295,7 @@
     {
      "algoritma": "REDCAP",
      "n_init": 1,
-     "time_per_init_sec": 21.48222,
+     "time_per_init_sec": 21.109264,
      "status": "degeneratif",
      "layak_dibandingkan": false,
      "n_cluster": 3,
@@ -3315,7 +3315,7 @@
     {
      "algoritma": "SKATER",
      "n_init": 1,
-     "time_per_init_sec": 2.514853,
+     "time_per_init_sec": 3.254514,
      "status": "gagal",
      "layak_dibandingkan": false,
      "galat": "ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field."
@@ -3327,7 +3327,7 @@
    "model_final": {
     "seed_terbaik": 50,
     "objective": 146078.438474,
-    "time_sec": 82.454964,
+    "time_sec": 80.756511,
     "pusat_klaster_pca": [
      [
       -1.414215,
@@ -4076,7 +4076,7 @@
     {
      "algoritma": "FCM",
      "n_init": 10,
-     "time_per_init_sec": 2.122698,
+     "time_per_init_sec": 2.133006,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 4,
@@ -4098,7 +4098,7 @@
     {
      "algoritma": "SFCM",
      "n_init": 10,
-     "time_per_init_sec": 1.412404,
+     "time_per_init_sec": 1.412033,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 4,
@@ -4120,7 +4120,7 @@
     {
      "algoritma": "SDWFCM",
      "n_init": 10,
-     "time_per_init_sec": 1.857559,
+     "time_per_init_sec": 1.867723,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 4,
@@ -4142,7 +4142,7 @@
     {
      "algoritma": "REDCAP",
      "n_init": 1,
-     "time_per_init_sec": 21.734203,
+     "time_per_init_sec": 21.653396,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 4,
@@ -4162,7 +4162,7 @@
     {
      "algoritma": "SKATER",
      "n_init": 1,
-     "time_per_init_sec": 2.634449,
+     "time_per_init_sec": 3.251984,
      "status": "gagal",
      "layak_dibandingkan": false,
      "galat": "ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field."
@@ -4258,13 +4258,13 @@
   }
  },
  "waktu_komputasi": {
-  "muat_data": 9.058425,
-  "aksesibilitas_dan_tas": 34.361288,
-  "data_gabungan_praproses_W": 3.826869,
-  "model_k_keluaran": 194.230128,
-  "model_final_dan_transisi": 8.140996,
-  "perbandingan_algoritma": 263.045662,
-  "total": 512.664794
+  "muat_data": 9.015748,
+  "aksesibilitas_dan_tas": 34.501323,
+  "data_gabungan_praproses_W": 3.815195,
+  "model_k_keluaran": 193.829677,
+  "model_final_dan_transisi": 7.985124,
+  "perbandingan_algoritma": 263.703042,
+  "total": 512.85131
  },
- "elapsed_sec": 512.664794
+ "elapsed_sec": 512.85131
 }

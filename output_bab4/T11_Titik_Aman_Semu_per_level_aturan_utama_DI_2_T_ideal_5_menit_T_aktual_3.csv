@@ -1,4 +1,4 @@
-﻿Level,TAS,Non-TAS,Terputus,Tergenang,% TAS (semua grid),% TAS (non-Tergenang),Median T_ideal TAS (menit),Median T_aktual TAS (menit)
+﻿Level,TAS,Non-TAS,TES terdekat tidak terjangkau,Tergenang,% TAS (semua grid),% TAS (non-Tergenang),Median T_ideal TAS (menit),Median T_aktual TAS (menit)
 Baseline,62,22443,168,0,0.273453,0.273453,3.705304,43.05554
 Rendah,70,22382,182,39,0.308737,0.309269,3.719545,40.29666
 Sedang,77,18621,600,3375,0.339611,0.399005,3.669667,39.381397

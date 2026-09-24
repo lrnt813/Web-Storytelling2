@@ -1,22 +1,22 @@
 # Ringkasan angka kunci Bab IV
 
-Sumber: `data/locked/` — commit analisis `01fe65b286723c3f24f5a1bf5afc2ea4fe2ded3d`, dikunci 2026-09-25T02:26:04+07:00. K utama = **4** (pengaturan_hasil.json); K lain = sensitivitas.
+Sumber: `data/locked/` — commit analisis `0bcb860004b90ed9bcf6ed4c09b27f7ff27d8432`, dikunci 2026-09-25T03:00:41+07:00. K utama = **4** (pengaturan_hasil.json); K lain = sensitivitas.
 
 ## Data dan level
 
 - Grid 22.673; segmen jalan 162.608; TES 1.647; T_pen 403,87 menit
 - Data gabungan 80.103 baris
-- Baseline (tidak ada kelas ditutup): Tergenang 0 (0,00 %); ruas ditutup 0; TES valid 1.434; rerata waktu minimum 9,04 menit (median 5,81); TAS 62 (0,27 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 254 / 34; absolut v3 5.758; persentil 1.842; Terputus 168
+- Baseline (tidak ada kelas ditutup): Tergenang 0 (0,00 %); ruas ditutup 0; TES valid 1.434; rerata waktu minimum 9,04 menit (median 5,81); TAS 62 (0,27 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 254 / 34; absolut v3 5.758; persentil 1.842; TES terdekat tidak terjangkau 168
   - Kategori akses (30 menit): Terjangkau 22.357 (98,61 %); Jauh 205 (0,90 %); Terputus 111 (0,49 %); Tergenang 0 (0,00 %)
-- Level Rendah (kelas 3 ditutup): Tergenang 39 (0,17 %); ruas ditutup 710; TES valid 1.434; rerata waktu minimum 9,33 menit (median 5,80); TAS 70 (0,31 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 258 / 36; absolut v3 5.757; persentil 1.811; Terputus 182
+- Level Rendah (kelas 3 ditutup): Tergenang 39 (0,17 %); ruas ditutup 710; TES valid 1.434; rerata waktu minimum 9,33 menit (median 5,80); TAS 70 (0,31 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 258 / 36; absolut v3 5.757; persentil 1.811; TES terdekat tidak terjangkau 182
   - Kategori akses (30 menit): Terjangkau 22.254 (98,15 %); Jauh 254 (1,12 %); Terputus 126 (0,56 %); Tergenang 39 (0,17 %)
-  - TAS baru akibat banjir 8; TAS hilang 0 (jadi Tergenang 0, jadi Terputus 0, lainnya 0)
-- Level Sedang (kelas ≥ 2 ditutup): Tergenang 3.375 (14,89 %); ruas ditutup 20.963; TES valid 1.367; rerata waktu minimum 16,67 menit (median 5,48); TAS 77 (0,40 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 218 / 37; absolut v3 5.092; persentil 1.485; Terputus 600
+  - TAS baru akibat banjir 8; TAS hilang 0 (jadi Tergenang 0, jadi TES terdekat tidak terjangkau 0, lainnya 0)
+- Level Sedang (kelas ≥ 2 ditutup): Tergenang 3.375 (14,89 %); ruas ditutup 20.963; TES valid 1.367; rerata waktu minimum 16,67 menit (median 5,48); TAS 77 (0,40 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 218 / 37; absolut v3 5.092; persentil 1.485; TES terdekat tidak terjangkau 600
   - Kategori akses (30 menit): Terjangkau 18.732 (82,62 %); Jauh 64 (0,28 %); Terputus 502 (2,21 %); Tergenang 3.375 (14,89 %)
-  - TAS baru akibat banjir 54; TAS hilang 39 (jadi Tergenang 31, jadi Terputus 7, lainnya 1)
-- Level Tinggi (kelas ≥ 1 ditutup): Tergenang 7.175 (31,65 %); ruas ditutup 44.096; TES valid 989; rerata waktu minimum 24,41 menit (median 6,29); TAS 44 (0,28 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 209 / 16; absolut v3 3.685; persentil 1.047; Terputus 951
+  - TAS baru akibat banjir 54; TAS hilang 39 (jadi Tergenang 31, jadi TES terdekat tidak terjangkau 7, lainnya 1)
+- Level Tinggi (kelas ≥ 1 ditutup): Tergenang 7.175 (31,65 %); ruas ditutup 44.096; TES valid 989; rerata waktu minimum 24,41 menit (median 6,29); TAS 44 (0,28 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 209 / 16; absolut v3 3.685; persentil 1.047; TES terdekat tidak terjangkau 951
   - Kategori akses (30 menit): Terjangkau 14.529 (64,08 %); Jauh 318 (1,40 %); Terputus 651 (2,87 %); Tergenang 7.175 (31,65 %)
-  - TAS baru akibat banjir 27; TAS hilang 45 (jadi Tergenang 35, jadi Terputus 8, lainnya 2)
+  - TAS baru akibat banjir 27; TAS hilang 45 (jadi Tergenang 35, jadi TES terdekat tidak terjangkau 8, lainnya 2)
 
 ## Pemilihan K
 
