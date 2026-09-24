@@ -323,14 +323,65 @@ def run_sdwfcm(X: np.ndarray, coords_gdf, k: int, mask, cfg: Cfg, fast: bool = F
 
 
 def relabel_by_metric(labels: np.ndarray, metric: np.ndarray) -> np.ndarray:
-    """Penomoran ulang: klaster dengan rata-rata metrik terendah → 0, dst.
-    (setara relabel_clusters_by_metric, ascending=True)."""
+    """Penomoran ulang: klaster dengan rata-rata `metric` terendah → 0, dst.
+    Seri dipecah dengan nomor lama (deterministik)."""
     labels = np.asarray(labels)
     uniq = sorted(int(c) for c in np.unique(labels) if c >= 0)
     means = {c: float(np.nanmean(metric[labels == c])) for c in uniq}
     order = sorted(uniq, key=lambda c: (means[c], c))
     mapping = {old: new for new, old in enumerate(order)}
     return np.array([mapping.get(int(l), int(l)) for l in labels], dtype=int)
+
+
+def _permute(labels: np.ndarray, U: np.ndarray, mapping: Dict[int, int]) -> Tuple[np.ndarray, np.ndarray]:
+    """Terapkan pemetaan label lama → baru pada label dan kolom U."""
+    new_labels = np.array([mapping[int(l)] for l in labels], dtype=int)
+    new_U = np.zeros_like(U)
+    for old, new in mapping.items():
+        new_U[:, new] = U[:, old]
+    return new_labels, new_U
+
+
+def number_by_travel_time(labels: np.ndarray, U: np.ndarray, waktu_min: np.ndarray):
+    """Aturan penomoran Baseline: urut naik rata-rata waktu_tes_min (menit asli);
+    klaster 0 = akses tercepat. Klaster kosong (tanpa anggota hard) diletakkan terakhir."""
+    k = U.shape[1]
+    means = [float(waktu_min[labels == c].mean()) if np.any(labels == c) else np.inf for c in range(k)]
+    order = sorted(range(k), key=lambda c: (means[c], c))
+    return _permute(labels, U, {old: new for new, old in enumerate(order)})
+
+
+def baseline_center_scale(base_centers: np.ndarray) -> float:
+    """Median jarak Euclidean antarpusat Baseline (pasangan i < j)."""
+    D = cdist(base_centers, base_centers)
+    iu = np.triu_indices(len(base_centers), k=1)
+    return float(np.median(D[iu]))
+
+
+def align_to_baseline(X: np.ndarray, labels: np.ndarray, U: np.ndarray, m: float,
+                      base_centers: np.ndarray) -> Tuple[np.ndarray, np.ndarray, dict]:
+    """Aturan penomoran level non-Baseline.
+
+    Pusat fuzzy level ini (ruang PCA bersama) dipasangkan ke pusat Baseline dengan
+    Hungarian (scipy.optimize.linear_sum_assignment) berbiaya jarak Euclidean kuadrat.
+    Klaster yang jarak Euclidean ke pasangannya > 2 × median jarak antarpusat Baseline
+    ditandai sebagai tipologi baru/tidak berpadanan.
+    """
+    C = fuzzy_centers(X, U, m)
+    cost = cdist(C, base_centers, "sqeuclidean")
+    rows, cols = linear_sum_assignment(cost)
+    mapping = {int(r): int(c) for r, c in zip(rows, cols)}
+    new_labels, new_U = _permute(labels, U, mapping)
+    scale = baseline_center_scale(base_centers)
+    batas = 2.0 * scale
+    pasangan = []
+    for r, c in sorted(zip(rows, cols), key=lambda t: t[1]):
+        d = float(np.sqrt(cost[r, c]))
+        pasangan.append({"klaster": int(c), "jarak_ke_pusat_baseline": d,
+                         "tipologi_baru": bool(d > batas)})
+    info = {"median_jarak_antarpusat_baseline": scale, "batas_tipologi_baru": batas,
+            "pasangan": pasangan}
+    return new_labels, new_U, info
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -477,6 +528,16 @@ def desc_pesc(X, labels, A: csr_matrix, coords: np.ndarray) -> Tuple[float, floa
     return float(desc), float(pesc)
 
 
+def same_label_neighbor_share(labels, A: csr_matrix) -> float:
+    """Proporsi pasangan tetangga (A simetris, tiap pasangan dihitung sekali) yang berlabel sama.
+    Tidak bergantung pada penomoran label."""
+    coo = A.tocoo()
+    upper = coo.row < coo.col
+    r, c = coo.row[upper], coo.col[upper]
+    labels = np.asarray(labels)
+    return float((labels[r] == labels[c]).mean()) if len(r) else float("nan")
+
+
 def size_entropy(labels) -> float:
     p = pd.Series(labels[labels >= 0]).value_counts(normalize=True).values
     return float(-(p * np.log(p + 1e-12)).sum())
@@ -566,12 +627,13 @@ def compare_algorithms(X, gdf_coords, w, k, mask, net_time, cfg: Cfg,
     sk_labels = run_skater(gdf_coords, w, X, k, cfg)
     runs["SKATER"] = (np.asarray(sk_labels, dtype=int), time.time() - t0)
 
-    # Algoritma pembanding dinomori ulang berdasarkan rata-rata waktu tempuh
-    # minimum (klaster 0 = tercepat). Moran's I pada label kategorik bergantung
-    # pada penomoran, sehingga aturan penomoran harus sama untuk semua algoritma.
-    for algo in ("SFCM", "REDCAP", "SKATER"):
+    # Semua algoritma (termasuk SDWFCM) dinomori ulang dengan aturan yang sama:
+    # urut naik rata-rata waktu_tes_min (klaster 0 = tercepat). Moran's I pada label
+    # kategorik bergantung pada penomoran.
+    for algo in list(runs):
         labels, t = runs[algo]
         runs[algo] = (relabel_by_metric(labels, net_time), t)
+    A_rook = rook_adjacency(w)
 
     rows = []
     for algo, (labels, t) in runs.items():
@@ -587,6 +649,7 @@ def compare_algorithms(X, gdf_coords, w, k, mask, net_time, cfg: Cfg,
             "moran_i": mi,
             "moran_p": mp,
             "size_entropy": size_entropy(labels),
+            "proporsi_tetangga_sama": same_label_neighbor_share(labels, A_rook),
             "wcss": wcss(Xv, Lv),
             "time_sec": float(t),
         })
@@ -775,12 +838,23 @@ def prepare_level(gdf_base, roads_raw, tes_raw, intensity: float, cfg: Cfg,
 
 
 def cluster_level(prep: dict, gdf_base, cfg: Cfg, k: int, fast: bool = False,
-                  seeds: Optional[List[int]] = None) -> dict:
-    """SDWFCM satu level. `seeds` (mis. seed terbaik hasil offline) mempercepat
-    simulasi blokir jalan: cukup satu inisialisasi pada cekungan yang sama."""
+                  seeds: Optional[List[int]] = None,
+                  baseline_centers: Optional[np.ndarray] = None) -> dict:
+    """SDWFCM satu level + penomoran klaster.
+
+    baseline_centers None  → aturan Baseline (urut rata-rata waktu_tes_min);
+    baseline_centers given → diselaraskan ke pusat Baseline (Hungarian).
+    `seeds` (mis. seed terbaik hasil offline) mempercepat simulasi blokir jalan.
+    """
     df = prep["df"]
     res = run_sdwfcm(prep["X"], gdf_base, k, prep["mask"], cfg, fast=fast, seeds=seeds)
-    labels, U = res["labels"], res["U"]
+    if baseline_centers is None:
+        labels, U = number_by_travel_time(res["labels"], res["U"], df["waktu_tes_min"].values)
+        alignment = None
+    else:
+        labels, U, alignment = align_to_baseline(prep["X"], res["labels"], res["U"], cfg.sdwfcm_m,
+                                                 np.asarray(baseline_centers))
+    centers = fuzzy_centers(prep["X"], U, cfg.sdwfcm_m)
     membership = U.max(axis=1) if U is not None else res["max_membership"]
     xy = np.column_stack([gdf_base["cx"].values, gdf_base["cy"].values])
     tas = detect_tas_detour(df, xy, prep["tes_v"], prep["graph"], prep["t_pen"], cfg)
@@ -788,7 +862,8 @@ def cluster_level(prep: dict, gdf_base, cfg: Cfg, k: int, fast: bool = False,
     for row in profile:
         row["deskripsi"] = describe_cluster(row)
     return {"labels": labels, "U": U, "membership": membership, "time": res["time"],
-            "objective": res["objective"], "seed": res["seed"], "tas": tas, "profile": profile}
+            "objective": res["objective"], "seed": res["seed"], "tas": tas, "profile": profile,
+            "centers": centers, "alignment": alignment}
 
 
 def level_grid_frame(key: str, df: pd.DataFrame, cl: dict, cfg: Cfg) -> pd.DataFrame:
@@ -858,6 +933,8 @@ def level_summary(key: str, prep: dict, cl: dict, cfg: Cfg) -> dict:
         "cluster_profile": cl["profile"],
         "cluster_names": {str(r["klaster"]): r["deskripsi"] for r in cl["profile"]},
         "tas": cl["tas"]["summary"],
+        "pusat_fuzzy_pca": np.asarray(cl["centers"]).tolist(),
+        "penyelarasan_label": cl["alignment"],
     }
 
 

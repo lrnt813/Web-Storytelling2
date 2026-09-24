@@ -383,7 +383,8 @@ async def post_simulate(body: SimulateRequest):
                 seed = state.thesis_results.get("levels", {}).get(lv["key"], {}).get("sdwfcm_seed")
                 cl = T.cluster_level(prep, state.gdf_base, cfg,
                                      k=int(state.thesis_results["k"]), fast=False,
-                                     seeds=[int(seed)] if seed is not None else None)
+                                     seeds=[int(seed)] if seed is not None else None,
+                                     baseline_centers=np.asarray(state.thesis_results["pusat_baseline_pca"]))
                 grid = pd.concat([
                     state.thesis_grid[["id_grid", "Road_Density_mean", T.SKENARIO]],
                     T.level_grid_frame(lv["key"], prep["df"], cl, cfg),

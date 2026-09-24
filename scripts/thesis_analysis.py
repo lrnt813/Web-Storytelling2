@@ -76,7 +76,8 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     gdf = load_data(cfg)
     roads, tes = load_road_network(cfg)
     w = build_weights(gdf)
-    A = T.queen_adjacency(gdf)   # blok spasial DESC/PESC
+    A = T.queen_adjacency(gdf)   # blok spasial DESC/PESC (lihat CATATAN_TEMUAN A1)
+    A_rook = T.rook_adjacency(w)
     xy = np.column_stack([gdf["cx"].values, gdf["cy"].values])
     k_final = None   # ditentukan dari skor komposit pada Baseline
 
@@ -108,6 +109,7 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
 
     t_pen = None
     preprocessor = None          # di-fit pada Baseline, dipakai ulang di level lain
+    baseline_centers = None      # pusat fuzzy Baseline (ruang PCA bersama)
     labels_by_level = {}
     for lv in T.LEVELS:
         key = lv["key"]
@@ -132,7 +134,10 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
                 "k_selected": k_final,
             }
 
-        cl = T.cluster_level(prep, gdf, cfg, k=k_final)
+        cl = T.cluster_level(prep, gdf, cfg, k=k_final, baseline_centers=baseline_centers)
+        if key == "baseline":
+            baseline_centers = cl["centers"]          # acuan penyelarasan level lain
+            results["pusat_baseline_pca"] = np.asarray(baseline_centers).tolist()
         labels_by_level[key] = cl["labels"]
 
         if key == "baseline" and not skip_comparison:
@@ -152,6 +157,7 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
             "desc": desc,
             "pesc": pesc,
             "size_entropy": T.size_entropy(cl["labels"]),
+            "proporsi_tetangga_sama": T.same_label_neighbor_share(cl["labels"], A_rook),
         }
         results["levels"][key] = summary
         grid_parts.append(T.level_grid_frame(key, df, cl, cfg))
