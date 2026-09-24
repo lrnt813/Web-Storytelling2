@@ -12,12 +12,12 @@ const TAS_COLOR = "#a855f7";
 const TERDAMPAK_COLOR = "#ff7f0e";
 const NEUTRAL_FILL = "#475569";
 
-// Level intensitas banjir sesuai Subbab 3.2 skripsi
+// Level banjir = kelas bahaya InaRisk yang ditutup (intensity hanya detail implementasi API)
 const LEVELS = [
-    { key: 'baseline', label: 'Baseline', intensity: 0.00 },
-    { key: 'rendah',   label: 'Rendah',   intensity: 0.25 },
-    { key: 'sedang',   label: 'Sedang',   intensity: 0.50 },
-    { key: 'tinggi',   label: 'Tinggi',   intensity: 0.75 }
+    { key: 'baseline', label: 'Baseline', kelas: 'tidak ada kelas ditutup', full: 'Baseline (tidak ada kelas ditutup)', intensity: 0.00 },
+    { key: 'rendah',   label: 'Rendah',   kelas: 'kelas 3 ditutup',   full: 'Level Rendah (kelas 3 ditutup)',   intensity: 0.25 },
+    { key: 'sedang',   label: 'Sedang',   kelas: 'kelas ≥ 2 ditutup', full: 'Level Sedang (kelas ≥ 2 ditutup)', intensity: 0.50 },
+    { key: 'tinggi',   label: 'Tinggi',   kelas: 'kelas ≥ 1 ditutup', full: 'Level Tinggi (kelas ≥ 1 ditutup)', intensity: 0.75 }
 ];
 
 const viewModes = {
@@ -259,6 +259,10 @@ function fmtInt(v) {
 
 function levelLabel(key) {
     return (LEVELS.find(l => l.key === key) || LEVELS[0]).label;
+}
+
+function levelFullLabel(key) {
+    return (LEVELS.find(l => l.key === key) || LEVELS[0]).full;
 }
 
 function popupRow(label, value, color = null) {

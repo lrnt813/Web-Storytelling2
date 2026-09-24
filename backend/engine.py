@@ -374,6 +374,15 @@ def build_weights(gdf: gpd.GeoDataFrame):
 # ══════════════════════════════════════════════════════════════════════════════
 # 6. GRAF JARINGAN JALAN
 # ══════════════════════════════════════════════════════════════════════════════
+def road_closed_mask(roads: gpd.GeoDataFrame, skenario: str, intensity: float, cfg: Cfg) -> np.ndarray:
+    """Ruas ditutup ⇔ norm_haz(kelas bahaya ruas) × intensitas ≥ impact_closure_threshold."""
+    hc = cfg.hazard_col_map.get(skenario, skenario)
+    if hc not in roads.columns:
+        return np.zeros(len(roads), dtype=bool)
+    haz = roads[hc].fillna(0).astype(int).map(cfg.norm_haz).to_numpy(dtype=float)
+    return haz * intensity >= cfg.impact_closure_threshold
+
+
 def build_road_graph(roads: gpd.GeoDataFrame, skenario: str, intensity: float, cfg: Cfg):
     """Graf tak berarah dari segmen jalan yang tidak ditutup banjir.
 
@@ -382,18 +391,16 @@ def build_road_graph(roads: gpd.GeoDataFrame, skenario: str, intensity: float, c
     diambil yang terpendek bila ada segmen ganda.
     Returns: (G, node_array, kdtree)
     """
-    hc = cfg.hazard_col_map.get(skenario, skenario)
     n_rm = n_ok = 0
     edge_weights: Dict[Tuple[tuple, tuple], float] = {}
 
-    hazard_vals = roads[hc].to_numpy() if hc in roads.columns else None
+    closed = road_closed_mask(roads, skenario, intensity, cfg)
     geoms = roads.geometry.to_numpy()
 
     for idx, geom in enumerate(geoms):
         if geom is None or geom.is_empty:
             continue
-        raw_hazard = int(hazard_vals[idx]) if hazard_vals is not None else 0
-        if cfg.norm_haz(raw_hazard) * intensity >= cfg.impact_closure_threshold:
+        if closed[idx]:
             n_rm += 1
             continue
         n_ok += 1

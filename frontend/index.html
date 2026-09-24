@@ -48,12 +48,12 @@
 
         <h2>Skenario Banjir</h2>
         <div class="form-group">
-            <label>Level Intensitas Bahaya</label>
+            <label>Level Banjir (kelas bahaya InaRisk yang ditutup)</label>
             <div class="level-group">
-                <button class="level-btn" data-level="baseline" onclick="setLevel('baseline')">Baseline</button>
-                <button class="level-btn" data-level="rendah" onclick="setLevel('rendah')">Rendah</button>
-                <button class="level-btn" data-level="sedang" onclick="setLevel('sedang')">Sedang</button>
-                <button class="level-btn" data-level="tinggi" onclick="setLevel('tinggi')">Tinggi</button>
+                <button class="level-btn" data-level="baseline" onclick="setLevel('baseline')" title="Baseline (tidak ada kelas ditutup)">Baseline</button>
+                <button class="level-btn" data-level="rendah" onclick="setLevel('rendah')" title="Level Rendah (kelas 3 ditutup)">Rendah<small>kelas 3</small></button>
+                <button class="level-btn" data-level="sedang" onclick="setLevel('sedang')" title="Level Sedang (kelas ≥ 2 ditutup)">Sedang<small>kelas ≥ 2</small></button>
+                <button class="level-btn" data-level="tinggi" onclick="setLevel('tinggi')" title="Level Tinggi (kelas ≥ 1 ditutup)">Tinggi<small>kelas ≥ 1</small></button>
             </div>
         </div>
 

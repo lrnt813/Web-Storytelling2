@@ -39,6 +39,7 @@ from .engine import (
     SpatialFuzzyCMeans,
     build_road_graph,
     calc_t_max,
+    road_closed_mask,
     impact_weights,
     sdwfcm_objective_value,
     compute_distances,
@@ -54,14 +55,21 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════════════════════
 SKENARIO = "banjir"
 
-# Level Tinggi = intensitas 0,75: pada intensitas ini seluruh ruas jalan
-# berbahaya (kelas 1–3) sudah tertutup sehingga dampak jaringan jenuh
-# (intensitas 1,0 menutup ruas yang sama).
+# Level didefinisikan oleh kelas bahaya banjir InaRisk yang ditutup (grid berkelas tersebut
+# tergenang dan ruas jalan berkelas tersebut ditutup):
+#   Baseline = tidak ada, Rendah = kelas 3, Sedang = kelas ≥ 2, Tinggi = kelas ≥ 1.
+# `intensity` hanya detail implementasi: simulate_hazard dan build_road_graph menerima angka
+# intensitas yang menghasilkan himpunan kelas yang sama persis (dibuktikan di
+# tests/test_level_kelas.py) dan dipakai sebagai kunci cache graf jalan di dashboard.
 LEVELS: List[dict] = [
-    {"key": "baseline", "label": "Baseline", "intensity": 0.00},
-    {"key": "rendah",   "label": "Rendah",   "intensity": 0.25},
-    {"key": "sedang",   "label": "Sedang",   "intensity": 0.50},
-    {"key": "tinggi",   "label": "Tinggi",   "intensity": 0.75},
+    {"key": "baseline", "label": "Baseline", "kelas_ditutup": [],
+     "label_lengkap": "Baseline (tidak ada kelas ditutup)", "intensity": 0.00},
+    {"key": "rendah", "label": "Rendah", "kelas_ditutup": [3],
+     "label_lengkap": "Level Rendah (kelas 3 ditutup)", "intensity": 0.25},
+    {"key": "sedang", "label": "Sedang", "kelas_ditutup": [2, 3],
+     "label_lengkap": "Level Sedang (kelas ≥ 2 ditutup)", "intensity": 0.50},
+    {"key": "tinggi", "label": "Tinggi", "kelas_ditutup": [1, 2, 3],
+     "label_lengkap": "Level Tinggi (kelas ≥ 1 ditutup)", "intensity": 0.75},
 ]
 LEVEL_KEYS = [lv["key"] for lv in LEVELS]
 LEVEL_BY_KEY = {lv["key"]: lv for lv in LEVELS}
@@ -185,10 +193,19 @@ def compute_level_accessibility(
 
 
 def _count_closed_roads(roads: gpd.GeoDataFrame, intensity: float, cfg: Cfg) -> int:
-    if roads is None or SKENARIO not in roads.columns:
+    if roads is None:
         return 0
-    haz = roads[SKENARIO].fillna(0).astype(int).map(cfg.norm_haz).values
-    return int((haz * intensity >= cfg.impact_closure_threshold).sum())
+    return int(road_closed_mask(roads, SKENARIO, intensity, cfg).sum())
+
+
+def grid_class_rule_mask(gdf_base, level: dict) -> np.ndarray:
+    """Aturan kelas: grid tergenang ⇔ kelas bahaya banjir ∈ kelas_ditutup level."""
+    return np.isin(gdf_base[SKENARIO].fillna(0).astype(int).values, level["kelas_ditutup"])
+
+
+def road_class_rule_mask(roads, level: dict) -> np.ndarray:
+    """Aturan kelas: ruas ditutup ⇔ kelas bahaya banjir ruas ∈ kelas_ditutup level."""
+    return np.isin(roads[SKENARIO].fillna(0).astype(int).values, level["kelas_ditutup"])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -992,38 +1009,24 @@ def level_summary(key: str, prep: dict, cl: dict, cfg: Cfg) -> dict:
     }
 
 
-def hazard_classes_affected(intensity: float, gdf_base, roads_raw, cfg: Cfg, mask) -> dict:
-    """Kelas bahaya banjir yang terkena pada satu intensitas.
-
-    Diturunkan dari aturan di kode (simulate_hazard untuk grid, build_road_graph untuk ruas
-    jalan) DAN diverifikasi dari data (kelas grid yang benar-benar ditandai terdampak dan kelas
-    ruas yang benar-benar ditutup).
-    """
-    h = gdf_base[SKENARIO].fillna(0).astype(float).values
-    hmin, hmax = float(h.min()), float(h.max())
-    grid_rule = []
-    for c in sorted(int(v) for v in np.unique(h)):
-        p_c = (c - hmin) / (hmax - hmin) if hmax > hmin else 0.5
-        if intensity > 0 and p_c >= 1.0 - intensity and p_c > 0:
-            grid_rule.append(c)
+def hazard_classes_affected(level: dict, gdf_base, roads_raw, cfg: Cfg, mask) -> dict:
+    """Kelas bahaya banjir yang ditutup pada satu level: aturan (kelas_ditutup) dibandingkan
+    dengan kelas grid yang benar-benar tergenang dan ruas yang benar-benar ditutup."""
+    h = gdf_base[SKENARIO].fillna(0).astype(int).values
     grid_data = sorted(int(v) for v in np.unique(h[np.asarray(mask, bool)])) if np.any(mask) else []
-
-    road_rule, road_data = [], []
+    road_data = []
     if roads_raw is not None and SKENARIO in roads_raw.columns:
         rc = roads_raw[SKENARIO].fillna(0).astype(int).values
-        for c in sorted(int(v) for v in np.unique(rc)):
-            if cfg.norm_haz(c) * intensity >= cfg.impact_closure_threshold:
-                road_rule.append(c)
-        closed = np.array([cfg.norm_haz(c) * intensity >= cfg.impact_closure_threshold for c in rc])
+        closed = road_closed_mask(roads_raw, SKENARIO, level["intensity"], cfg)
         road_data = sorted(int(v) for v in np.unique(rc[closed])) if closed.any() else []
+    rule = sorted(level["kelas_ditutup"])
     return {
-        "grid_terdampak_kelas_aturan": grid_rule,
-        "grid_terdampak_kelas_data": grid_data,
-        "ruas_ditutup_kelas_aturan": road_rule,
+        "kelas_ditutup_aturan": rule,
+        "grid_tergenang_kelas_data": grid_data,
         "ruas_ditutup_kelas_data": road_data,
-        "konsisten": grid_rule == grid_data and road_rule == road_data,
+        "konsisten": grid_data == rule and road_data == rule,
         "tes_tidak_valid_kelas": f"kelas ≥ {cfg.tes_hazard_threshold} (semua level) + TES berkelas "
-                                 f"< {cfg.tes_hazard_threshold} dalam radius 50 m grid terdampak",
+                                 f"< {cfg.tes_hazard_threshold} dalam radius 50 m grid tergenang",
     }
 
 
@@ -1053,7 +1056,7 @@ def level_diagnostics(prep: dict, cl: dict, gdf_base, roads_raw, cfg: Cfg, k: in
         "tes_total_per_kategori": {kat: int(v["total"]) for kat, v in tes_stats.items()},
         "tes_valid_total": int(sum(v["valid"] for v in tes_stats.values())),
         "proporsi_terdampak_per_klaster": per_klaster,
-        "kelas_bahaya": hazard_classes_affected(LEVEL_BY_KEY[prep["level_key"]]["intensity"],
+        "kelas_bahaya": hazard_classes_affected(LEVEL_BY_KEY[prep["level_key"]],
                                                 gdf_base, roads_raw, cfg, terdampak),
     }
 

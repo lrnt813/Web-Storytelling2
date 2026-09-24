@@ -33,7 +33,8 @@ from shapely.geometry import Point
 
 from . import thesis as T
 from .config import BASE_DIR, DATA_DIR, cfg, utm_to_wgs84 as _utm_to_wgs84, wgs84_to_utm as _wgs84_to_utm
-from .engine import apply_road_cuts_to_graph, build_road_graph, filter_tes, load_data, load_road_network, simulate_hazard
+from .engine import (apply_road_cuts_to_graph, build_road_graph, filter_tes, load_data, load_road_network,
+                     road_closed_mask, simulate_hazard)
 from .schemas import RoadRequest, RouteAllTesRequest, SimulateRequest
 from .state import state
 
@@ -611,9 +612,7 @@ async def post_roads(body: RoadRequest):
     lv = _resolve_level(body.level, body.intensity)
     roads_sim = state.roads_raw.copy()
     roads_sim["is_broken"] = False
-    if T.SKENARIO in roads_sim.columns:
-        haz = roads_sim[T.SKENARIO].fillna(0).astype(int).map(cfg.norm_haz).values
-        roads_sim.loc[haz * lv["intensity"] >= cfg.impact_closure_threshold, "is_broken"] = True
+    roads_sim.loc[road_closed_mask(roads_sim, T.SKENARIO, lv["intensity"], cfg), "is_broken"] = True
 
     if body.cut_roads:
         pts = [Point(*_latlon_to_projected(c["lat"], c["lng"])) for c in body.cut_roads

@@ -148,7 +148,7 @@ function renderDataTab(r) {
     const levelRows = LEVELS.map(l => {
         const s = r.levels?.[l.key] || {};
         const tesValid = Object.values(s.tes_valid || {}).reduce((a, b) => a + b, 0);
-        return { cells: [l.label, fmtNum(l.intensity), fmtInt(s.n_grid_terdampak), `${fmtNum(s.persen_grid_terdampak)}%`,
+        return { cells: [l.label, l.kelas, fmtInt(s.n_grid_terdampak), `${fmtNum(s.persen_grid_terdampak)}%`,
                          fmtInt(s.n_roads_closed), fmtInt(tesValid), `${(s.preprocessing?.features_kept || []).length} / ${s.preprocessing?.n_features_in ?? '–'}`,
                          fmtInt(s.preprocessing?.n_components),
                          `${fmtNum((s.preprocessing?.explained_variance || 0) * 100, 1)}%`] };
@@ -158,8 +158,8 @@ function renderDataTab(r) {
         + section('Statistik Deskriptif Waktu Tempuh (Baseline)', 'Waktu tempuh berjalan kaki (menit) dari setiap grid ke TES terdekat per kategori.',
                   table(['Variabel', 'n', 'Rata-rata', 'Std', 'Min', 'Q1', 'Median', 'Q3', 'Maks'], statRows),
                   'Nilai maksimum sama dengan waktu penalti (3 × waktu tempuh maksimum tercapai) untuk grid yang tidak dapat menjangkau TES.')
-        + section('Kondisi Tiap Level Intensitas', 'Dampak skenario banjir terhadap grid, jaringan jalan, dan TES, serta hasil pra-pemrosesan: IQR capping 3 × IQR → seleksi fitur → Yeo-Johnson → RobustScaler → PCA (varians kumulatif ≥ 80%).',
-                  table(['Level', 'Intensitas', 'Grid terdampak', '% grid', 'Jalan terputus', 'TES valid', 'Fitur terpilih', 'Komponen PCA', 'Varians'], levelRows),
+        + section('Kondisi Tiap Level Banjir', 'Dampak skenario banjir terhadap grid, jaringan jalan, dan TES, serta hasil pra-pemrosesan: IQR capping 3 × IQR → seleksi fitur → Yeo-Johnson → RobustScaler → PCA (varians kumulatif ≥ 80%).',
+                  table(['Level', 'Kelas ditutup', 'Grid terdampak', '% grid', 'Jalan terputus', 'TES valid', 'Fitur terpilih', 'Komponen PCA', 'Varians'], levelRows),
                   'Penanda isolasi dan jumlah opsi rute tersaring pada level dengan < 25% grid terisolasi karena IQR-nya nol (nilainya konstan setelah capping).');
 }
 
@@ -301,7 +301,7 @@ function renderTransitionTab(r) {
             return `<span class="cell-val${i === j ? ' diag' : ''}" style="background:rgba(59,130,246,${a.toFixed(2)})">${fmtInt(v)}</span>`;
         })
     ] }));
-    return section('Alur Perpindahan Grid Antar Level', 'Setiap pita menunjukkan jumlah grid yang berpindah dari satu klaster ke klaster lain ketika intensitas banjir meningkat. Arahkan kursor untuk detail.',
+    return section('Alur Perpindahan Grid Antar Level', 'Setiap pita menunjukkan jumlah grid yang berpindah dari satu klaster ke klaster lain ketika level banjir naik. Arahkan kursor untuk detail.',
                    buildSankey(r))
         + section('Stabilitas Transisi', 'Stability rate = proporsi grid yang tetap pada nomor klaster yang sama; ARI = Adjusted Rand Index antara partisi dua level berurutan.',
                   table(['Transisi', 'Stability Rate', 'ARI', 'Grid berpindah', 'Transisi dominan', 'Edge aktif', 'CDVM vs Baseline'], rows),
@@ -368,7 +368,7 @@ function renderWaktuTab(r) {
         return { cells: [l.label, ...Object.keys(tesCategories).map(k => fmtNum(s.mean_waktu?.[k])),
                          fmtNum(s.mean_waktu_min), fmtNum(s.median_waktu_min)] };
     });
-    return section('Rata-rata Waktu Tempuh Minimum ke TES', 'Rata-rata waktu tempuh minimum (menit) seluruh grid pada setiap level intensitas banjir.',
+    return section('Rata-rata Waktu Tempuh Minimum ke TES', 'Rata-rata waktu tempuh minimum (menit) seluruh grid pada setiap level banjir.',
                    buildBarChart(items, 'menit'))
         + section('Rata-rata Waktu Tempuh per Kategori TES', 'Satuan menit. Grid yang tidak menjangkau TES diberi waktu penalti.',
                   table(['Level', ...Object.values(tesCategories).map(m => m.label), 'Minimum', 'Median Min.'], rows));
