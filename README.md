@@ -28,25 +28,28 @@ Lingkungan: Python 3.14.7 (`.python-version`) dan pustaka dengan versi persis di
 
 ```bash
 pip install -r requirements.txt
-python -m pytest -q                        # uji unit (±1 menit)
-python -m scripts.cek_reproduksi           # jalankan ulang ke folder sementara + bandingkan hash (±15–20 menit)
+python -m pytest -q                        # uji unit (±1 menit; SMOKE_API=1 untuk uji API dashboard)
+python -m scripts.cek_reproduksi           # jalankan ulang ke folder sementara + bandingkan hash (±1,7 jam)
 python -m scripts.export_bab4              # bangun ulang output_bab4/ dari data/locked/ (beberapa detik)
 ```
 
-Hash yang diharapkan (hasil `hasil-skripsi-v1`, K = 4):
+Hash yang diharapkan (hasil `hasil-skripsi-v2`, desain gabungan, K = 2):
 
 | Besaran | SHA-256 |
 |---|---|
-| Fingerprint `thesis_results.json` tanpa field waktu dan `meta.git` | `7123e860b310a00e0ea7fd1ea5cedf9c829174096f9232e625009e7a2b13feca` |
-| Isi `thesis_grid_results.csv` (setelah dekompresi) | `fa437881a7c68036fa3ed6e4c0294da7b4b809800c66845f859eac5d528c79fb` |
+| Fingerprint `thesis_results.json` tanpa field waktu dan `meta.git` | `565eff44f3264717d49bea0cf028f9f46337932a9d22ca3814302697c71a314a` |
+| Isi `thesis_grid_results.csv` (setelah dekompresi) | `98bec16c545d8c2a987439ff7145fa32f47150eafce2d08093678c987ed0ce7e` |
+| Isi `thesis_pooled_results.csv` (setelah dekompresi) | `02815cd0bfd48766bb72d9eda6b1ba4413d6343fda198e9d904c96404734b820` |
 
-Hash berkas mentah di `LOCK.json` memuat stempel waktu (JSON: `elapsed_sec`/`time_sec`; gzip: header),
-sehingga yang dibandingkan saat reproduksi adalah dua hash di atas. Satu run penuh
-(`python -m scripts.thesis_analysis --force`) memakan waktu ±15–16 menit pada laptop pengembangan.
-Determinisme diperiksa dengan dua run berturut-turut yang menghasilkan hash identik.
+Hash berkas mentah di `LOCK.json` memuat stempel waktu (field waktu JSON dan header gzip), sehingga
+yang dibandingkan saat reproduksi adalah hash di atas. Satu run penuh
+(`python -m scripts.thesis_analysis --force`) memakan waktu ±1,7 jam pada laptop pengembangan (sebagian
+besar untuk pemilihan K berbasis stabilitas). Determinisme diperiksa dengan dua run yang menghasilkan
+hash identik. Hasil v1 diarsipkan di `data/locked/arsip_v1/` (tag `hasil-skripsi-v1`).
 
 Menjalankan ulang analisis dan mengunci hasil baru mengikuti `docs/ALUR_KERJA.md`. Semua angka
-skripsi diambil dari `output_bab4/` (tabel CSV, `Tabel_Bab4.docx`, `ringkasan_angka_bab4.md`).
+skripsi diambil dari `output_bab4/` (tabel CSV, `Tabel_Bab4.docx`, `ringkasan_angka_bab4.md`,
+`perbandingan_v1_vs_v2.md`). Metode lengkap ada di `docs/METODOLOGI.md`.
 
 ## Membagikan secara online
 

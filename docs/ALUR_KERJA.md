@@ -26,7 +26,7 @@ git switch -c <branch-perubahan>
 # ... ubah kode, tambahkan/ubah uji ...
 python -m pytest -q                                   # semua uji harus lulus
 git commit -am "Ubah ...: alasan"                     # 1. commit kode
-python -m scripts.thesis_analysis --force             # 2. jalankan (~25–30 menit)
+python -m scripts.thesis_analysis --force             # 2. jalankan (±1,7 jam; jangan biarkan laptop sleep)
 python -m scripts.kunci_hasil                         # 3. kunci (ditolak bila kode belum di-commit)
 python -m scripts.export_bab4                         # 4. bangun tabel Bab IV
 git add data/locked output_bab4 && git commit -m "Hasil terkunci: ..."   # 5. commit hasil

@@ -186,3 +186,38 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
 | D1 (selisih skor K tipis) | **Diganti** | Aturan K berbasis stabilitas; skor komposit hanya sensitivitas (Langkah 7) |
 | D2 (tipologi baru antarlevel) | **Tidak relevan lagi** | Satu model gabungan untuk semua level; Hungarian dihapus (Langkah 6) |
 | B5 (ω hanya di pembilang d_s) | **Tidak berpengaruh** | ω = 1,0 (nonaktif) pada desain gabungan |
+
+## P2-F. Pengamatan dari hasil v2 (untuk dibahas dengan pembimbing)
+
+- **P2-F1. K = 2 terpilih menurut aturan, tetapi K = 3 praktis setara.** Rerata ARI subsampel: K = 2
+  0,964 ± 0,006; K = 3 0,963 ± 0,003 (selisih 0,001, dalam toleransi 0,01), sehingga aturan memilih
+  K terkecil. K = 3 punya ARI inisialisasi 1,000 (K = 2: 0,999), Silhouette dan ketegasan partisi
+  lebih tinggi, dan dipilih oleh skor komposit lama baik dengan maupun tanpa DESC. Dengan K = 2,
+  tipologi hanya membedakan "akses baik" (K0, waktu minimum rata-rata 4,9 menit) dan "akses kritis"
+  (K1, 41,8 menit). Aturan tidak diubah. — *PERLU DIPUTUSKAN*
+- **P2-F2. Stabilitas K = 5, 6, 7, 9 rendah dan bervariasi besar** (sd ARI subsampel 0,15–0,22;
+  ARI inisialisasi K = 6, 7, 9, 10 ≈ 0,72–0,79), sedangkan K = 8 dan K = 10 kembali stabil secara
+  subsampel (≈ 0,94). — *DICATAT*
+- **P2-F3. PESC meledak pada beberapa K** (mis. K = 5: 5.974; K = 9: 23.996; K = 10: 31.110),
+  karena jarak atribut antarpusat blok mendekati 0 membuat penyebut sangat kecil. PESC tidak
+  informatif sebagai pembanding (melanjutkan C2). DESC dengan blok rook juga jauh lebih besar daripada
+  v1 queen (24–44 untuk K ≥ 3). — *DICATAT*
+- **P2-F4. Semua TAS juga lolos ambang absolut DI ≥ 2** (100% di keempat level), karena P75 DI
+  pada grid terjangkau selalu ≥ 2. Uji sensitivitas menghasilkan lebih banyak TAS (seluruh grid dekat
+  dengan DI ≥ 2), bukan lebih sedikit. — *DICATAT*
+- **P2-F5. Kebetulan angka di level Sedang:** jumlah grid K1 (7.845) sama dengan jumlah grid
+  Tergenang (7.845). Sudah diverifikasi dari dua berkas independen (label data gabungan dan state
+  grid) dan bukan galat. — *DICATAT*
+- **P2-F6. Transisi Baseline → Tinggi berubah drastis**: 35,5% grid masuk Tergenang, dan ARI pada
+  grid yang tetap non-Tergenang hanya 0,012 (stability rate 59,6%). Transisi dominan pada tiga dari
+  empat pasangan adalah K0 → Tergenang. Transisi Sedang → Tinggi yang dominan adalah K0 → K1 (2.092
+  grid), karena hanya 196 grid kelas 1 yang menjadi Tergenang. — *DICATAT*
+- **P2-F7. REDCAP degeneratif** (klaster terbesar 98,2%) dan **SKATER gagal** (P2-D1), sehingga
+  perbandingan yang layak hanya FCM, SFCM, dan SDWFCM. Di antara ketiganya, Silhouette/CH/DB hampir
+  sama (0,317–0,325), sedangkan SDWFCM unggul pada Moran's I (0,832) dan proporsi tetangga berlabel
+  sama (0,917). — *DICATAT*
+- **P2-F8. σ kernel Gaussian = 141,42 m pada keempat level** (median jarak 8 tetangga pada grid
+  teratur 100 m), jadi pilihan σ per level vs global (P2-C2) tidak berpengaruh. — *DICATAT*
+- **P2-F9. Waktu komputasi.** Log mencatat total 15.086 detik, tetapi termasuk jeda ± 8.890 detik saat
+  komputer sleep (13:32–16:00, kedua run berhenti bersamaan pada K = 4). Waktu efektif ± 6.200 detik
+  (± 1,7 jam), sesuai estimasi P2-C3. — *DICATAT*
