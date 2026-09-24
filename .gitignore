@@ -1,14 +1,9 @@
 __pycache__/
 *.py[cod]
 
-scratch/*.log
-scratch/*.out
-scratch/*.err
-scratch/logs/
-
-# Cache runtime (graf jalan dibangun ulang otomatis)
-scratch/graph_cache/
 
 # Program bantu yang diunduh otomatis (cloudflared)
 tools/
-scratch/alamat_publik.txt
+
+# Cache, log, dan berkas kerja sementara (graf jalan, alamat publik) — dibuat ulang otomatis
+scratch/

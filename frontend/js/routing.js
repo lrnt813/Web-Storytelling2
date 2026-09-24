@@ -251,6 +251,7 @@ function renderGridAttrPopup(g) {
         ${popupRow('Indeks bahaya banjir', g.indeks_bahaya ?? '–')}
         ${popupRow('Terdampak banjir', g.terdampak === 1 ? 'Ya' : 'Tidak', g.terdampak === 1 ? TERDAMPAK_COLOR : null)}
         ${popupRow('Kerapatan jalan', fmtNum(g.road_density, 3))}
+        ${popupRow('ID grid', g.id_grid_asli != null ? `${g.id_grid_asli} (indeks ${g.id_grid})` : g.id_grid)}
     </div>
     <div class="popup-card">
         <div class="popup-section">Waktu tempuh ke TES terdekat</div>

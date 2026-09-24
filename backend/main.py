@@ -386,7 +386,7 @@ async def post_simulate(body: SimulateRequest):
                                      seeds=[int(seed)] if seed is not None else None,
                                      baseline_centers=np.asarray(state.thesis_results["pusat_baseline_pca"]))
                 grid = pd.concat([
-                    state.thesis_grid[["id_grid", "Road_Density_mean", T.SKENARIO]],
+                    state.thesis_grid[["id_grid", "id_grid_asli", "Road_Density_mean", T.SKENARIO]],
                     T.level_grid_frame(lv["key"], prep["df"], cl, cfg),
                 ], axis=1)
                 return T.level_summary(lv["key"], prep, cl, cfg), T.records_from_grid(grid, lv["key"], cfg)

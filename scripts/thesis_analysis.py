@@ -162,6 +162,7 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     }
     grid_parts = [pd.DataFrame({
         "id_grid": gdf["id_grid"].values,
+        "id_grid_asli": gdf["id_grid_asli"].values,
         "Road_Density_mean": gdf["Road_Density_mean"].values,
         T.SKENARIO: gdf[T.SKENARIO].values,
     })]

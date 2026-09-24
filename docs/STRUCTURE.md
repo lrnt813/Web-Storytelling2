@@ -8,7 +8,6 @@ Web-Storytelling2/
     main.py               Aplikasi FastAPI (API level banjir, simulasi, rute, wilayah, geocoding)
     thesis.py             Metodologi skripsi Bab III–IV (pra-pemrosesan, SDWFCM, metrik, transisi, TAS)
     engine.py             Modul komputasi dasar (Lampiran 1): data, graf jalan, jarak, algoritma klaster
-    pseudo_safety.py      Fungsi pelabelan ulang klaster (Lampiran 2), dipakai engine.py
     config.py, state.py, schemas.py
   scripts/
     thesis_analysis.py    Analisis offline Bab IV → data/thesis_results.json & thesis_grid_results.csv.gz
@@ -30,7 +29,7 @@ Web-Storytelling2/
     *.gpkg                Data spasial masukan (grid, jalan, TES, batas administrasi BIG)
     thesis_results.json, thesis_grid_results.csv.gz   Hasil analisis (dibaca dashboard)
     locked/               Salinan hasil terkunci + LOCK.json (checksum)
-  scratch/                Cache & log sementara (tidak di-commit)
+  scratch/                Cache & log sementara (dibuat otomatis, diabaikan git)
   Jalankan Dashboard*.bat Peluncur klik-dua-kali (lokal / publik via Cloudflare Tunnel)
   tools/                  cloudflared (diunduh otomatis, tidak di-commit)
   Dockerfile, requirements.txt   Dependensi & image container (lihat docs/DEPLOY.md)

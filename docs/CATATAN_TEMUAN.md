@@ -92,3 +92,26 @@ rekonstruksi dibiarkan apa adanya, tetapi perlu diputuskan secara metodologis:
 - **D4. REDCAP dan SKATER menghasilkan partisi sangat timpang** (Size Entropy 0,44 dan 0,006), dan
   proporsi tetangga berlabel sama ≈ 1 karena hampir semua grid berada di satu klaster.
   Perbandingan algoritma perlu membaca Size Entropy bersama metrik lain.
+
+---
+
+# Putaran 2 — revisi desain metode (branch `revisi-metode-v2`)
+
+## P2-A. Kebersihan repo (Langkah 1)
+
+- **P2-A1. Kode lama dihapus**: `backend/engine.py` bagian 10, 11, 16, 17, 18, `backend/pseudo_safety.py`,
+  fungsi bantu `_resolve_cluster_profile_time_cols`, dan impor `kneed`. Pelacakan pemakaian:
+  `backend/main.py` dan `frontend/` tidak memanggil satu pun fungsi tersebut, jadi dashboard tidak
+  terdampak. — *SELESAI*
+- **P2-A2. Sisa kode yatim.** Bagian 14 (`run_all_clustering`) dan 15 (`eval_one`, `evaluate_all`)
+  di `engine.py` hanya dipanggil oleh pipeline lama yang sudah dihapus. Keduanya tidak termasuk daftar
+  hapus di instruksi, jadi dibiarkan. Parameter `Cfg` milik kode lama (`psi_*`, `alr_*`,
+  `elbow_*`, `threshold_n_classes`, `k_min_parsimony`) juga dibiarkan. — *DICATAT*
+- **P2-A3. ID grid asli.** GPKG grid punya kolom `Id` (int, 22.673 nilai unik, tanpa null), jadi
+  kolom ini dipakai sebagai `id_grid_asli` (disimpan sebagai teks) dan dibawa ke CSV grid, JSON
+  dashboard, dan ekspor Excel. `id_grid` (0..N−1, urutan baris) tetap dipakai sebagai kunci JOIN
+  dengan geometri statis dashboard. Bila `Id` tidak unik/lengkap, dipakai ID centroid
+  `E{cx:.0f}_N{cy:.0f}`. — *SELESAI (menyelesaikan C5)*
+- **P2-A4. Folder `scratch/` dihapus dari repo** dan diabaikan git. Dashboard membuatnya ulang
+  otomatis (cache graf jalan dan `alamat_publik.txt`). Dua skrip diagnostik lama di
+  `scratch/diagnostics/` ikut terhapus. — *SELESAI*

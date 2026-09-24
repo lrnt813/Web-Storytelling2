@@ -941,6 +941,7 @@ def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg) -> List[dict]:
     """Array JSON ringan (tanpa geometri) untuk frontend, JOIN via id_grid."""
     cols = {
         "id_grid": "id_grid",
+        "id_grid_asli": "id_grid_asli",
         f"cl_{key}": "cluster_sdwfcm",
         f"mem_{key}": "membership_max",
         f"terdampak_{key}": "terdampak",
