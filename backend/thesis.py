@@ -120,13 +120,14 @@ def resolve_level(level: Optional[str] = None, intensity: Optional[float] = None
 
 
 def feature_columns(cfg: Cfg) -> List[str]:
-    """Variabel masukan klasterisasi (10 variabel). Penanda isolasi per kategori
-    TES tetap dihitung untuk profil klaster, tetapi fitur klasterisasi memakai
-    satu penanda is_isolated (tidak ada kategori TES yang terjangkau)."""
+    """Variabel masukan klasterisasi (9 variabel aksesibilitas). Kelas bahaya banjir TIDAK
+    menjadi fitur (tipologi murni menggambarkan aksesibilitas); kelas bahaya tetap dilaporkan
+    sebagai variabel deskriptif pada profil klaster. Penanda isolasi per kategori TES dihitung
+    untuk profil klaster; fitur klasterisasi memakai satu penanda is_isolated."""
     return (
         ["Road_Density_mean"]
         + [f"waktu_tes_{k}" for k in cfg.kategori_fac]
-        + ["waktu_tes_min", "jumlah_opsi_rute", "is_isolated", SKENARIO]
+        + ["waktu_tes_min", "jumlah_opsi_rute", "is_isolated"]
     )
 
 
