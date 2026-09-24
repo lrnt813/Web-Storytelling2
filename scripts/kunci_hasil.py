@@ -107,10 +107,12 @@ def lock(data_dir: Path = PROJECT_ROOT / "data") -> dict:
         "konstanta_thesis": _thesis_constants(),
         "seed": {"sdwfcm_seed_awal": _thesis_constants()["SDWFCM_SEED"],
                  "sdwfcm_n_init": _thesis_constants()["SDWFCM_N_INIT"],
-                 "sdwfcm_seed_terbaik_per_level": {k: v.get("sdwfcm_seed") for k, v in results["levels"].items()},
+                 "sdwfcm_seed_terbaik_per_k": {k: m["model_final"]["seed_terbaik"]
+                                               for k, m in results.get("model", {}).items()},
                  "moran_permutation_seed": _thesis_constants()["MORAN_PERMUTATION_SEED"],
                  "dunn_sample_seed": 42},
-        "k_terpilih": results.get("k"),
+        "k_terpilih_aturan": results.get("k_terpilih_aturan"),
+        "k_keluaran": results.get("k_keluaran"),
         "files": {f: file_sha256(lock_dir / f) for f in RESULT_FILES},
         "fingerprint_hasil_tanpa_waktu": results_fingerprint(lock_dir / RESULTS_FILE),
         "sha256_isi_grid_csv": grid_content_sha256(lock_dir / GRID_FILE),
@@ -147,7 +149,7 @@ if __name__ == "__main__":
     m = lock()
     print("Hasil DIKUNCI:")
     print("  commit analisis :", m["git"]["commit_analisis"])
-    print("  K terpilih      :", m["k_terpilih"])
+    print("  K aturan / keluaran:", m["k_terpilih_aturan"], "/", m["k_keluaran"])
     for f, h in m["files"].items():
         print(f"  {f:28s} {h}")
     print("  fingerprint     :", m["fingerprint_hasil_tanpa_waktu"])
