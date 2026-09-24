@@ -234,7 +234,7 @@ function renderProfileTab(r) {
         return { cells: [l.label, ...d.map(x => `${fmtInt(x.jumlah_grid)} <span class="muted">(${fmtNum(x.persen_semua_grid, 1)}%)</span>`)] };
     });
     return section(`Profil Tipologi — ${kLabel(r)} (data gabungan keempat level)`,
-            'Label peringkat menurut rata-rata waktu tempuh minimum (Tipologi 1 = terbaik). Waktu dalam menit. "> 30 mnt" = proporsi baris dengan waktu minimum melebihi batas waktu evakuasi; "Terputus" = waktu minimum = penalti. Indeks bahaya hanya deskriptif.',
+            'Label peringkat menurut rata-rata waktu tempuh minimum (Tipologi 1 = terbaik). Waktu dalam menit. "> 30 mnt" = proporsi baris dengan waktu minimum melebihi batas waktu evakuasi; "Terputus" (kategori akses) = waktu minimum = penalti, tidak mencapai TES mana pun. Indeks bahaya hanya deskriptif.',
             table(['Klaster', 'Tipologi', 'Baris', '%', 'Median', 'P75', 'P90', 'Rerata', '> 30 mnt', 'Terputus', 'Prop. terisolasi', 'Opsi rute', 'Kerapatan jalan', 'Indeks bahaya'], rows))
         + section('Waktu per kategori TES', 'Median (rerata; % baris penalti), menit.',
             table(['Klaster', 'Pendidikan', 'Kesehatan', 'Pemerintahan', 'Ibadah', 'GOR', 'Minimum'], detail))
@@ -321,7 +321,7 @@ function renderTasTab(r) {
     const rows = LEVELS.map(l => {
         const s = r.levels?.[l.key]?.tas || {};
         const sw = s.sensitivitas_ambang_waktu || {};
-        return { cells: [l.label, fmtInt(s.jumlah_tas), fmtInt(s.jumlah_non_tas), fmtInt(s.jumlah_terputus), fmtInt(s.jumlah_tergenang),
+        return { cells: [l.label, fmtInt(s.jumlah_tas), fmtInt(s.jumlah_non_tas), fmtInt(s.jumlah_tes_terdekat_tidak_terjangkau), fmtInt(s.jumlah_tergenang),
                          `${fmtNum(s.persen_tas_non_tergenang)}%`, fmtInt(sw['20']?.jumlah_tas), fmtInt(sw['40']?.jumlah_tas),
                          `${fmtNum((sw['40']?.proporsi_tas_utama_yang_tetap_tas ?? 0) * 100, 1)}%`,
                          fmtInt(s.sensitivitas_absolut_v3?.jumlah_tas), fmtInt(s.sensitivitas_persentil?.jumlah_tas),
@@ -329,7 +329,7 @@ function renderTasTab(r) {
     });
     const chg = LEVELS.slice(1).map(l => {
         const c = r.levels?.[l.key]?.tas_perubahan_vs_baseline || {};
-        return { cells: [l.label, fmtInt(c.tas_baru), fmtInt(c.tas_hilang), fmtInt(c.tas_hilang_jadi_tergenang), fmtInt(c.tas_hilang_jadi_terputus), fmtInt(c.tas_hilang_lainnya)] };
+        return { cells: [l.label, fmtInt(c.tas_baru), fmtInt(c.tas_hilang), fmtInt(c.tas_hilang_jadi_tergenang), fmtInt(c.tas_hilang_jadi_tes_terdekat_tidak_terjangkau), fmtInt(c.tas_hilang_lainnya)] };
     });
     const dist = LEVELS.map(l => { const s = r.levels?.[l.key]?.tas || {}; return { cells: [l.label, q(s.sebaran_di_tas), q(s.sebaran_di_non_tas)] }; });
     const kat = Object.keys(tesCategories);
@@ -341,9 +341,9 @@ function renderTasTab(r) {
     }));
     return section('Deteksi Titik Aman Semu (Detour Index)',
         'Aturan utama: TAS bila DI<sub>t</sub> ≥ 2, T<sub>ideal</sub> ≤ 5 menit, dan T<sub>aktual</sub> ≥ 30 menit (batas waktu evakuasi; Li dkk., 2026), pada grid non-Tergenang yang terjangkau. Sensitivitas: T<sub>aktual</sub> ≥ 20 / 40 menit, aturan absolut v3 (tanpa syarat T<sub>aktual</sub>), dan aturan persentil.',
-        table(['Level', 'TAS', 'Non-TAS', 'Terputus', 'Tergenang', '% TAS', 'TAS (≥ 20 mnt)', 'TAS (≥ 40 mnt)', 'TAS utama yang tetap pada 40 mnt', 'Absolut v3', 'Persentil', 'Median T<sub>ideal</sub> TAS', 'Median T<sub>aktual</sub> TAS'], rows))
+        table(['Level', 'TAS', 'Non-TAS', 'TES terdekat tidak terjangkau', 'Tergenang', '% TAS', 'TAS (≥ 20 mnt)', 'TAS (≥ 40 mnt)', 'TAS utama yang tetap pada 40 mnt', 'Absolut v3', 'Persentil', 'Median T<sub>ideal</sub> TAS', 'Median T<sub>aktual</sub> TAS'], rows))
         + section('Perubahan TAS terhadap Baseline', 'TAS baru = bukan TAS di Baseline, menjadi TAS di level ini. TAS hilang dipecah menurut status di level ini.',
-            table(['Level', 'TAS baru akibat banjir', 'TAS hilang', 'jadi Tergenang', 'jadi Terputus', 'lainnya'], chg))
+            table(['Level', 'TAS baru akibat banjir', 'TAS hilang', 'jadi Tergenang', 'jadi TES terdekat tidak terjangkau', 'lainnya'], chg))
         + section('Sebaran Detour Index', 'Deskriptif; perbedaan DI TAS vs Non-TAS mengikuti definisi aturan, bukan bukti keberhasilan deteksi.',
             table(['Level', 'DI TAS: median [P25–P75; P90]', 'DI Non-TAS: median [P25–P75; P90]'], dist))
         + section('TAS per kategori TES terdekat', '', table(['Level', ...kat.map(k => tesCategories[k].label)], katRows))

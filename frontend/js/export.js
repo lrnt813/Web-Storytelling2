@@ -110,7 +110,7 @@ async function exportGridData() {
         return [d.id_grid, d.id_grid_asli ?? null, cleanDesaName(adm.desa), adm.kecamatan ?? null, d.cluster_sdwfcm, getClusterDesc(d.cluster_sdwfcm), d.membership_max,
             d.indeks_bahaya, d.tergenang, d.road_density, ...kat.map(k => d[`waktu_tes_${k}`]), d.waktu_tes_min, d.jumlah_opsi_rute,
             d.is_isolated, d.t_ideal, d.t_aktual, d.detour_index, d.titik_aman_semu,
-            ({ 0: 'Non-TAS', 1: 'TAS', 2: 'Terputus', 3: 'Tergenang' })[d.status_tas] ?? null];
+            ({ 0: 'Non-TAS', 1: 'TAS', 2: 'TES terdekat tidak terjangkau', 3: 'Tergenang' })[d.status_tas] ?? null];
     });
     const sim = lastLevelResult?.simulated ? '_simulasi' : '';
     downloadWorkbook([{ name: `Grid ${levelLabel(activeLevel)}${sim ? ' (simulasi)' : ''}`, aoa: [head, ...rows] }],

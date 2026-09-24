@@ -43,9 +43,9 @@ function buildLegendHtml(k) {
     } else if (activeView === 'tas') {
         html += `<div class="legend-static-item">${legendSwatch(TAS_COLOR, '#f5f3ff')} Titik Aman Semu <span class="legend-note">${fmtInt(countBy(d => d.titik_aman_semu === 1))}</span></div>
                  <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Non-TAS <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 0))}</span></div>
-                 <div class="legend-static-item">${legendSwatch(TERPUTUS_COLOR, '#94a3b8')} Terputus <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 2))}</span></div>
+                 <div class="legend-static-item">${legendSwatch(TERPUTUS_COLOR, '#94a3b8')} TES terdekat tidak terjangkau <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 2))}</span></div>
                  <div class="legend-static-item">${legendSwatch(TERGENANG_COLOR)} Tergenang <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 3))}</span></div>
-                 <div class="legend-foot">TAS: Detour Index ≥ 2, T<sub>ideal</sub> ≤ 5 menit, dan T<sub>aktual</sub> ≥ 30 menit (grid non-Tergenang yang terjangkau). Terputus: tidak menjangkau TES.</div>`;
+                 <div class="legend-foot">TAS: Detour Index ≥ 2, T<sub>ideal</sub> ≤ 5 menit, dan T<sub>aktual</sub> ≥ 30 menit (grid non-Tergenang yang terjangkau). TES terdekat tidak terjangkau: TES terdekat secara garis lurus tidak dapat dicapai lewat jaringan jalan (berbeda dari kategori akses Terputus).</div>`;
     } else if (activeView === 'terdampak') {
         html += `<div class="legend-static-item">${legendSwatch(TERGENANG_COLOR)} Tergenang <span class="legend-note">${fmtInt(countBy(d => d.tergenang === 1))}</span></div>
                  <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Tidak tergenang</div>

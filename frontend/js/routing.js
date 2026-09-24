@@ -268,7 +268,7 @@ function renderGridAttrPopup(g) {
         ${popupRow('T<sub>aktual</sub> (jaringan)', `${fmtNum(g.t_aktual, 2)} mnt`)}
         ${popupRow('Detour Index', fmtNum(g.detour_index, 2))}
         ${isTas ? `<div class="popup-flag"><i class="fa fa-exclamation-triangle"></i> TITIK AMAN SEMU</div>` : ''}
-        ${isTerputus ? `<div class="popup-flag terputus"><i class="fa fa-link-slash"></i> TERPUTUS — tidak menjangkau TES</div>` : ''}
+        ${isTerputus ? `<div class="popup-flag terputus"><i class="fa fa-link-slash"></i> TES TERDEKAT TIDAK TERJANGKAU lewat jaringan jalan</div>` : ''}
         ${isTergenang ? `<div class="popup-flag tergenang"><i class="fa fa-water"></i> TERGENANG — dikeluarkan dari klasterisasi & TAS; waktu tempuh hanya informasi</div>` : ''}
     </div>`;
 }

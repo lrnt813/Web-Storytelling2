@@ -14,7 +14,7 @@ from backend.thesis import TAS_DI_ABSOLUTE, TAS_MIN_EUCLID_M, TAS_T_AKTUAL_MIN, 
 def _setup():
     """Jalan lurus sepanjang y = 0 (x = 0..2000 m, simpul tiap 100 m) + satu TES di (1000, 0).
     Grid di atas jalan (dekat, lurus), grid di seberang sungai yang harus memutar,
-    dan satu grid yang tidak bisa di-snap (terputus)."""
+    dan satu grid yang tidak bisa di-snap (TES terdekat tidak terjangkau)."""
     G = nx.Graph()
     xs = np.arange(0, 2001, 100.0)
     for a, b in zip(xs[:-1], xs[1:]):
@@ -36,9 +36,9 @@ def test_terputus_dikeluarkan_dan_jarak_minimum():
     t_pen = 400.0
     res = detect_tas_detour(pd.DataFrame(index=range(len(grid_xy))), grid_xy, tes, pack, t_pen, cfg)
     st, s = res["status"], res["summary"]
-    assert st[-1] == 2 and np.isnan(res["detour_index"][-1])          # terputus
-    assert s["jumlah_terputus"] == 1
-    assert s["jumlah_tas"] + s["jumlah_non_tas"] + s["jumlah_terputus"] == len(grid_xy)
+    assert st[-1] == 2 and np.isnan(res["detour_index"][-1])          # TES terdekat tidak terjangkau
+    assert s["jumlah_tes_terdekat_tidak_terjangkau"] == 1
+    assert s["jumlah_tas"] + s["jumlah_non_tas"] + s["jumlah_tes_terdekat_tidak_terjangkau"] == len(grid_xy)
     # jarak Euclidean minimum 50 m
     assert res["t_ideal"].min() >= TAS_MIN_EUCLID_M / cfg.walking_speed_m_per_min - 1e-12
     reach = st != 2

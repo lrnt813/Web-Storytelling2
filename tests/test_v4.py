@@ -49,8 +49,8 @@ def test_perubahan_tas():
     lvl = np.array([1, 3, 2, 0, 1, 1, 0])
     ch = T.tas_change(base, lvl)
     assert ch["tas_tetap"] == 1 and ch["tas_hilang"] == 3
-    assert (ch["tas_hilang_jadi_tergenang"], ch["tas_hilang_jadi_terputus"], ch["tas_hilang_lainnya"]) == (1, 1, 1)
-    assert ch["tas_baru"] == 2 and ch["tas_baru_dari_status_baseline"] == {"Non-TAS": 1, "Terputus": 1}
+    assert (ch["tas_hilang_jadi_tergenang"], ch["tas_hilang_jadi_tes_terdekat_tidak_terjangkau"], ch["tas_hilang_lainnya"]) == (1, 1, 1)
+    assert ch["tas_baru"] == 2 and ch["tas_baru_dari_status_baseline"] == {"Non-TAS": 1, "TES terdekat tidak terjangkau": 1}
 
 
 def test_aturan_tas_syarat_t_aktual():

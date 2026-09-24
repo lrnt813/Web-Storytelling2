@@ -9,7 +9,7 @@ Ringkasan alur (rincian dan persamaan: docs/METODOLOGI.md):
   3. SDWFCM dengan W KNN-Gaussian blok-diagonal per level; K dipilih dengan stabilitas
      subsampel; klaster dinomori menurut rata-rata waktu tempuh minimum.
   4. Analisis transisi antarlevel (state tipologi + Tergenang), perbandingan algoritma
-     di Baseline, dan deteksi Titik Aman Semu (TAS, Non-TAS, Terputus, Tergenang).
+     di Baseline, dan deteksi Titik Aman Semu (TAS, Non-TAS, TES terdekat tidak terjangkau, Tergenang).
 """
 import logging
 import time
@@ -110,7 +110,9 @@ TAS_MIN_EUCLID_M = 50.0   # jarak minimum (setengah lebar grid 100 m) untuk T_id
 TAS_DI_ABSOLUTE = 2.0     # aturan utama TAS: DI_t ≥ 2 …
 TAS_T_IDEAL_MAX = 5.0     # … dan T_ideal ≤ 5 menit (garis lurus ≤ 400 m pada 80 m/menit) …
 TAS_T_AKTUAL_MIN = EVAC_TIME_MIN   # … dan T_aktual ≥ batas waktu evakuasi (30 menit)
-TAS_STATUS = {0: "Non-TAS", 1: "TAS", 2: "Terputus", 3: "Tergenang"}
+# Status TAS 2 = TES terdekat (Euclidean) tidak terjangkau lewat jaringan (T_aktual = penalti). Berbeda
+# dengan kategori akses "Terputus" (AKSES_STATUS 2: tidak mencapai TES mana pun); lihat METODOLOGI §11.
+TAS_STATUS = {0: "Non-TAS", 1: "TAS", 2: "TES terdekat tidak terjangkau", 3: "Tergenang"}
 TERGENANG = "Tergenang"   # status grid yang terdampak (mask simulasi) pada suatu level
 
 FEATURE_LABELS = {
@@ -989,7 +991,7 @@ def tas_change(status_base: np.ndarray, status_level: np.ndarray) -> dict:
         "tas_baru_dari_status_baseline": {TAS_STATUS[c]: int((new & (b == c)).sum()) for c in (0, 2)},
         "tas_hilang": int(lost.sum()),
         "tas_hilang_jadi_tergenang": int((lost & (l == 3)).sum()),
-        "tas_hilang_jadi_terputus": int((lost & (l == 2)).sum()),
+        "tas_hilang_jadi_tes_terdekat_tidak_terjangkau": int((lost & (l == 2)).sum()),
         "tas_hilang_lainnya": int((lost & (l == 0)).sum()),
         "tas_tetap": int(((b == 1) & (l == 1)).sum()),
     }
@@ -1085,11 +1087,12 @@ def detect_tas_detour(
                pada KEDUA jarak, sehingga T_aktual ≥ T_ideal untuk semua grid terjangkau
     DI_t = T_aktual / T_ideal
     Grid Tergenang (mask simulasi level ini) → status "Tergenang", dikeluarkan dari seluruh
-    perhitungan TAS. Grid non-Tergenang dengan T_aktual = T_pen (tidak terjangkau) → "Terputus".
+    perhitungan TAS. Grid non-Tergenang dengan T_aktual = T_pen → "TES terdekat tidak terjangkau".
     Untuk grid non-Tergenang yang terjangkau (R):
         aturan utama      : TAS ⇔ DI_t ≥ TAS_DI_ABSOLUTE (2) ∧ T_ideal ≤ TAS_T_IDEAL_MAX (5 menit)
         sensitivitas      : TAS ⇔ T_ideal ≤ P25(T_ideal | R) ∧ DI_t ≥ P75(DI_t | R)
-    status (aturan utama) dan status_persentil: 0 = Non-TAS, 1 = TAS, 2 = Terputus, 3 = Tergenang.
+    status (aturan utama) dan status_persentil: 0 = Non-TAS, 1 = TAS, 2 = TES terdekat tidak terjangkau,
+    3 = Tergenang.
     Kategori TES terdekat = kategori TES valid terdekat secara Euclidean (e(i)).
     """
     n = len(grid_xy)
@@ -1102,7 +1105,7 @@ def detect_tas_detour(
         return {"t_ideal": np.full(n, np.nan), "t_aktual": np.full(n, t_pen),
                 "detour_index": np.full(n, np.nan), "is_tas": np.zeros(n, int),
                 "status": st, "status_persentil": st.copy(), "kategori_tes_terdekat": np.full(n, None),
-                "summary": {"jumlah_terputus": int((~wet).sum()), "jumlah_tergenang": int(wet.sum())}}
+                "summary": {"jumlah_tes_terdekat_tidak_terjangkau": int((~wet).sum()), "jumlah_tergenang": int(wet.sum())}}
 
     tes_xy = np.column_stack([tes_v.geometry.x.values, tes_v.geometry.y.values])
     d_euc_raw, tes_idx = cKDTree(tes_xy).query(grid_xy, k=1)
@@ -1144,7 +1147,7 @@ def detect_tas_detour(
     total_m = np.maximum(total_m, TAS_MIN_EUCLID_M)        # batas minimum yang sama dengan T_ideal
     t_akt[fin] = np.minimum(total_m[fin] / speed, t_pen)
     reach = (t_akt < t_pen) & ~wet              # non-Tergenang & terjangkau
-    cut = (t_akt >= t_pen) & ~wet               # non-Tergenang & tidak terjangkau → "Terputus"
+    cut = (t_akt >= t_pen) & ~wet               # non-Tergenang, TES terdekat tidak terjangkau
     di = np.full(n, np.nan)
     di[reach] = t_akt[reach] / t_ideal[reach]
     kat = tes_v["kategori"].values[tes_idx] if "kategori" in tes_v.columns else np.full(n, None)
@@ -1178,14 +1181,14 @@ def detect_tas_detour(
                    f"{TAS_T_AKTUAL_MIN:g} menit (grid non-Tergenang terjangkau)"),
         "jumlah_tas": int(is_tas.sum()),
         "jumlah_non_tas": int(non.sum()),
-        "jumlah_terputus": int(cut.sum()),
+        "jumlah_tes_terdekat_tidak_terjangkau": int(cut.sum()),
         "jumlah_tergenang": int(wet.sum()),
         "jumlah_terjangkau": n_reach,
         "jumlah_non_tergenang": n_dry,
         "persen_tas": float(is_tas.sum() / n * 100),
         "persen_tas_non_tergenang": float(is_tas.sum() / n_dry * 100) if n_dry else None,
         "persen_tas_terjangkau": float(is_tas.sum() / n_reach * 100) if n_reach else None,
-        "persen_terputus": float(cut.sum() / n * 100),
+        "persen_tes_terdekat_tidak_terjangkau": float(cut.sum() / n * 100),
         "persen_tergenang": float(wet.sum() / n * 100),
         "sebaran_di_tas": _quantiles(di[is_tas]),
         "sebaran_di_non_tas": _quantiles(di[non]),

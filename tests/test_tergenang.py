@@ -22,7 +22,7 @@ def test_tas_mengeluarkan_grid_tergenang():
     st, s = res["status"], res["summary"]
     assert np.all(st[wet] == 3) and not np.any(st[~wet] == 3)
     assert s["jumlah_tergenang"] == 3
-    assert s["jumlah_tas"] + s["jumlah_non_tas"] + s["jumlah_terputus"] + s["jumlah_tergenang"] == len(grid_xy)
+    assert s["jumlah_tas"] + s["jumlah_non_tas"] + s["jumlah_tes_terdekat_tidak_terjangkau"] + s["jumlah_tergenang"] == len(grid_xy)
     ok = (st == 0) | (st == 1)
     assert np.isclose(s["sensitivitas_persentil"]["p25_t_ideal"], np.percentile(res["t_ideal"][ok], 25))
     assert np.all(res["status_persentil"][wet] == 3)
