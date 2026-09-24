@@ -223,10 +223,10 @@ function renderProfileTab(r) {
     const M = currentModel(r), k = currentK(r);
     const tcols = ['waktu_tes_pendidikan', 'waktu_tes_kesehatan', 'waktu_tes_pemerintahan', 'waktu_tes_ibadah', 'waktu_tes_gor', 'waktu_tes_min'];
     const rows = (M.cluster_profile || []).map(p => ({ cells: [
-        `${swatch(p.klaster)} Klaster ${p.klaster}`, fmtInt(p.jumlah_baris), `${fmtNum(p.persen_baris, 1)}%`,
-        `${fmtNum(p.waktu_tes_min_median)} <span class="muted">[${fmtNum(p.waktu_tes_min_p25)}–${fmtNum(p.waktu_tes_min_p75)}]</span>`,
-        fmtNum(p.waktu_tes_min), `${fmtNum(p.waktu_tes_min_persen_penalti, 1)}%`, fmtNum(p.proporsi_terisolasi, 3),
-        fmtNum(p.jumlah_opsi_rute), fmtNum(p.Road_Density_mean), fmtNum(p.banjir), `<b>${p.deskripsi || ''}</b>`] }));
+        `${swatch(p.klaster)} Klaster ${p.klaster}`, `<b>${p.deskripsi || ''}</b>`, fmtInt(p.jumlah_baris), `${fmtNum(p.persen_baris, 1)}%`,
+        fmtNum(p.waktu_tes_min_median), fmtNum(p.waktu_tes_min_p75), fmtNum(p.waktu_tes_min_p90), fmtNum(p.waktu_tes_min),
+        `${fmtNum((p.proporsi_waktu_min_lebih_batas || 0) * 100, 1)}%`, `${fmtNum((p.proporsi_terputus || 0) * 100, 1)}%`,
+        fmtNum(p.proporsi_terisolasi, 3), fmtNum(p.jumlah_opsi_rute), fmtNum(p.Road_Density_mean), fmtNum(p.banjir)] }));
     const detail = (M.cluster_profile || []).map(p => ({ cells: [`${swatch(p.klaster)} K${p.klaster}`,
         ...tcols.map(c => `${fmtNum(p[`${c}_median`])} <span class="muted">(${fmtNum(p[c])}; ${fmtNum(p[`${c}_persen_penalti`], 1)}%)</span>`)] }));
     const distRows = LEVELS.map(l => {
@@ -234,8 +234,8 @@ function renderProfileTab(r) {
         return { cells: [l.label, ...d.map(x => `${fmtInt(x.jumlah_grid)} <span class="muted">(${fmtNum(x.persen_semua_grid, 1)}%)</span>`)] };
     });
     return section(`Profil Tipologi — ${kLabel(r)} (data gabungan keempat level)`,
-            'Waktu minimum: median [P25–P75], rerata, dan % baris bernilai penalti. Label: "Terisolasi" bila > 50% baris waktu minimum = penalti; selain itu median ≤ 10 menit "Akses Baik", 10–30 "Akses Sedang", > 30 "Akses Kritis". Indeks bahaya hanya deskriptif.',
-            table(['Klaster', 'Baris', '%', 'Median waktu min.', 'Rerata', '% penalti', 'Prop. terisolasi', 'Opsi rute', 'Kerapatan jalan', 'Indeks bahaya', 'Interpretasi'], rows, { leftLast: true }))
+            'Label peringkat menurut rata-rata waktu tempuh minimum (Tipologi 1 = terbaik). Waktu dalam menit. "> 30 mnt" = proporsi baris dengan waktu minimum melebihi batas waktu evakuasi; "Terputus" = waktu minimum = penalti. Indeks bahaya hanya deskriptif.',
+            table(['Klaster', 'Tipologi', 'Baris', '%', 'Median', 'P75', 'P90', 'Rerata', '> 30 mnt', 'Terputus', 'Prop. terisolasi', 'Opsi rute', 'Kerapatan jalan', 'Indeks bahaya'], rows))
         + section('Waktu per kategori TES', 'Median (rerata; % baris penalti), menit.',
             table(['Klaster', 'Pendidikan', 'Kesehatan', 'Pemerintahan', 'Ibadah', 'GOR', 'Minimum'], detail))
         + section('Distribusi Tipologi per Level', 'Jumlah grid per tipologi dan Tergenang (persentase dari seluruh grid).',
@@ -315,28 +315,40 @@ function renderTransitionTab(r) {
                   pairTabs + table(['Asal \\ Tujuan', ...Array.from({ length: S }, (_, j) => stateName(j, k))], mRows));
 }
 
-// ── Tab: Titik Aman Semu (aturan absolut; persentil = sensitivitas) ──────────
+// ── Tab: Titik Aman Semu (aturan utama v4; sensitivitas 20/40 menit, absolut v3, persentil) ──
 function renderTasTab(r) {
     const q = d => d && d.n ? `${fmtNum(d.median, 2)} [${fmtNum(d.p25, 2)}–${fmtNum(d.p75, 2)}; P90 ${fmtNum(d.p90, 2)}]` : '–';
     const rows = LEVELS.map(l => {
         const s = r.levels?.[l.key]?.tas || {};
-        const sp = s.sensitivitas_persentil || {};
+        const sw = s.sensitivitas_ambang_waktu || {};
         return { cells: [l.label, fmtInt(s.jumlah_tas), fmtInt(s.jumlah_non_tas), fmtInt(s.jumlah_terputus), fmtInt(s.jumlah_tergenang),
-                         `${fmtNum(s.persen_tas_non_tergenang)}%`, q(s.sebaran_di_tas), q(s.sebaran_di_non_tas),
-                         fmtNum(s.median_t_ideal_tas), fmtNum(s.median_t_aktual_tas), fmtInt(sp.jumlah_tas), fmtInt(sp.jumlah_tas_kedua_aturan)] };
+                         `${fmtNum(s.persen_tas_non_tergenang)}%`, fmtInt(sw['20']?.jumlah_tas), fmtInt(sw['40']?.jumlah_tas),
+                         `${fmtNum((sw['40']?.proporsi_tas_utama_yang_tetap_tas ?? 0) * 100, 1)}%`,
+                         fmtInt(s.sensitivitas_absolut_v3?.jumlah_tas), fmtInt(s.sensitivitas_persentil?.jumlah_tas),
+                         fmtNum(s.median_t_ideal_tas), fmtNum(s.median_t_aktual_tas)] };
     });
+    const chg = LEVELS.slice(1).map(l => {
+        const c = r.levels?.[l.key]?.tas_perubahan_vs_baseline || {};
+        return { cells: [l.label, fmtInt(c.tas_baru), fmtInt(c.tas_hilang), fmtInt(c.tas_hilang_jadi_tergenang), fmtInt(c.tas_hilang_jadi_terputus), fmtInt(c.tas_hilang_lainnya)] };
+    });
+    const dist = LEVELS.map(l => { const s = r.levels?.[l.key]?.tas || {}; return { cells: [l.label, q(s.sebaran_di_tas), q(s.sebaran_di_non_tas)] }; });
     const kat = Object.keys(tesCategories);
-    const katRows = LEVELS.map(l => {
-        const s = r.levels?.[l.key]?.tas || {};
-        return { cells: [l.label, ...kat.map(k => fmtInt(s.tas_per_kategori_tes_terdekat?.[k] || 0))] };
-    });
+    const katRows = LEVELS.map(l => { const s = r.levels?.[l.key]?.tas || {}; return { cells: [l.label, ...kat.map(k => fmtInt(s.tas_per_kategori_tes_terdekat?.[k] || 0))] }; });
+    const aksesRows = [];
+    LEVELS.forEach(l => ['20', '30', '40'].forEach(t => {
+        const a = r.levels?.[l.key]?.kategori_akses?.[t];
+        if (a) aksesRows.push({ cells: [l.label, `${t} menit`, ...['Terjangkau', 'Jauh', 'Terputus', 'Tergenang'].map(c => `${fmtInt(a[c]?.jumlah_grid)} <span class="muted">(${fmtNum(a[c]?.persen, 1)}%)</span>`)] });
+    }));
     return section('Deteksi Titik Aman Semu (Detour Index)',
-        'Aturan utama: TAS bila DI<sub>t</sub> ≥ 2 dan T<sub>ideal</sub> ≤ 5 menit (garis lurus ≤ 400 m), pada grid non-Tergenang yang terjangkau; batas minimum 50 m pada kedua jarak. Sensitivitas: aturan persentil (T<sub>ideal</sub> ≤ P25 dan DI ≥ P75).',
-        table(['Level', 'TAS', 'Non-TAS', 'Terputus', 'Tergenang', '% TAS (non-Tergenang)', 'DI TAS: median [P25–P75; P90]', 'DI Non-TAS: median [P25–P75; P90]',
-               'Median T<sub>ideal</sub> TAS (mnt)', 'Median T<sub>aktual</sub> TAS (mnt)', 'TAS aturan persentil', 'TAS kedua aturan'], rows),
-        'Sebaran DI dilaporkan sebagai deskripsi; perbedaan DI antara TAS dan Non-TAS mengikuti definisi aturan, bukan bukti keberhasilan deteksi.')
-        + section('TAS per kategori TES terdekat', 'Kategori TES valid terdekat secara Euclidean.',
-            table(['Level', ...kat.map(k => tesCategories[k].label)], katRows));
+        'Aturan utama: TAS bila DI<sub>t</sub> ≥ 2, T<sub>ideal</sub> ≤ 5 menit, dan T<sub>aktual</sub> ≥ 30 menit (batas waktu evakuasi; Li dkk., 2026), pada grid non-Tergenang yang terjangkau. Sensitivitas: T<sub>aktual</sub> ≥ 20 / 40 menit, aturan absolut v3 (tanpa syarat T<sub>aktual</sub>), dan aturan persentil.',
+        table(['Level', 'TAS', 'Non-TAS', 'Terputus', 'Tergenang', '% TAS', 'TAS (≥ 20 mnt)', 'TAS (≥ 40 mnt)', 'TAS utama yang tetap pada 40 mnt', 'Absolut v3', 'Persentil', 'Median T<sub>ideal</sub> TAS', 'Median T<sub>aktual</sub> TAS'], rows))
+        + section('Perubahan TAS terhadap Baseline', 'TAS baru = bukan TAS di Baseline, menjadi TAS di level ini. TAS hilang dipecah menurut status di level ini.',
+            table(['Level', 'TAS baru akibat banjir', 'TAS hilang', 'jadi Tergenang', 'jadi Terputus', 'lainnya'], chg))
+        + section('Sebaran Detour Index', 'Deskriptif; perbedaan DI TAS vs Non-TAS mengikuti definisi aturan, bukan bukti keberhasilan deteksi.',
+            table(['Level', 'DI TAS: median [P25–P75; P90]', 'DI Non-TAS: median [P25–P75; P90]'], dist))
+        + section('TAS per kategori TES terdekat', '', table(['Level', ...kat.map(k => tesCategories[k].label)], katRows))
+        + section('Kategori Akses per Level', 'Padanan Li dkk. (2026): Terjangkau, Jauh (remote), Terputus (isolated), Tergenang (flooded), untuk batas 20/30/40 menit.',
+            table(['Level', 'Batas', 'Terjangkau', 'Jauh', 'Terputus', 'Tergenang'], aksesRows));
 }
 
 // ── Tab: Waktu Tempuh (Gambar 18) ────────────────────────────────────────────

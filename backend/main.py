@@ -368,6 +368,7 @@ async def health_check():
 @app.get("/api/levels", tags=["System"], summary="Daftar level intensitas banjir")
 async def get_levels():
     return {"status": "ok", "skenario": T.SKENARIO, "levels": T.LEVELS, "k": _resolve_k(None),
+            "akses_status": T.AKSES_STATUS, "batas_waktu_evakuasi_menit": T.EVAC_TIME_MIN,
             "k_utama": k_utama_default(), "k_keluaran": _k_list(),
             "tas_status": T.TAS_STATUS}
 
@@ -384,7 +385,7 @@ async def get_level(
     level: Optional[str] = Query(None, description="baseline | rendah | sedang | tinggi"),
     intensity: Optional[float] = Query(None, ge=0.0, le=1.0, description="Alternatif numerik untuk level"),
     skenario: Optional[str] = Query(None, description="Diabaikan — penelitian hanya banjir"),
-    k: Optional[int] = Query(None, description="K model (2 atau 3); bawaan = K utama"),
+    k: Optional[int] = Query(None, description="K model (2, 3, atau 4); bawaan = K utama"),
 ):
     _check_ready()
     lv = _resolve_level(level, intensity)
@@ -416,7 +417,9 @@ async def post_simulate(body: SimulateRequest):
                                        state.gdf_base, cfg)
                 grid = pd.concat([
                     state.thesis_grid[["id_grid", "id_grid_asli", "Road_Density_mean", T.SKENARIO]],
-                    T.level_grid_frame(lv["key"], prep["df"], prep["tas"], cfg),
+                    T.level_grid_frame(lv["key"], prep["df"], prep["tas"], cfg).assign(**{
+                        f"akses_{lv['key']}": T.access_category(prep["df"]["waktu_tes_min"].values,
+                                                                prep["df"]["tergenang"].values, prep["t_pen"])}),
                     T.model_grid_frame(lv["key"], k, sim["labels"], sim["membership"], sim["states"]),
                 ], axis=1)
                 return (T.level_summary(lv["key"], prep, cfg), T.records_from_grid(grid, lv["key"], cfg, k),

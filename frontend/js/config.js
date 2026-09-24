@@ -8,7 +8,10 @@ const RESOLVED_API_BASE = `${backendOrigin}/api`;
 const clusterColors = { 0: "#1f77b4", 1: "#2ca02c", 2: "#9467bd", 3: "#e377c2", 4: "#bcbd22", 5: "#17becf",
                         6: "#8c564b", 7: "#d62728", 8: "#7f7f7f", 9: "#ff7f0e", "-1": "#475569" };
 const TERPUTUS_COLOR = "#0f172a";
-const TERGENANG_COLOR = "#38bdf8";   // grid tergenang (terdampak simulasi) — dikeluarkan dari klasterisasi & TAS
+const TERGENANG_COLOR = "#38bdf8";
+// Kategori akses per grid (padanan Li dkk. 2026): 0 Terjangkau, 1 Jauh (> 30 menit), 2 Terputus, 3 Tergenang
+const AKSES_COLORS = { 0: '#22c55e', 1: '#f97316', 2: '#0f172a', 3: TERGENANG_COLOR };
+const AKSES_LABELS = { 0: 'Terjangkau (≤ 30 menit)', 1: 'Jauh (> 30 menit)', 2: 'Terputus', 3: 'Tergenang' };   // grid tergenang (terdampak simulasi) — dikeluarkan dari klasterisasi & TAS
 const TAS_COLOR = "#a855f7";
 const TERDAMPAK_COLOR = "#ff7f0e";
 const NEUTRAL_FILL = "#475569";
@@ -25,6 +28,7 @@ const viewModes = {
     klaster:   'Tipologi Klaster SDWFCM',
     tas:       'Titik Aman Semu (TAS)',
     terdampak: 'Grid Tergenang',
+    akses:     'Kategori Akses (batas 30 menit)',
     waktu:     'Waktu Tempuh Minimum ke TES',
     bahaya:    'Indeks Bahaya Banjir'
 };

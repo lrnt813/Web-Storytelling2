@@ -45,11 +45,14 @@ function buildLegendHtml(k) {
                  <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Non-TAS <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 0))}</span></div>
                  <div class="legend-static-item">${legendSwatch(TERPUTUS_COLOR, '#94a3b8')} Terputus <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 2))}</span></div>
                  <div class="legend-static-item">${legendSwatch(TERGENANG_COLOR)} Tergenang <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 3))}</span></div>
-                 <div class="legend-foot">TAS: Detour Index ≥ 2 dan T<sub>ideal</sub> ≤ 5 menit (grid non-Tergenang yang terjangkau). Terputus: tidak menjangkau TES.</div>`;
+                 <div class="legend-foot">TAS: Detour Index ≥ 2, T<sub>ideal</sub> ≤ 5 menit, dan T<sub>aktual</sub> ≥ 30 menit (grid non-Tergenang yang terjangkau). Terputus: tidak menjangkau TES.</div>`;
     } else if (activeView === 'terdampak') {
         html += `<div class="legend-static-item">${legendSwatch(TERGENANG_COLOR)} Tergenang <span class="legend-note">${fmtInt(countBy(d => d.tergenang === 1))}</span></div>
                  <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Tidak tergenang</div>
                  <div class="legend-foot">${LEVELS.find(l => l.key === activeLevel)?.kelas || ''}</div>`;
+    } else if (activeView === 'akses') {
+        [0, 1, 2, 3].forEach(c => { html += `<div class="legend-static-item">${legendSwatch(AKSES_COLORS[c])} ${AKSES_LABELS[c]} <span class="legend-note">${fmtInt(countBy(d => d.kategori_akses === c))}</span></div>`; });
+        html += `<div class="legend-foot">Batas waktu evakuasi 30 menit berjalan kaki (Li dkk., 2026).</div>`;
     } else if (activeView === 'waktu') {
         waktuBins.forEach(b => { html += `<div class="legend-static-item">${legendSwatch(b.color)} ${b.label}</div>`; });
         html += `<div class="legend-foot">Kecepatan berjalan kaki 80 m/menit</div>`;

@@ -11,7 +11,7 @@ pytestmark = pytest.mark.skipif(os.environ.get("SMOKE_API") != "1",
                                 reason="smoke test API lambat; set SMOKE_API=1")
 
 LEVELS = ["baseline", "rendah", "sedang", "tinggi"]
-KS = [2, 3]
+KS = [2, 3, 4]
 
 
 @pytest.fixture(scope="module")
@@ -39,7 +39,7 @@ def test_system(client):
     r = client.get("/api/thesis-results")
     assert r.status_code == 200
     res = r.json()
-    assert set(res["model"]) == {"2", "3"}
+    assert set(res["model"]) == {"2", "3", "4"}
     assert "ari_subsampel_mean" in res["k_selection"]["candidates"][0]
     for p in ["/api/admin-layers", "/api/admin-boundaries", "/api/grid-admin", "/api/search-list"]:
         assert client.get(p).status_code == 200, p

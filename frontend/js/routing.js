@@ -251,6 +251,7 @@ function renderGridAttrPopup(g) {
         ${isTergenang ? '' : popupRow('Derajat keanggotaan', `${fmtNum((g.membership_max || 0) * 100, 1)}%`)}
         ${popupRow('Indeks bahaya banjir', g.indeks_bahaya ?? '–')}
         ${popupRow('Tergenang', isTergenang ? 'Ya' : 'Tidak', isTergenang ? TERGENANG_COLOR : null)}
+        ${popupRow('Kategori akses', AKSES_LABELS[g.kategori_akses] ?? '–', AKSES_COLORS[g.kategori_akses] ?? null)}
         ${popupRow('Kerapatan jalan', fmtNum(g.road_density, 3))}
         ${popupRow('ID grid', g.id_grid_asli != null ? `${g.id_grid_asli} (indeks ${g.id_grid})` : g.id_grid)}
     </div>

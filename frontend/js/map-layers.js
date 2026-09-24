@@ -647,6 +647,9 @@ function gridStyleFor(d) {
             ? { fillColor: TERGENANG_COLOR, fillOpacity: 0.8, stroke: false }
             : { fillColor: NEUTRAL_FILL, fillOpacity: 0.18, stroke: false };
     }
+    if (activeView === 'akses') {
+        return { fillColor: AKSES_COLORS[d.kategori_akses] ?? NEUTRAL_FILL, fillOpacity: d.kategori_akses === 0 ? 0.45 : 0.8, stroke: false };
+    }
     if (activeView === 'klaster' && d.cluster_sdwfcm === -1) {
         return { fillColor: TERGENANG_COLOR, fillOpacity: activeCluster !== null ? 0.05 : 0.55, stroke: false };
     }
