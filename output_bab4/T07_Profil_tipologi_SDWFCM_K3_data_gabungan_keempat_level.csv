@@ -1,4 +1,0 @@
-﻿Klaster,Jumlah baris,% baris,Median waktu minimum,P25 waktu minimum,P75 waktu minimum,Rerata waktu minimum,Baris waktu minimum = penalti,% baris waktu minimum = penalti,Proporsi terisolasi,Opsi rute (rerata),Kepadatan jalan (rerata),Kelas bahaya (deskriptif),Interpretasi
-0,23669,29.548207,3.253364,1.99619,4.732126,3.782087,16,0.067599,0.000676,4.986311,0.937291,0.393722,Akses Baik
-1,34749,43.380398,5.751538,3.881709,7.726998,6.722031,71,0.204322,0.002043,4.973668,0.721024,0.24346,Akses Baik
-2,21685,27.071396,11.864931,8.787796,16.527046,36.56904,1303,6.008762,0.060088,4.41757,0.65566,0.326585,Akses Sedang

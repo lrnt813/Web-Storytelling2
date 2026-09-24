@@ -1,11 +1,11 @@
 {
  "keterangan": "Hasil analisis terkunci. Jangan diedit manual. Semua angka skripsi berasal dari output_bab4/ yang dibangun dari folder ini (python -m scripts.export_bab4).",
- "locked_at": "2026-09-24T21:53:53+07:00",
+ "locked_at": "2026-09-25T02:26:04+07:00",
  "git": {
-  "commit_analisis": "4413d4f0fa84d36e403817d49c2d2f34a508af0a",
-  "branch_analisis": "revisi-v3",
-  "commit_saat_kunci": "a5b9eb17ab8bf7ef73c06c665cc7701b5fb6a347",
-  "branch_saat_kunci": "revisi-v3",
+  "commit_analisis": "01fe65b286723c3f24f5a1bf5afc2ea4fe2ded3d",
+  "branch_analisis": "revisi-v4",
+  "commit_saat_kunci": "f7652aa16b89bf7da10bc77a3ffce03348378084",
+  "branch_saat_kunci": "revisi-v4",
   "berkas_pipeline_sama_dengan_commit_analisis": true
  },
  "python": {
@@ -161,7 +161,8 @@
   "sdwfcm_n_init": 10,
   "sdwfcm_seed_terbaik_per_k": {
    "2": 50,
-   "3": 49
+   "3": 49,
+   "4": 50
   },
   "moran_permutation_seed": 42,
   "dunn_sample_seed": 42
@@ -169,15 +170,16 @@
  "k_terpilih_aturan": 2,
  "k_keluaran": [
   2,
-  3
+  3,
+  4
  ],
  "files": {
-  "thesis_results.json": "0288e4fbdbf32610988f16b9ddcfba168644e8787b4a41c8678e93097d17e54e",
-  "thesis_grid_results.csv.gz": "206018ad27ee77a256f2225303d021d3abbbb86cc9d7882a7689ad02141db1d1",
-  "thesis_pooled_results.csv.gz": "6c71069b9a6850d75507c68be35af1a47d6a584e3335ebf13985d83402ca7a1a"
+  "thesis_results.json": "6855a5540347cd18b0539a3d076850ea87c293c4bd5d435c3cc42b9eebdbaeb3",
+  "thesis_grid_results.csv.gz": "f2e56ced881e2ce2273d43559c01180a658a764434cb62de7fce53cc5e190a5e",
+  "thesis_pooled_results.csv.gz": "6ff79008e720a0c3c9bdcca60780710f0a2e3bbd7a47998e6d6b07126797edcd"
  },
- "fingerprint_hasil_tanpa_waktu": "85bd479d9a4b899fe08340dd75e9df97ad085aadbcdb6e193eebdd75aefa4f0b",
- "sha256_isi_grid_csv": "8e139bace3910a77eec6195955b780484642f9afb8f1edc2003a9e3ef5cbb28f",
- "sha256_isi_pooled_csv": "e62474f2f9a15b5fd213cf7cbbd00d8750b290cff51f08459858b64844ca2641",
+ "fingerprint_hasil_tanpa_waktu": "f3081907c8e50c72c982470aabb4d5d36fdbbcb0a230a96d0173c3fe329bd4d4",
+ "sha256_isi_grid_csv": "ca705355f0a47d78e8c4c6200b13562a3e08625bcfae5da0b866922c6067f80a",
+ "sha256_isi_pooled_csv": "398451698bd772f376025f974c63445d9e228b04c4f95349d4c34d41779426f4",
  "catatan_fingerprint": "fingerprint = SHA-256 JSON kanonik thesis_results.json tanpa field waktu dan meta.git; sha256_isi_*_csv = SHA-256 isi CSV setelah dekompresi (header gzip memuat stempel waktu). Keduanya dipakai scripts/cek_reproduksi.py."
 }

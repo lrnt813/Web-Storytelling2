@@ -1,11 +1,11 @@
 {
  "meta": {
   "git": {
-   "commit": "4413d4f0fa84d36e403817d49c2d2f34a508af0a",
-   "branch": "revisi-v3",
+   "commit": "01fe65b286723c3f24f5a1bf5afc2ea4fe2ded3d",
+   "branch": "revisi-v4",
    "kode_berubah_belum_commit": false
   },
-  "versi_desain": "v3 (kelas bahaya dari raster InaRisk, TAS aturan absolut, keluaran K = 2 dan 3)",
+  "versi_desain": "v4 (kelas bahaya dari raster InaRisk; pemilihan K dari v3; keluaran K = 2, 3, 4; TAS dengan syarat T_aktual ≥ batas waktu evakuasi; kategori akses)",
   "sumber_kelas_bahaya": "data/Kulonprogo_Banjir.tif (grid mayoritas, ruas maksimum, TES titik)",
   "skenario": "banjir",
   "levels": [
@@ -101,13 +101,21 @@
   "tas_aturan_utama": {
    "di_min": 2.0,
    "t_ideal_maks_menit": 5.0,
+   "t_aktual_min_menit": 30.0,
    "jarak_min_m": 50.0
   },
-  "label_interpretasi": {
-   "terisolasi_proporsi_penalti_lebih_dari": 0.5,
-   "akses_baik_median_maks": 10.0,
-   "akses_sedang_median_maks": 30.0
-  }
+  "batas_waktu_evakuasi_menit": 30.0,
+  "sensitivitas_batas_waktu_menit": [
+   20.0,
+   40.0
+  ],
+  "akses_status": {
+   "0": "Terjangkau",
+   "1": "Jauh",
+   "2": "Terputus",
+   "3": "Tergenang"
+  },
+  "label_tipologi": "peringkat menurut rata-rata waktu_tes_min: Tipologi 1 (terbaik) … Tipologi K (terburuk)"
  },
  "data_summary": {
   "n_grid": 22673,
@@ -153,40 +161,67 @@
    },
    "n_isolated_non_tergenang": 111,
    "tas": {
-    "aturan": "DI_t ≥ 2 dan T_ideal ≤ 5 menit (grid non-Tergenang terjangkau)",
-    "jumlah_tas": 5758,
-    "jumlah_non_tas": 16747,
+    "aturan": "DI_t ≥ 2, T_ideal ≤ 5 menit, dan T_aktual ≥ 30 menit (grid non-Tergenang terjangkau)",
+    "jumlah_tas": 62,
+    "jumlah_non_tas": 22443,
     "jumlah_terputus": 168,
     "jumlah_tergenang": 0,
     "jumlah_terjangkau": 22505,
     "jumlah_non_tergenang": 22673,
-    "persen_tas": 25.395845,
-    "persen_tas_non_tergenang": 25.395845,
-    "persen_tas_terjangkau": 25.585425,
+    "persen_tas": 0.273453,
+    "persen_tas_non_tergenang": 0.273453,
+    "persen_tas_terjangkau": 0.275494,
     "persen_terputus": 0.740969,
     "persen_tergenang": 0.0,
     "sebaran_di_tas": {
-     "n": 5758,
-     "median": 2.723328,
-     "p25": 2.280085,
-     "p75": 3.727224,
-     "p90": 5.377707
+     "n": 62,
+     "median": 12.68495,
+     "p25": 9.169623,
+     "p75": 18.835323,
+     "p90": 32.59681
     },
     "sebaran_di_non_tas": {
-     "n": 16747,
-     "median": 1.499305,
-     "p25": 1.314099,
-     "p75": 1.750176,
-     "p90": 1.990689
+     "n": 22443,
+     "median": 1.6574,
+     "p25": 1.375905,
+     "p75": 2.240341,
+     "p90": 3.280398
     },
-    "median_t_ideal_tas": 2.340589,
-    "median_t_aktual_tas": 6.950788,
+    "median_t_ideal_tas": 3.705304,
+    "median_t_aktual_tas": 43.05554,
     "tas_per_kategori_tes_terdekat": {
-     "gor": 116,
-     "ibadah": 3403,
-     "kesehatan": 96,
-     "pemerintahan": 350,
-     "pendidikan": 1793
+     "gor": 2,
+     "ibadah": 39,
+     "pemerintahan": 8,
+     "pendidikan": 13
+    },
+    "sensitivitas_ambang_waktu": {
+     "20": {
+      "ambang_t_aktual_menit": 20.0,
+      "jumlah_tas": 254,
+      "persen_tas_non_tergenang": 1.120275,
+      "jumlah_tas_utama_yang_tetap_tas": 62,
+      "proporsi_tas_utama_yang_tetap_tas": 1.0
+     },
+     "40": {
+      "ambang_t_aktual_menit": 40.0,
+      "jumlah_tas": 34,
+      "persen_tas_non_tergenang": 0.149958,
+      "jumlah_tas_utama_yang_tetap_tas": 34,
+      "proporsi_tas_utama_yang_tetap_tas": 0.548387
+     }
+    },
+    "sensitivitas_absolut_v3": {
+     "aturan": "DI_t ≥ 2 dan T_ideal ≤ 5 menit (tanpa syarat T_aktual)",
+     "jumlah_tas": 5758,
+     "persen_tas_non_tergenang": 25.395845,
+     "sebaran_di_tas": {
+      "n": 5758,
+      "median": 2.723328,
+      "p25": 2.280085,
+      "p75": 3.727224,
+      "p90": 5.377707
+     }
     },
     "sensitivitas_persentil": {
      "aturan": "T_ideal ≤ P25(T_ideal) dan DI_t ≥ P75(DI_t) pada grid non-Tergenang terjangkau",
@@ -194,9 +229,9 @@
      "p75_di": 2.248928,
      "jumlah_tas": 1842,
      "persen_tas_non_tergenang": 8.124201,
-     "jumlah_tas_kedua_aturan": 1842,
-     "jumlah_tas_hanya_aturan_utama": 3916,
-     "jumlah_tas_hanya_persentil": 0,
+     "jumlah_tas_kedua_aturan": 6,
+     "jumlah_tas_hanya_aturan_utama": 56,
+     "jumlah_tas_hanya_persentil": 1836,
      "sebaran_di_tas": {
       "n": 1842,
       "median": 3.178787,
@@ -243,6 +278,74 @@
      "konsisten": true,
      "tes_tidak_valid_kelas": "kelas ≥ 2 (semua level) + TES berkelas < 2 dalam radius 50 m grid tergenang"
     }
+   },
+   "kategori_akses": {
+    "30": {
+     "Terjangkau": {
+      "jumlah_grid": 22357,
+      "persen": 98.606272
+     },
+     "Jauh": {
+      "jumlah_grid": 205,
+      "persen": 0.904159
+     },
+     "Terputus": {
+      "jumlah_grid": 111,
+      "persen": 0.489569
+     },
+     "Tergenang": {
+      "jumlah_grid": 0,
+      "persen": 0.0
+     }
+    },
+    "20": {
+     "Terjangkau": {
+      "jumlah_grid": 21840,
+      "persen": 96.326027
+     },
+     "Jauh": {
+      "jumlah_grid": 722,
+      "persen": 3.184404
+     },
+     "Terputus": {
+      "jumlah_grid": 111,
+      "persen": 0.489569
+     },
+     "Tergenang": {
+      "jumlah_grid": 0,
+      "persen": 0.0
+     }
+    },
+    "40": {
+     "Terjangkau": {
+      "jumlah_grid": 22529,
+      "persen": 99.364883
+     },
+     "Jauh": {
+      "jumlah_grid": 33,
+      "persen": 0.145548
+     },
+     "Terputus": {
+      "jumlah_grid": 111,
+      "persen": 0.489569
+     },
+     "Tergenang": {
+      "jumlah_grid": 0,
+      "persen": 0.0
+     }
+    }
+   },
+   "tas_perubahan_vs_baseline": {
+    "tas_baru": 0,
+    "tas_baru_dari_status_baseline": {
+     "Non-TAS": 0,
+     "Terputus": 0
+    },
+    "tas_hilang": 0,
+    "tas_hilang_jadi_tergenang": 0,
+    "tas_hilang_jadi_terputus": 0,
+    "tas_hilang_lainnya": 0,
+    "tas_tetap": 62
    }
   },
   "rendah": {
@@ -278,40 +381,67 @@
    },
    "n_isolated_non_tergenang": 126,
    "tas": {
-    "aturan": "DI_t ≥ 2 dan T_ideal ≤ 5 menit (grid non-Tergenang terjangkau)",
-    "jumlah_tas": 5757,
-    "jumlah_non_tas": 16695,
+    "aturan": "DI_t ≥ 2, T_ideal ≤ 5 menit, dan T_aktual ≥ 30 menit (grid non-Tergenang terjangkau)",
+    "jumlah_tas": 70,
+    "jumlah_non_tas": 22382,
     "jumlah_terputus": 182,
     "jumlah_tergenang": 39,
     "jumlah_terjangkau": 22452,
     "jumlah_non_tergenang": 22634,
-    "persen_tas": 25.391435,
-    "persen_tas_non_tergenang": 25.435186,
-    "persen_tas_terjangkau": 25.641368,
+    "persen_tas": 0.308737,
+    "persen_tas_non_tergenang": 0.309269,
+    "persen_tas_terjangkau": 0.311776,
     "persen_terputus": 0.802717,
     "persen_tergenang": 0.172011,
     "sebaran_di_tas": {
-     "n": 5757,
-     "median": 2.72339,
-     "p25": 2.280039,
-     "p75": 3.730264,
-     "p90": 5.418742
+     "n": 70,
+     "median": 12.147306,
+     "p25": 8.897022,
+     "p75": 17.934305,
+     "p90": 30.670063
     },
     "sebaran_di_non_tas": {
-     "n": 16695,
-     "median": 1.504173,
-     "p25": 1.31541,
-     "p75": 1.760057,
-     "p90": 2.008477
+     "n": 22382,
+     "median": 1.666823,
+     "p25": 1.379063,
+     "p75": 2.252152,
+     "p90": 3.298011
     },
-    "median_t_ideal_tas": 2.34047,
-    "median_t_aktual_tas": 6.94999,
+    "median_t_ideal_tas": 3.719545,
+    "median_t_aktual_tas": 40.29666,
     "tas_per_kategori_tes_terdekat": {
-     "gor": 117,
-     "ibadah": 3401,
-     "kesehatan": 96,
-     "pemerintahan": 350,
-     "pendidikan": 1793
+     "gor": 2,
+     "ibadah": 39,
+     "pemerintahan": 8,
+     "pendidikan": 21
+    },
+    "sensitivitas_ambang_waktu": {
+     "20": {
+      "ambang_t_aktual_menit": 20.0,
+      "jumlah_tas": 258,
+      "persen_tas_non_tergenang": 1.139878,
+      "jumlah_tas_utama_yang_tetap_tas": 70,
+      "proporsi_tas_utama_yang_tetap_tas": 1.0
+     },
+     "40": {
+      "ambang_t_aktual_menit": 40.0,
+      "jumlah_tas": 36,
+      "persen_tas_non_tergenang": 0.159053,
+      "jumlah_tas_utama_yang_tetap_tas": 36,
+      "proporsi_tas_utama_yang_tetap_tas": 0.514286
+     }
+    },
+    "sensitivitas_absolut_v3": {
+     "aturan": "DI_t ≥ 2 dan T_ideal ≤ 5 menit (tanpa syarat T_aktual)",
+     "jumlah_tas": 5757,
+     "persen_tas_non_tergenang": 25.435186,
+     "sebaran_di_tas": {
+      "n": 5757,
+      "median": 2.72339,
+      "p25": 2.280039,
+      "p75": 3.730264,
+      "p90": 5.418742
+     }
     },
     "sensitivitas_persentil": {
      "aturan": "T_ideal ≤ P25(T_ideal) dan DI_t ≥ P75(DI_t) pada grid non-Tergenang terjangkau",
@@ -319,9 +449,9 @@
      "p75_di": 2.260549,
      "jumlah_tas": 1811,
      "persen_tas_non_tergenang": 8.001237,
-     "jumlah_tas_kedua_aturan": 1811,
-     "jumlah_tas_hanya_aturan_utama": 3946,
-     "jumlah_tas_hanya_persentil": 0,
+     "jumlah_tas_kedua_aturan": 6,
+     "jumlah_tas_hanya_aturan_utama": 64,
+     "jumlah_tas_hanya_persentil": 1805,
      "sebaran_di_tas": {
       "n": 1811,
       "median": 3.202892,
@@ -374,6 +504,74 @@
      "konsisten": true,
      "tes_tidak_valid_kelas": "kelas ≥ 2 (semua level) + TES berkelas < 2 dalam radius 50 m grid tergenang"
     }
+   },
+   "kategori_akses": {
+    "30": {
+     "Terjangkau": {
+      "jumlah_grid": 22254,
+      "persen": 98.151987
+     },
+     "Jauh": {
+      "jumlah_grid": 254,
+      "persen": 1.120275
+     },
+     "Terputus": {
+      "jumlah_grid": 126,
+      "persen": 0.555727
+     },
+     "Tergenang": {
+      "jumlah_grid": 39,
+      "persen": 0.172011
+     }
+    },
+    "20": {
+     "Terjangkau": {
+      "jumlah_grid": 21755,
+      "persen": 95.951131
+     },
+     "Jauh": {
+      "jumlah_grid": 753,
+      "persen": 3.321131
+     },
+     "Terputus": {
+      "jumlah_grid": 126,
+      "persen": 0.555727
+     },
+     "Tergenang": {
+      "jumlah_grid": 39,
+      "persen": 0.172011
+     }
+    },
+    "40": {
+     "Terjangkau": {
+      "jumlah_grid": 22479,
+      "persen": 99.144357
+     },
+     "Jauh": {
+      "jumlah_grid": 29,
+      "persen": 0.127905
+     },
+     "Terputus": {
+      "jumlah_grid": 126,
+      "persen": 0.555727
+     },
+     "Tergenang": {
+      "jumlah_grid": 39,
+      "persen": 0.172011
+     }
+    }
+   },
+   "tas_perubahan_vs_baseline": {
+    "tas_baru": 8,
+    "tas_baru_dari_status_baseline": {
+     "Non-TAS": 8,
+     "Terputus": 0
+    },
+    "tas_hilang": 0,
+    "tas_hilang_jadi_tergenang": 0,
+    "tas_hilang_jadi_terputus": 0,
+    "tas_hilang_lainnya": 0,
+    "tas_tetap": 62
    }
   },
   "sedang": {
@@ -410,40 +608,66 @@
    },
    "n_isolated_non_tergenang": 502,
    "tas": {
-    "aturan": "DI_t ≥ 2 dan T_ideal ≤ 5 menit (grid non-Tergenang terjangkau)",
-    "jumlah_tas": 5092,
-    "jumlah_non_tas": 13606,
+    "aturan": "DI_t ≥ 2, T_ideal ≤ 5 menit, dan T_aktual ≥ 30 menit (grid non-Tergenang terjangkau)",
+    "jumlah_tas": 77,
+    "jumlah_non_tas": 18621,
     "jumlah_terputus": 600,
     "jumlah_tergenang": 3375,
     "jumlah_terjangkau": 18698,
     "jumlah_non_tergenang": 19298,
-    "persen_tas": 22.458431,
-    "persen_tas_non_tergenang": 26.386154,
-    "persen_tas_terjangkau": 27.232859,
+    "persen_tas": 0.339611,
+    "persen_tas_non_tergenang": 0.399005,
+    "persen_tas_terjangkau": 0.411809,
     "persen_terputus": 2.646319,
     "persen_tergenang": 14.885547,
     "sebaran_di_tas": {
-     "n": 5092,
-     "median": 2.726511,
-     "p25": 2.28476,
-     "p75": 3.743185,
-     "p90": 5.454637
+     "n": 77,
+     "median": 12.040073,
+     "p25": 9.30913,
+     "p75": 16.230077,
+     "p90": 20.856956
     },
     "sebaran_di_non_tas": {
-     "n": 13606,
-     "median": 1.503778,
-     "p25": 1.313994,
-     "p75": 1.753702,
-     "p90": 1.984228
+     "n": 18621,
+     "median": 1.677637,
+     "p25": 1.383966,
+     "p75": 2.281123,
+     "p90": 3.413706
     },
-    "median_t_ideal_tas": 2.27861,
-    "median_t_aktual_tas": 6.770756,
+    "median_t_ideal_tas": 3.669667,
+    "median_t_aktual_tas": 39.381397,
     "tas_per_kategori_tes_terdekat": {
-     "gor": 98,
-     "ibadah": 3025,
-     "kesehatan": 87,
-     "pemerintahan": 290,
-     "pendidikan": 1592
+     "ibadah": 57,
+     "pemerintahan": 3,
+     "pendidikan": 17
+    },
+    "sensitivitas_ambang_waktu": {
+     "20": {
+      "ambang_t_aktual_menit": 20.0,
+      "jumlah_tas": 218,
+      "persen_tas_non_tergenang": 1.129651,
+      "jumlah_tas_utama_yang_tetap_tas": 77,
+      "proporsi_tas_utama_yang_tetap_tas": 1.0
+     },
+     "40": {
+      "ambang_t_aktual_menit": 40.0,
+      "jumlah_tas": 37,
+      "persen_tas_non_tergenang": 0.19173,
+      "jumlah_tas_utama_yang_tetap_tas": 37,
+      "proporsi_tas_utama_yang_tetap_tas": 0.480519
+     }
+    },
+    "sensitivitas_absolut_v3": {
+     "aturan": "DI_t ≥ 2 dan T_ideal ≤ 5 menit (tanpa syarat T_aktual)",
+     "jumlah_tas": 5092,
+     "persen_tas_non_tergenang": 26.386154,
+     "sebaran_di_tas": {
+      "n": 5092,
+      "median": 2.726511,
+      "p25": 2.28476,
+      "p75": 3.743185,
+      "p90": 5.454637
+     }
     },
     "sensitivitas_persentil": {
      "aturan": "T_ideal ≤ P25(T_ideal) dan DI_t ≥ P75(DI_t) pada grid non-Tergenang terjangkau",
@@ -451,9 +675,9 @@
      "p75_di": 2.294721,
      "jumlah_tas": 1485,
      "persen_tas_non_tergenang": 7.695098,
-     "jumlah_tas_kedua_aturan": 1485,
-     "jumlah_tas_hanya_aturan_utama": 3607,
-     "jumlah_tas_hanya_persentil": 0,
+     "jumlah_tas_kedua_aturan": 7,
+     "jumlah_tas_hanya_aturan_utama": 70,
+     "jumlah_tas_hanya_persentil": 1478,
      "sebaran_di_tas": {
       "n": 1485,
       "median": 3.235067,
@@ -509,6 +733,74 @@
      "konsisten": true,
      "tes_tidak_valid_kelas": "kelas ≥ 2 (semua level) + TES berkelas < 2 dalam radius 50 m grid tergenang"
     }
+   },
+   "kategori_akses": {
+    "30": {
+     "Terjangkau": {
+      "jumlah_grid": 18732,
+      "persen": 82.618092
+     },
+     "Jauh": {
+      "jumlah_grid": 64,
+      "persen": 0.282274
+     },
+     "Terputus": {
+      "jumlah_grid": 502,
+      "persen": 2.214087
+     },
+     "Tergenang": {
+      "jumlah_grid": 3375,
+      "persen": 14.885547
+     }
+    },
+    "20": {
+     "Terjangkau": {
+      "jumlah_grid": 18510,
+      "persen": 81.638954
+     },
+     "Jauh": {
+      "jumlah_grid": 286,
+      "persen": 1.261412
+     },
+     "Terputus": {
+      "jumlah_grid": 502,
+      "persen": 2.214087
+     },
+     "Tergenang": {
+      "jumlah_grid": 3375,
+      "persen": 14.885547
+     }
+    },
+    "40": {
+     "Terjangkau": {
+      "jumlah_grid": 18792,
+      "persen": 82.882724
+     },
+     "Jauh": {
+      "jumlah_grid": 4,
+      "persen": 0.017642
+     },
+     "Terputus": {
+      "jumlah_grid": 502,
+      "persen": 2.214087
+     },
+     "Tergenang": {
+      "jumlah_grid": 3375,
+      "persen": 14.885547
+     }
+    }
+   },
+   "tas_perubahan_vs_baseline": {
+    "tas_baru": 54,
+    "tas_baru_dari_status_baseline": {
+     "Non-TAS": 54,
+     "Terputus": 0
+    },
+    "tas_hilang": 39,
+    "tas_hilang_jadi_tergenang": 31,
+    "tas_hilang_jadi_terputus": 7,
+    "tas_hilang_lainnya": 1,
+    "tas_tetap": 23
    }
   },
   "tinggi": {
@@ -546,40 +838,65 @@
    },
    "n_isolated_non_tergenang": 651,
    "tas": {
-    "aturan": "DI_t ≥ 2 dan T_ideal ≤ 5 menit (grid non-Tergenang terjangkau)",
-    "jumlah_tas": 3685,
-    "jumlah_non_tas": 10862,
+    "aturan": "DI_t ≥ 2, T_ideal ≤ 5 menit, dan T_aktual ≥ 30 menit (grid non-Tergenang terjangkau)",
+    "jumlah_tas": 44,
+    "jumlah_non_tas": 14503,
     "jumlah_terputus": 951,
     "jumlah_tergenang": 7175,
     "jumlah_terjangkau": 14547,
     "jumlah_non_tergenang": 15498,
-    "persen_tas": 16.252812,
-    "persen_tas_non_tergenang": 23.777262,
-    "persen_tas_terjangkau": 25.331684,
+    "persen_tas": 0.194063,
+    "persen_tas_non_tergenang": 0.283908,
+    "persen_tas_terjangkau": 0.302468,
     "persen_terputus": 4.194416,
     "persen_tergenang": 31.64557,
     "sebaran_di_tas": {
-     "n": 3685,
-     "median": 2.740839,
-     "p25": 2.287739,
-     "p75": 3.776795,
-     "p90": 5.666721
+     "n": 44,
+     "median": 13.500519,
+     "p25": 8.346609,
+     "p75": 23.814394,
+     "p90": 49.748563
     },
     "sebaran_di_non_tas": {
-     "n": 10862,
-     "median": 1.520135,
-     "p25": 1.323694,
-     "p75": 1.792214,
-     "p90": 2.195291
+     "n": 14503,
+     "median": 1.687672,
+     "p25": 1.388444,
+     "p75": 2.308403,
+     "p90": 3.445902
     },
-    "median_t_ideal_tas": 2.431438,
-    "median_t_aktual_tas": 7.260604,
+    "median_t_ideal_tas": 3.476345,
+    "median_t_aktual_tas": 35.064919,
     "tas_per_kategori_tes_terdekat": {
-     "gor": 73,
-     "ibadah": 2286,
-     "kesehatan": 47,
-     "pemerintahan": 178,
-     "pendidikan": 1101
+     "ibadah": 38,
+     "pendidikan": 6
+    },
+    "sensitivitas_ambang_waktu": {
+     "20": {
+      "ambang_t_aktual_menit": 20.0,
+      "jumlah_tas": 209,
+      "persen_tas_non_tergenang": 1.348561,
+      "jumlah_tas_utama_yang_tetap_tas": 44,
+      "proporsi_tas_utama_yang_tetap_tas": 1.0
+     },
+     "40": {
+      "ambang_t_aktual_menit": 40.0,
+      "jumlah_tas": 16,
+      "persen_tas_non_tergenang": 0.103239,
+      "jumlah_tas_utama_yang_tetap_tas": 16,
+      "proporsi_tas_utama_yang_tetap_tas": 0.363636
+     }
+    },
+    "sensitivitas_absolut_v3": {
+     "aturan": "DI_t ≥ 2 dan T_ideal ≤ 5 menit (tanpa syarat T_aktual)",
+     "jumlah_tas": 3685,
+     "persen_tas_non_tergenang": 23.777262,
+     "sebaran_di_tas": {
+      "n": 3685,
+      "median": 2.740839,
+      "p25": 2.287739,
+      "p75": 3.776795,
+      "p90": 5.666721
+     }
     },
     "sensitivitas_persentil": {
      "aturan": "T_ideal ≤ P25(T_ideal) dan DI_t ≥ P75(DI_t) pada grid non-Tergenang terjangkau",
@@ -587,9 +904,9 @@
      "p75_di": 2.319418,
      "jumlah_tas": 1047,
      "persen_tas_non_tergenang": 6.75571,
-     "jumlah_tas_kedua_aturan": 1047,
-     "jumlah_tas_hanya_aturan_utama": 2638,
-     "jumlah_tas_hanya_persentil": 0,
+     "jumlah_tas_kedua_aturan": 9,
+     "jumlah_tas_hanya_aturan_utama": 35,
+     "jumlah_tas_hanya_persentil": 1038,
      "sebaran_di_tas": {
       "n": 1047,
       "median": 3.327766,
@@ -648,6 +965,74 @@
      "konsisten": true,
      "tes_tidak_valid_kelas": "kelas ≥ 2 (semua level) + TES berkelas < 2 dalam radius 50 m grid tergenang"
     }
+   },
+   "kategori_akses": {
+    "30": {
+     "Terjangkau": {
+      "jumlah_grid": 14529,
+      "persen": 64.080625
+     },
+     "Jauh": {
+      "jumlah_grid": 318,
+      "persen": 1.402549
+     },
+     "Terputus": {
+      "jumlah_grid": 651,
+      "persen": 2.871257
+     },
+     "Tergenang": {
+      "jumlah_grid": 7175,
+      "persen": 31.64557
+     }
+    },
+    "20": {
+     "Terjangkau": {
+      "jumlah_grid": 14189,
+      "persen": 62.581044
+     },
+     "Jauh": {
+      "jumlah_grid": 658,
+      "persen": 2.90213
+     },
+     "Terputus": {
+      "jumlah_grid": 651,
+      "persen": 2.871257
+     },
+     "Tergenang": {
+      "jumlah_grid": 7175,
+      "persen": 31.64557
+     }
+    },
+    "40": {
+     "Terjangkau": {
+      "jumlah_grid": 14676,
+      "persen": 64.728973
+     },
+     "Jauh": {
+      "jumlah_grid": 171,
+      "persen": 0.754201
+     },
+     "Terputus": {
+      "jumlah_grid": 651,
+      "persen": 2.871257
+     },
+     "Tergenang": {
+      "jumlah_grid": 7175,
+      "persen": 31.64557
+     }
+    }
+   },
+   "tas_perubahan_vs_baseline": {
+    "tas_baru": 27,
+    "tas_baru_dari_status_baseline": {
+     "Non-TAS": 27,
+     "Terputus": 0
+    },
+    "tas_hilang": 45,
+    "tas_hilang_jadi_tergenang": 35,
+    "tas_hilang_jadi_terputus": 8,
+    "tas_hilang_lainnya": 2,
+    "tas_tetap": 17
    }
   }
  },
@@ -1507,12 +1892,173 @@
    50,
    51
   ],
-  "aturan": "K dengan rerata ARI subsampel tertinggi; bila beberapa K berselisih ≤ 0,01 dari nilai tertinggi, dipilih K terkecil di antaranya. Metrik pendukung dan skor komposit lama hanya dilaporkan."
+  "aturan": "K dengan rerata ARI subsampel tertinggi; bila beberapa K berselisih ≤ 0,01 dari nilai tertinggi, dipilih K terkecil di antaranya. Metrik pendukung dan skor komposit lama hanya dilaporkan.",
+  "sumber": "hasil v3 (tidak dijalankan ulang)",
+  "fingerprint_sumber": "4413d4f0fa84d36e403817d49c2d2f34a508af0a"
  },
  "k_terpilih_aturan": 2,
  "k_keluaran": [
   2,
-  3
+  3,
+  4
+ ],
+ "verifikasi_v3": {
+  "data_gabungan_identik": true,
+  "label_k2_k3_identik_v3": true
+ },
+ "transisi_akses": [
+  {
+   "matrix": [
+    [
+     22254,
+     58,
+     9,
+     36
+    ],
+    [
+     0,
+     196,
+     8,
+     1
+    ],
+    [
+     0,
+     0,
+     109,
+     2
+    ],
+    [
+     0,
+     0,
+     0,
+     0
+    ]
+   ],
+   "state_labels": [
+    "Terjangkau",
+    "Jauh",
+    "Terputus",
+    "Tergenang"
+   ],
+   "tetap": 22559,
+   "berubah": 114,
+   "from_level": "baseline",
+   "to_level": "rendah"
+  },
+  {
+   "matrix": [
+    [
+     18726,
+     54,
+     345,
+     3129
+    ],
+    [
+     3,
+     10,
+     77,
+     164
+    ],
+    [
+     3,
+     0,
+     80,
+     43
+    ],
+    [
+     0,
+     0,
+     0,
+     39
+    ]
+   ],
+   "state_labels": [
+    "Terjangkau",
+    "Jauh",
+    "Terputus",
+    "Tergenang"
+   ],
+   "tetap": 18855,
+   "berubah": 3818,
+   "from_level": "rendah",
+   "to_level": "sedang"
+  },
+  {
+   "matrix": [
+    [
+     14525,
+     269,
+     479,
+     3459
+    ],
+    [
+     1,
+     47,
+     0,
+     16
+    ],
+    [
+     3,
+     2,
+     172,
+     325
+    ],
+    [
+     0,
+     0,
+     0,
+     3375
+    ]
+   ],
+   "state_labels": [
+    "Terjangkau",
+    "Jauh",
+    "Terputus",
+    "Tergenang"
+   ],
+   "tetap": 18119,
+   "berubah": 4554,
+   "from_level": "sedang",
+   "to_level": "tinggi"
+  },
+  {
+   "matrix": [
+    [
+     14529,
+     309,
+     555,
+     6964
+    ],
+    [
+     0,
+     9,
+     26,
+     170
+    ],
+    [
+     0,
+     0,
+     70,
+     41
+    ],
+    [
+     0,
+     0,
+     0,
+     0
+    ]
+   ],
+   "state_labels": [
+    "Terjangkau",
+    "Jauh",
+    "Terputus",
+    "Tergenang"
+   ],
+   "tetap": 14608,
+   "berubah": 8065,
+   "from_level": "baseline",
+   "to_level": "tinggi"
+  }
  ],
  "model": {
   "2": {
@@ -1520,7 +2066,7 @@
    "model_final": {
     "seed_terbaik": 50,
     "objective": 291364.801746,
-    "time_sec": 37.522756,
+    "time_sec": 28.989874,
     "pusat_klaster_pca": [
      [
       -0.885548,
@@ -1592,35 +2138,46 @@
      "waktu_tes_pendidikan_median": 6.253365,
      "waktu_tes_pendidikan_p25": 3.979114,
      "waktu_tes_pendidikan_p75": 9.172417,
+     "waktu_tes_pendidikan_p90": 12.184053,
      "waktu_tes_pendidikan_n_penalti": 33,
      "waktu_tes_pendidikan_persen_penalti": 0.084298,
      "waktu_tes_kesehatan_median": 25.270249,
      "waktu_tes_kesehatan_p25": 14.940102,
      "waktu_tes_kesehatan_p75": 39.790225,
+     "waktu_tes_kesehatan_p90": 57.777236,
      "waktu_tes_kesehatan_n_penalti": 61,
      "waktu_tes_kesehatan_persen_penalti": 0.155823,
      "waktu_tes_pemerintahan_median": 11.708665,
      "waktu_tes_pemerintahan_p25": 6.895008,
      "waktu_tes_pemerintahan_p75": 18.408295,
+     "waktu_tes_pemerintahan_p90": 25.184859,
      "waktu_tes_pemerintahan_n_penalti": 33,
      "waktu_tes_pemerintahan_persen_penalti": 0.084298,
      "waktu_tes_ibadah_median": 5.111394,
      "waktu_tes_ibadah_p25": 3.197726,
      "waktu_tes_ibadah_p75": 7.511649,
+     "waktu_tes_ibadah_p90": 10.27498,
      "waktu_tes_ibadah_n_penalti": 35,
      "waktu_tes_ibadah_persen_penalti": 0.089407,
      "waktu_tes_gor_median": 27.105328,
      "waktu_tes_gor_p25": 14.626392,
      "waktu_tes_gor_p75": 45.319582,
+     "waktu_tes_gor_p90": 68.694277,
      "waktu_tes_gor_n_penalti": 503,
      "waktu_tes_gor_persen_penalti": 1.284901,
      "waktu_tes_min_median": 3.718047,
      "waktu_tes_min_p25": 2.315719,
      "waktu_tes_min_p75": 5.339419,
+     "waktu_tes_min_p90": 6.939142,
      "waktu_tes_min_n_penalti": 33,
      "waktu_tes_min_persen_penalti": 0.084298,
+     "proporsi_waktu_min_lebih_30": 0.000843,
+     "proporsi_waktu_min_lebih_20": 0.00092,
+     "proporsi_waktu_min_lebih_40": 0.000843,
+     "proporsi_waktu_min_lebih_batas": 0.000843,
+     "proporsi_terputus": 0.000843,
      "proporsi_terisolasi": 0.000843,
-     "deskripsi": "Akses Baik"
+     "deskripsi": "Tipologi 1 (terbaik)"
     },
     {
      "klaster": 1,
@@ -1644,40 +2201,51 @@
      "waktu_tes_pendidikan_median": 12.988295,
      "waktu_tes_pendidikan_p25": 9.278618,
      "waktu_tes_pendidikan_p75": 17.915054,
+     "waktu_tes_pendidikan_p90": 26.983093,
      "waktu_tes_pendidikan_n_penalti": 2003,
      "waktu_tes_pendidikan_persen_penalti": 4.890614,
      "waktu_tes_kesehatan_median": 47.318686,
      "waktu_tes_kesehatan_p25": 33.393627,
      "waktu_tes_kesehatan_p75": 69.785898,
+     "waktu_tes_kesehatan_p90": 113.073936,
      "waktu_tes_kesehatan_n_penalti": 2886,
      "waktu_tes_kesehatan_persen_penalti": 7.046587,
      "waktu_tes_pemerintahan_median": 28.282012,
      "waktu_tes_pemerintahan_p25": 19.955682,
      "waktu_tes_pemerintahan_p75": 40.88916,
+     "waktu_tes_pemerintahan_p90": 68.090357,
      "waktu_tes_pemerintahan_n_penalti": 2617,
      "waktu_tes_pemerintahan_persen_penalti": 6.389784,
      "waktu_tes_ibadah_median": 10.549901,
      "waktu_tes_ibadah_p25": 7.207977,
      "waktu_tes_ibadah_p75": 14.778227,
+     "waktu_tes_ibadah_p90": 22.029367,
      "waktu_tes_ibadah_n_penalti": 1382,
      "waktu_tes_ibadah_persen_penalti": 3.374353,
      "waktu_tes_gor_median": 49.580425,
      "waktu_tes_gor_p25": 32.568113,
      "waktu_tes_gor_p75": 85.294536,
+     "waktu_tes_gor_p90": 403.86917,
      "waktu_tes_gor_n_penalti": 4316,
      "waktu_tes_gor_persen_penalti": 10.538138,
      "waktu_tes_min_median": 8.874222,
      "waktu_tes_min_p25": 6.293473,
      "waktu_tes_min_p75": 12.550423,
+     "waktu_tes_min_p90": 19.222525,
      "waktu_tes_min_n_penalti": 1357,
      "waktu_tes_min_persen_penalti": 3.313312,
+     "proporsi_waktu_min_lebih_30": 0.053667,
+     "proporsi_waktu_min_lebih_20": 0.092123,
+     "proporsi_waktu_min_lebih_40": 0.03892,
+     "proporsi_waktu_min_lebih_batas": 0.053667,
+     "proporsi_terputus": 0.033133,
      "proporsi_terisolasi": 0.033133,
-     "deskripsi": "Akses Baik"
+     "deskripsi": "Tipologi 2 (terburuk)"
     }
    ],
    "cluster_names": {
-    "0": "Akses Baik",
-    "1": "Akses Baik"
+    "0": "Tipologi 1 (terbaik)",
+    "1": "Tipologi 2 (terburuk)"
    },
    "distribusi": {
     "baseline": [
@@ -1961,7 +2529,7 @@
     {
      "algoritma": "FCM",
      "n_init": 10,
-     "time_per_init_sec": 0.259998,
+     "time_per_init_sec": 0.234632,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 2,
@@ -1983,7 +2551,7 @@
     {
      "algoritma": "SFCM",
      "n_init": 10,
-     "time_per_init_sec": 0.154986,
+     "time_per_init_sec": 0.150548,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 2,
@@ -2005,7 +2573,7 @@
     {
      "algoritma": "SDWFCM",
      "n_init": 10,
-     "time_per_init_sec": 0.282347,
+     "time_per_init_sec": 0.247992,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 2,
@@ -2027,7 +2595,7 @@
     {
      "algoritma": "REDCAP",
      "n_init": 1,
-     "time_per_init_sec": 24.537493,
+     "time_per_init_sec": 22.690262,
      "status": "degeneratif",
      "layak_dibandingkan": false,
      "n_cluster": 2,
@@ -2047,7 +2615,7 @@
     {
      "algoritma": "SKATER",
      "n_init": 1,
-     "time_per_init_sec": 6.156642,
+     "time_per_init_sec": 7.663747,
      "status": "gagal",
      "layak_dibandingkan": false,
      "galat": "ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field."
@@ -2059,7 +2627,7 @@
    "model_final": {
     "seed_terbaik": 49,
     "objective": 216980.302887,
-    "time_sec": 124.063429,
+    "time_sec": 82.481915,
     "pusat_klaster_pca": [
      [
       -1.252896,
@@ -2138,35 +2706,46 @@
      "waktu_tes_pendidikan_median": 5.362161,
      "waktu_tes_pendidikan_p25": 3.369821,
      "waktu_tes_pendidikan_p75": 7.922489,
+     "waktu_tes_pendidikan_p90": 10.640976,
      "waktu_tes_pendidikan_n_penalti": 16,
      "waktu_tes_pendidikan_persen_penalti": 0.067599,
      "waktu_tes_kesehatan_median": 19.697403,
      "waktu_tes_kesehatan_p25": 11.638952,
      "waktu_tes_kesehatan_p75": 32.439216,
+     "waktu_tes_kesehatan_p90": 49.609681,
      "waktu_tes_kesehatan_n_penalti": 21,
      "waktu_tes_kesehatan_persen_penalti": 0.088724,
      "waktu_tes_pemerintahan_median": 8.822401,
      "waktu_tes_pemerintahan_p25": 5.239196,
      "waktu_tes_pemerintahan_p75": 13.544263,
+     "waktu_tes_pemerintahan_p90": 19.383172,
      "waktu_tes_pemerintahan_n_penalti": 16,
      "waktu_tes_pemerintahan_persen_penalti": 0.067599,
      "waktu_tes_ibadah_median": 4.73818,
      "waktu_tes_ibadah_p25": 2.988779,
      "waktu_tes_ibadah_p75": 6.936558,
+     "waktu_tes_ibadah_p90": 9.530255,
      "waktu_tes_ibadah_n_penalti": 16,
      "waktu_tes_ibadah_persen_penalti": 0.067599,
      "waktu_tes_gor_median": 20.793484,
      "waktu_tes_gor_p25": 11.305698,
      "waktu_tes_gor_p75": 40.183404,
+     "waktu_tes_gor_p90": 64.819737,
      "waktu_tes_gor_n_penalti": 255,
      "waktu_tes_gor_persen_penalti": 1.077359,
      "waktu_tes_min_median": 3.253364,
      "waktu_tes_min_p25": 1.99619,
      "waktu_tes_min_p75": 4.732126,
+     "waktu_tes_min_p90": 6.15986,
      "waktu_tes_min_n_penalti": 16,
      "waktu_tes_min_persen_penalti": 0.067599,
+     "proporsi_waktu_min_lebih_30": 0.000676,
+     "proporsi_waktu_min_lebih_20": 0.000676,
+     "proporsi_waktu_min_lebih_40": 0.000676,
+     "proporsi_waktu_min_lebih_batas": 0.000676,
+     "proporsi_terputus": 0.000676,
      "proporsi_terisolasi": 0.000676,
-     "deskripsi": "Akses Baik"
+     "deskripsi": "Tipologi 1 (terbaik)"
     },
     {
      "klaster": 1,
@@ -2190,35 +2769,46 @@
      "waktu_tes_pendidikan_median": 9.265905,
      "waktu_tes_pendidikan_p25": 6.423291,
      "waktu_tes_pendidikan_p75": 12.518609,
+     "waktu_tes_pendidikan_p90": 15.759743,
      "waktu_tes_pendidikan_n_penalti": 72,
      "waktu_tes_pendidikan_persen_penalti": 0.2072,
      "waktu_tes_kesehatan_median": 37.342068,
      "waktu_tes_kesehatan_p25": 26.263094,
      "waktu_tes_kesehatan_p75": 53.987909,
+     "waktu_tes_kesehatan_p90": 74.940661,
      "waktu_tes_kesehatan_n_penalti": 149,
      "waktu_tes_kesehatan_persen_penalti": 0.428789,
      "waktu_tes_pemerintahan_median": 20.251248,
      "waktu_tes_pemerintahan_p25": 14.142767,
      "waktu_tes_pemerintahan_p75": 27.409389,
+     "waktu_tes_pemerintahan_p90": 36.567057,
      "waktu_tes_pemerintahan_n_penalti": 77,
      "waktu_tes_pemerintahan_persen_penalti": 0.221589,
      "waktu_tes_ibadah_median": 7.070076,
      "waktu_tes_ibadah_p25": 4.614606,
      "waktu_tes_ibadah_p75": 9.918267,
+     "waktu_tes_ibadah_p90": 12.939572,
      "waktu_tes_ibadah_n_penalti": 76,
      "waktu_tes_ibadah_persen_penalti": 0.218711,
      "waktu_tes_gor_median": 36.922142,
      "waktu_tes_gor_p25": 24.629867,
      "waktu_tes_gor_p75": 53.494997,
+     "waktu_tes_gor_p90": 78.918957,
      "waktu_tes_gor_n_penalti": 541,
      "waktu_tes_gor_persen_penalti": 1.556879,
      "waktu_tes_min_median": 5.751538,
      "waktu_tes_min_p25": 3.881709,
      "waktu_tes_min_p75": 7.726998,
+     "waktu_tes_min_p90": 9.594691,
      "waktu_tes_min_n_penalti": 71,
      "waktu_tes_min_persen_penalti": 0.204322,
+     "proporsi_waktu_min_lebih_30": 0.002043,
+     "proporsi_waktu_min_lebih_20": 0.002158,
+     "proporsi_waktu_min_lebih_40": 0.002043,
+     "proporsi_waktu_min_lebih_batas": 0.002043,
+     "proporsi_terputus": 0.002043,
      "proporsi_terisolasi": 0.002043,
-     "deskripsi": "Akses Baik"
+     "deskripsi": "Tipologi 2"
     },
     {
      "klaster": 2,
@@ -2242,41 +2832,52 @@
      "waktu_tes_pendidikan_median": 16.266267,
      "waktu_tes_pendidikan_p25": 11.867394,
      "waktu_tes_pendidikan_p75": 23.199772,
+     "waktu_tes_pendidikan_p90": 41.521564,
      "waktu_tes_pendidikan_n_penalti": 1948,
      "waktu_tes_pendidikan_persen_penalti": 8.983168,
      "waktu_tes_kesehatan_median": 54.324826,
      "waktu_tes_kesehatan_p25": 39.77386,
      "waktu_tes_kesehatan_p75": 82.634738,
+     "waktu_tes_kesehatan_p90": 403.86917,
      "waktu_tes_kesehatan_n_penalti": 2777,
      "waktu_tes_kesehatan_persen_penalti": 12.806087,
      "waktu_tes_pemerintahan_median": 35.17216,
      "waktu_tes_pemerintahan_p25": 25.302908,
      "waktu_tes_pemerintahan_p75": 50.784316,
+     "waktu_tes_pemerintahan_p90": 403.86917,
      "waktu_tes_pemerintahan_n_penalti": 2557,
      "waktu_tes_pemerintahan_persen_penalti": 11.791561,
      "waktu_tes_ibadah_median": 13.326972,
      "waktu_tes_ibadah_p25": 9.755203,
      "waktu_tes_ibadah_p75": 18.854746,
+     "waktu_tes_ibadah_p90": 32.41391,
      "waktu_tes_ibadah_n_penalti": 1325,
      "waktu_tes_ibadah_persen_penalti": 6.110214,
      "waktu_tes_gor_median": 64.867844,
      "waktu_tes_gor_p25": 41.091639,
      "waktu_tes_gor_p75": 127.974896,
+     "waktu_tes_gor_p90": 403.86917,
      "waktu_tes_gor_n_penalti": 4023,
      "waktu_tes_gor_persen_penalti": 18.551994,
      "waktu_tes_min_median": 11.864931,
      "waktu_tes_min_p25": 8.787796,
      "waktu_tes_min_p75": 16.527046,
+     "waktu_tes_min_p90": 29.747123,
      "waktu_tes_min_n_penalti": 1303,
      "waktu_tes_min_persen_penalti": 6.008762,
+     "proporsi_waktu_min_lebih_30": 0.09887,
+     "proporsi_waktu_min_lebih_20": 0.171455,
+     "proporsi_waktu_min_lebih_40": 0.071017,
+     "proporsi_waktu_min_lebih_batas": 0.09887,
+     "proporsi_terputus": 0.060088,
      "proporsi_terisolasi": 0.060088,
-     "deskripsi": "Akses Sedang"
+     "deskripsi": "Tipologi 3 (terburuk)"
     }
    ],
    "cluster_names": {
-    "0": "Akses Baik",
-    "1": "Akses Baik",
-    "2": "Akses Sedang"
+    "0": "Tipologi 1 (terbaik)",
+    "1": "Tipologi 2",
+    "2": "Tipologi 3 (terburuk)"
    },
    "distribusi": {
     "baseline": [
@@ -2628,7 +3229,7 @@
     {
      "algoritma": "FCM",
      "n_init": 10,
-     "time_per_init_sec": 2.196177,
+     "time_per_init_sec": 1.90859,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 3,
@@ -2650,7 +3251,7 @@
     {
      "algoritma": "SFCM",
      "n_init": 10,
-     "time_per_init_sec": 0.480857,
+     "time_per_init_sec": 0.441956,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 3,
@@ -2672,7 +3273,7 @@
     {
      "algoritma": "SDWFCM",
      "n_init": 10,
-     "time_per_init_sec": 1.251915,
+     "time_per_init_sec": 1.099928,
      "status": "ok",
      "layak_dibandingkan": true,
      "n_cluster": 3,
@@ -2694,7 +3295,7 @@
     {
      "algoritma": "REDCAP",
      "n_init": 1,
-     "time_per_init_sec": 22.980054,
+     "time_per_init_sec": 21.48222,
      "status": "degeneratif",
      "layak_dibandingkan": false,
      "n_cluster": 3,
@@ -2714,7 +3315,854 @@
     {
      "algoritma": "SKATER",
      "n_init": 1,
-     "time_per_init_sec": 3.141166,
+     "time_per_init_sec": 2.514853,
+     "status": "gagal",
+     "layak_dibandingkan": false,
+     "galat": "ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field."
+    }
+   ]
+  },
+  "4": {
+   "k": 4,
+   "model_final": {
+    "seed_terbaik": 50,
+    "objective": 146078.438474,
+    "time_sec": 82.454964,
+    "pusat_klaster_pca": [
+     [
+      -1.414215,
+      -0.354188,
+      0.645624,
+      -0.024237,
+      0.039833
+     ],
+     [
+      -0.322505,
+      -0.188835,
+      -0.272775,
+      0.107823,
+      -0.118605
+     ],
+     [
+      0.724096,
+      0.608708,
+      -0.320973,
+      -0.087791,
+      0.143667
+     ],
+     [
+      9.121427,
+      -1.502078,
+      3.166305,
+      0.734878,
+      -1.880036
+     ]
+    ],
+    "validity": {
+     "iidx": 15.036863,
+     "ketegasan_partisi": 0.45639,
+     "pc": 0.541619,
+     "pe": 0.792956,
+     "dunn": {
+      "mean": 0.006697,
+      "sd": 0.003801,
+      "nilai": [
+       0.012654,
+       0.007487,
+       0.004072,
+       0.006413,
+       0.002861
+      ],
+      "seeds": [
+       42,
+       43,
+       44,
+       45,
+       46
+      ],
+      "ukuran_sampel": 2000
+     },
+     "desc": 76.31053,
+     "pesc": 124.49422670227864,
+     "silhouette_sampel": 0.20271,
+     "size_entropy": 1.153756,
+     "klaster_terbesar_persen": 38.968578,
+     "proporsi_tetangga_sama": 0.872071
+    }
+   },
+   "cluster_profile": [
+    {
+     "klaster": 0,
+     "jumlah_baris": 20397,
+     "persen_baris": 25.463466,
+     "Road_Density_mean": 0.974688,
+     "banjir": 0.434083,
+     "waktu_tes_pendidikan": 6.079147,
+     "waktu_tes_kesehatan": 22.634031,
+     "waktu_tes_pemerintahan": 9.469219,
+     "waktu_tes_ibadah": 5.551243,
+     "waktu_tes_gor": 28.20844,
+     "waktu_tes_min": 3.734177,
+     "jumlah_opsi_rute": 4.99446,
+     "is_isolated": 0.0,
+     "is_isolated_pendidikan": 0.0,
+     "is_isolated_kesehatan": 0.0,
+     "is_isolated_pemerintahan": 0.0,
+     "is_isolated_ibadah": 0.0,
+     "is_isolated_gor": 0.00554,
+     "waktu_tes_pendidikan_median": 5.522635,
+     "waktu_tes_pendidikan_p25": 3.506017,
+     "waktu_tes_pendidikan_p75": 8.085467,
+     "waktu_tes_pendidikan_p90": 10.764239,
+     "waktu_tes_pendidikan_n_penalti": 0,
+     "waktu_tes_pendidikan_persen_penalti": 0.0,
+     "waktu_tes_kesehatan_median": 18.237015,
+     "waktu_tes_kesehatan_p25": 10.818444,
+     "waktu_tes_kesehatan_p75": 29.020496,
+     "waktu_tes_kesehatan_p90": 44.8296,
+     "waktu_tes_kesehatan_n_penalti": 0,
+     "waktu_tes_kesehatan_persen_penalti": 0.0,
+     "waktu_tes_pemerintahan_median": 8.281519,
+     "waktu_tes_pemerintahan_p25": 4.95047,
+     "waktu_tes_pemerintahan_p75": 12.499461,
+     "waktu_tes_pemerintahan_p90": 17.622152,
+     "waktu_tes_pemerintahan_n_penalti": 0,
+     "waktu_tes_pemerintahan_persen_penalti": 0.0,
+     "waktu_tes_ibadah_median": 4.981994,
+     "waktu_tes_ibadah_p25": 3.189465,
+     "waktu_tes_ibadah_p75": 7.280369,
+     "waktu_tes_ibadah_p90": 9.901798,
+     "waktu_tes_ibadah_n_penalti": 0,
+     "waktu_tes_ibadah_persen_penalti": 0.0,
+     "waktu_tes_gor_median": 18.445816,
+     "waktu_tes_gor_p25": 10.370593,
+     "waktu_tes_gor_p75": 36.492373,
+     "waktu_tes_gor_p90": 59.360068,
+     "waktu_tes_gor_n_penalti": 113,
+     "waktu_tes_gor_persen_penalti": 0.554003,
+     "waktu_tes_min_median": 3.443805,
+     "waktu_tes_min_p25": 2.114995,
+     "waktu_tes_min_p75": 4.99195,
+     "waktu_tes_min_p90": 6.614304,
+     "waktu_tes_min_n_penalti": 0,
+     "waktu_tes_min_persen_penalti": 0.0,
+     "proporsi_waktu_min_lebih_30": 0.0,
+     "proporsi_waktu_min_lebih_20": 0.0,
+     "proporsi_waktu_min_lebih_40": 0.0,
+     "proporsi_waktu_min_lebih_batas": 0.0,
+     "proporsi_terputus": 0.0,
+     "proporsi_terisolasi": 0.0,
+     "deskripsi": "Tipologi 1 (terbaik)"
+    },
+    {
+     "klaster": 1,
+     "jumlah_baris": 27069,
+     "persen_baris": 33.792742,
+     "Road_Density_mean": 0.705323,
+     "banjir": 0.193284,
+     "waktu_tes_pendidikan": 8.241577,
+     "waktu_tes_kesehatan": 45.99431,
+     "waktu_tes_pemerintahan": 22.657841,
+     "waktu_tes_ibadah": 6.045251,
+     "waktu_tes_gor": 58.867205,
+     "waktu_tes_min": 4.31468,
+     "jumlah_opsi_rute": 4.946322,
+     "is_isolated": 0.0,
+     "is_isolated_pendidikan": 3.7e-05,
+     "is_isolated_kesehatan": 0.009014,
+     "is_isolated_pemerintahan": 0.003325,
+     "is_isolated_ibadah": 0.000185,
+     "is_isolated_gor": 0.041117,
+     "waktu_tes_pendidikan_median": 7.42743,
+     "waktu_tes_pendidikan_p25": 4.903928,
+     "waktu_tes_pendidikan_p75": 10.781877,
+     "waktu_tes_pendidikan_p90": 14.548677,
+     "waktu_tes_pendidikan_n_penalti": 1,
+     "waktu_tes_pendidikan_persen_penalti": 0.003694,
+     "waktu_tes_kesehatan_median": 37.545546,
+     "waktu_tes_kesehatan_p25": 26.155129,
+     "waktu_tes_kesehatan_p75": 55.2016,
+     "waktu_tes_kesehatan_p90": 77.573307,
+     "waktu_tes_kesehatan_n_penalti": 244,
+     "waktu_tes_kesehatan_persen_penalti": 0.9014,
+     "waktu_tes_pemerintahan_median": 19.170559,
+     "waktu_tes_pemerintahan_p25": 12.844877,
+     "waktu_tes_pemerintahan_p75": 26.703699,
+     "waktu_tes_pemerintahan_p90": 36.467151,
+     "waktu_tes_pemerintahan_n_penalti": 90,
+     "waktu_tes_pemerintahan_persen_penalti": 0.332484,
+     "waktu_tes_ibadah_median": 5.349572,
+     "waktu_tes_ibadah_p25": 3.392373,
+     "waktu_tes_ibadah_p75": 7.673076,
+     "waktu_tes_ibadah_p90": 10.723055,
+     "waktu_tes_ibadah_n_penalti": 5,
+     "waktu_tes_ibadah_persen_penalti": 0.018471,
+     "waktu_tes_gor_median": 39.29213,
+     "waktu_tes_gor_p25": 25.775784,
+     "waktu_tes_gor_p75": 57.838841,
+     "waktu_tes_gor_p90": 91.004372,
+     "waktu_tes_gor_n_penalti": 1113,
+     "waktu_tes_gor_persen_penalti": 4.111715,
+     "waktu_tes_min_median": 4.279764,
+     "waktu_tes_min_p25": 2.806811,
+     "waktu_tes_min_p75": 5.724271,
+     "waktu_tes_min_p90": 6.923916,
+     "waktu_tes_min_n_penalti": 0,
+     "waktu_tes_min_persen_penalti": 0.0,
+     "proporsi_waktu_min_lebih_30": 0.0,
+     "proporsi_waktu_min_lebih_20": 0.000148,
+     "proporsi_waktu_min_lebih_40": 0.0,
+     "proporsi_waktu_min_lebih_batas": 0.0,
+     "proporsi_terputus": 0.0,
+     "proporsi_terisolasi": 0.0,
+     "deskripsi": "Tipologi 2"
+    },
+    {
+     "klaster": 2,
+     "jumlah_baris": 31215,
+     "persen_baris": 38.968578,
+     "Road_Density_mean": 0.692204,
+     "banjir": 0.329553,
+     "waktu_tes_pendidikan": 22.920614,
+     "waktu_tes_kesehatan": 64.888348,
+     "waktu_tes_pemerintahan": 45.132241,
+     "waktu_tes_ibadah": 13.567564,
+     "waktu_tes_gor": 79.176626,
+     "waktu_tes_min": 11.801545,
+     "jumlah_opsi_rute": 4.830883,
+     "is_isolated": 0.000673,
+     "is_isolated_pendidikan": 0.019926,
+     "is_isolated_kesehatan": 0.041294,
+     "is_isolated_pemerintahan": 0.036713,
+     "is_isolated_ibadah": 0.001378,
+     "is_isolated_gor": 0.069806,
+     "waktu_tes_pendidikan_median": 13.804221,
+     "waktu_tes_pendidikan_p25": 10.33924,
+     "waktu_tes_pendidikan_p75": 18.358893,
+     "waktu_tes_pendidikan_p90": 25.647776,
+     "waktu_tes_pendidikan_n_penalti": 622,
+     "waktu_tes_pendidikan_persen_penalti": 1.992632,
+     "waktu_tes_kesehatan_median": 46.097081,
+     "waktu_tes_kesehatan_p25": 31.973404,
+     "waktu_tes_kesehatan_p75": 66.54877,
+     "waktu_tes_kesehatan_p90": 97.901168,
+     "waktu_tes_kesehatan_n_penalti": 1289,
+     "waktu_tes_kesehatan_persen_penalti": 4.129425,
+     "waktu_tes_pemerintahan_median": 28.358964,
+     "waktu_tes_pemerintahan_p25": 19.954443,
+     "waktu_tes_pemerintahan_p75": 40.318303,
+     "waktu_tes_pemerintahan_p90": 58.325926,
+     "waktu_tes_pemerintahan_n_penalti": 1146,
+     "waktu_tes_pemerintahan_persen_penalti": 3.671312,
+     "waktu_tes_ibadah_median": 11.547826,
+     "waktu_tes_ibadah_p25": 8.64889,
+     "waktu_tes_ibadah_p75": 15.250612,
+     "waktu_tes_ibadah_p90": 20.911286,
+     "waktu_tes_ibadah_n_penalti": 43,
+     "waktu_tes_ibadah_persen_penalti": 0.137754,
+     "waktu_tes_gor_median": 48.339,
+     "waktu_tes_gor_p25": 31.460475,
+     "waktu_tes_gor_p75": 79.730326,
+     "waktu_tes_gor_p90": 138.528884,
+     "waktu_tes_gor_n_penalti": 2179,
+     "waktu_tes_gor_persen_penalti": 6.980618,
+     "waktu_tes_min_median": 9.887238,
+     "waktu_tes_min_p25": 7.835781,
+     "waktu_tes_min_p75": 13.161928,
+     "waktu_tes_min_p90": 18.230284,
+     "waktu_tes_min_n_penalti": 21,
+     "waktu_tes_min_persen_penalti": 0.067275,
+     "proporsi_waktu_min_lebih_30": 0.026462,
+     "proporsi_waktu_min_lebih_20": 0.076694,
+     "proporsi_waktu_min_lebih_40": 0.007432,
+     "proporsi_waktu_min_lebih_batas": 0.026462,
+     "proporsi_terputus": 0.000673,
+     "proporsi_terisolasi": 0.000673,
+     "deskripsi": "Tipologi 3"
+    },
+    {
+     "klaster": 3,
+     "jumlah_baris": 1422,
+     "persen_baris": 1.775214,
+     "Road_Density_mean": 0.616945,
+     "banjir": 0.343179,
+     "waktu_tes_pendidikan": 401.430516,
+     "waktu_tes_kesehatan": 401.785212,
+     "waktu_tes_pemerintahan": 401.772876,
+     "waktu_tes_ibadah": 390.183902,
+     "waktu_tes_gor": 401.996981,
+     "waktu_tes_min": 390.12404,
+     "jumlah_opsi_rute": 0.060478,
+     "is_isolated": 0.962729,
+     "is_isolated_pendidikan": 0.993671,
+     "is_isolated_kesehatan": 0.994374,
+     "is_isolated_pemerintahan": 0.994374,
+     "is_isolated_ibadah": 0.962729,
+     "is_isolated_gor": 0.994374,
+     "waktu_tes_pendidikan_median": 403.86917,
+     "waktu_tes_pendidikan_p25": 403.86917,
+     "waktu_tes_pendidikan_p75": 403.86917,
+     "waktu_tes_pendidikan_p90": 403.86917,
+     "waktu_tes_pendidikan_n_penalti": 1413,
+     "waktu_tes_pendidikan_persen_penalti": 99.367089,
+     "waktu_tes_kesehatan_median": 403.86917,
+     "waktu_tes_kesehatan_p25": 403.86917,
+     "waktu_tes_kesehatan_p75": 403.86917,
+     "waktu_tes_kesehatan_p90": 403.86917,
+     "waktu_tes_kesehatan_n_penalti": 1414,
+     "waktu_tes_kesehatan_persen_penalti": 99.437412,
+     "waktu_tes_pemerintahan_median": 403.86917,
+     "waktu_tes_pemerintahan_p25": 403.86917,
+     "waktu_tes_pemerintahan_p75": 403.86917,
+     "waktu_tes_pemerintahan_p90": 403.86917,
+     "waktu_tes_pemerintahan_n_penalti": 1414,
+     "waktu_tes_pemerintahan_persen_penalti": 99.437412,
+     "waktu_tes_ibadah_median": 403.86917,
+     "waktu_tes_ibadah_p25": 403.86917,
+     "waktu_tes_ibadah_p75": 403.86917,
+     "waktu_tes_ibadah_p90": 403.86917,
+     "waktu_tes_ibadah_n_penalti": 1369,
+     "waktu_tes_ibadah_persen_penalti": 96.272855,
+     "waktu_tes_gor_median": 403.86917,
+     "waktu_tes_gor_p25": 403.86917,
+     "waktu_tes_gor_p75": 403.86917,
+     "waktu_tes_gor_p90": 403.86917,
+     "waktu_tes_gor_n_penalti": 1414,
+     "waktu_tes_gor_persen_penalti": 99.437412,
+     "waktu_tes_min_median": 403.86917,
+     "waktu_tes_min_p25": 403.86917,
+     "waktu_tes_min_p75": 403.86917,
+     "waktu_tes_min_p90": 403.86917,
+     "waktu_tes_min_n_penalti": 1369,
+     "waktu_tes_min_persen_penalti": 96.272855,
+     "proporsi_waktu_min_lebih_30": 0.988045,
+     "proporsi_waktu_min_lebih_20": 0.992264,
+     "proporsi_waktu_min_lebih_40": 0.981013,
+     "proporsi_waktu_min_lebih_batas": 0.988045,
+     "proporsi_terputus": 0.962729,
+     "proporsi_terisolasi": 0.962729,
+     "deskripsi": "Tipologi 4 (terburuk)"
+    }
+   ],
+   "cluster_names": {
+    "0": "Tipologi 1 (terbaik)",
+    "1": "Tipologi 2",
+    "2": "Tipologi 3",
+    "3": "Tipologi 4 (terburuk)"
+   },
+   "distribusi": {
+    "baseline": [
+     {
+      "state": 0,
+      "nama": "Klaster 0",
+      "jumlah_grid": 7009,
+      "persen_semua_grid": 30.913421,
+      "persen_non_tergenang": 30.913421
+     },
+     {
+      "state": 1,
+      "nama": "Klaster 1",
+      "jumlah_grid": 7237,
+      "persen_semua_grid": 31.919023,
+      "persen_non_tergenang": 31.919023
+     },
+     {
+      "state": 2,
+      "nama": "Klaster 2",
+      "jumlah_grid": 8314,
+      "persen_semua_grid": 36.669166,
+      "persen_non_tergenang": 36.669166
+     },
+     {
+      "state": 3,
+      "nama": "Klaster 3",
+      "jumlah_grid": 113,
+      "persen_semua_grid": 0.49839,
+      "persen_non_tergenang": 0.49839
+     },
+     {
+      "state": 4,
+      "nama": "Tergenang",
+      "jumlah_grid": 0,
+      "persen_semua_grid": 0.0,
+      "persen_non_tergenang": null
+     }
+    ],
+    "rendah": [
+     {
+      "state": 0,
+      "nama": "Klaster 0",
+      "jumlah_grid": 6938,
+      "persen_semua_grid": 30.600273,
+      "persen_non_tergenang": 30.653
+     },
+     {
+      "state": 1,
+      "nama": "Klaster 1",
+      "jumlah_grid": 7277,
+      "persen_semua_grid": 32.095444,
+      "persen_non_tergenang": 32.150747
+     },
+     {
+      "state": 2,
+      "nama": "Klaster 2",
+      "jumlah_grid": 8291,
+      "persen_semua_grid": 36.567724,
+      "persen_non_tergenang": 36.630733
+     },
+     {
+      "state": 3,
+      "nama": "Klaster 3",
+      "jumlah_grid": 128,
+      "persen_semua_grid": 0.564548,
+      "persen_non_tergenang": 0.565521
+     },
+     {
+      "state": 4,
+      "nama": "Tergenang",
+      "jumlah_grid": 39,
+      "persen_semua_grid": 0.172011,
+      "persen_non_tergenang": null
+     }
+    ],
+    "sedang": [
+     {
+      "state": 0,
+      "nama": "Klaster 0",
+      "jumlah_grid": 4639,
+      "persen_semua_grid": 20.46046,
+      "persen_non_tergenang": 24.03876
+     },
+     {
+      "state": 1,
+      "nama": "Klaster 1",
+      "jumlah_grid": 7196,
+      "persen_semua_grid": 31.738191,
+      "persen_non_tergenang": 37.288838
+     },
+     {
+      "state": 2,
+      "nama": "Klaster 2",
+      "jumlah_grid": 6966,
+      "persen_semua_grid": 30.723768,
+      "persen_non_tergenang": 36.097005
+     },
+     {
+      "state": 3,
+      "nama": "Klaster 3",
+      "jumlah_grid": 497,
+      "persen_semua_grid": 2.192035,
+      "persen_non_tergenang": 2.575396
+     },
+     {
+      "state": 4,
+      "nama": "Tergenang",
+      "jumlah_grid": 3375,
+      "persen_semua_grid": 14.885547,
+      "persen_non_tergenang": null
+     }
+    ],
+    "tinggi": [
+     {
+      "state": 0,
+      "nama": "Klaster 0",
+      "jumlah_grid": 1811,
+      "persen_semua_grid": 7.987474,
+      "persen_non_tergenang": 11.685379
+     },
+     {
+      "state": 1,
+      "nama": "Klaster 1",
+      "jumlah_grid": 5359,
+      "persen_semua_grid": 23.636043,
+      "persen_non_tergenang": 34.578655
+     },
+     {
+      "state": 2,
+      "nama": "Klaster 2",
+      "jumlah_grid": 7644,
+      "persen_semua_grid": 33.714109,
+      "persen_non_tergenang": 49.322493
+     },
+     {
+      "state": 3,
+      "nama": "Klaster 3",
+      "jumlah_grid": 684,
+      "persen_semua_grid": 3.016804,
+      "persen_non_tergenang": 4.413473
+     },
+     {
+      "state": 4,
+      "nama": "Tergenang",
+      "jumlah_grid": 7175,
+      "persen_semua_grid": 31.64557,
+      "persen_non_tergenang": null
+     }
+    ]
+   },
+   "transitions": [
+    {
+     "matrix": [
+      [
+       6938,
+       66,
+       1,
+       0,
+       4
+      ],
+      [
+       0,
+       7209,
+       26,
+       0,
+       2
+      ],
+      [
+       0,
+       2,
+       8264,
+       17,
+       31
+      ],
+      [
+       0,
+       0,
+       0,
+       111,
+       2
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ]
+     ],
+     "state_labels": [
+      "Klaster 0",
+      "Klaster 1",
+      "Klaster 2",
+      "Klaster 3",
+      "Tergenang"
+     ],
+     "n_grid": 22673,
+     "masuk_tergenang": 39,
+     "persen_masuk_tergenang_semua_grid": 0.172011,
+     "persen_masuk_tergenang_dari_non_tergenang_awal": 0.172011,
+     "keluar_tergenang": 0,
+     "n_non_tergenang_kedua_level": 22634,
+     "stability_rate": 99.505169,
+     "ari": 0.986573,
+     "dominant_transition": {
+      "from": 0,
+      "to": 1,
+      "count": 66,
+      "menuju": "tipologi lain"
+     },
+     "active_edges": 9,
+     "active_edges_antar_tipologi": 5,
+     "n_berpindah": 151,
+     "cdvm": 0.004146,
+     "from_level": "baseline",
+     "to_level": "rendah"
+    },
+    {
+     "matrix": [
+      [
+       4623,
+       1108,
+       221,
+       40,
+       946
+      ],
+      [
+       15,
+       6077,
+       675,
+       39,
+       471
+      ],
+      [
+       1,
+       11,
+       6067,
+       336,
+       1876
+      ],
+      [
+       0,
+       0,
+       3,
+       82,
+       43
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       39
+      ]
+     ],
+     "state_labels": [
+      "Klaster 0",
+      "Klaster 1",
+      "Klaster 2",
+      "Klaster 3",
+      "Tergenang"
+     ],
+     "n_grid": 22673,
+     "masuk_tergenang": 3336,
+     "persen_masuk_tergenang_semua_grid": 14.713536,
+     "persen_masuk_tergenang_dari_non_tergenang_awal": 14.738888,
+     "keluar_tergenang": 0,
+     "n_non_tergenang_kedua_level": 19298,
+     "stability_rate": 87.309566,
+     "ari": 0.686857,
+     "dominant_transition": {
+      "from": 2,
+      "to": 4,
+      "count": 1876,
+      "menuju": "Tergenang"
+     },
+     "active_edges": 14,
+     "active_edges_antar_tipologi": 10,
+     "n_berpindah": 5785,
+     "cdvm": 0.16341,
+     "from_level": "rendah",
+     "to_level": "sedang"
+    },
+    {
+     "matrix": [
+      [
+       1803,
+       981,
+       490,
+       88,
+       1277
+      ],
+      [
+       7,
+       4360,
+       1474,
+       116,
+       1239
+      ],
+      [
+       1,
+       18,
+       5675,
+       306,
+       966
+      ],
+      [
+       0,
+       0,
+       5,
+       174,
+       318
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       3375
+      ]
+     ],
+     "state_labels": [
+      "Klaster 0",
+      "Klaster 1",
+      "Klaster 2",
+      "Klaster 3",
+      "Tergenang"
+     ],
+     "n_grid": 22673,
+     "masuk_tergenang": 3800,
+     "persen_masuk_tergenang_semua_grid": 16.760023,
+     "persen_masuk_tergenang_dari_non_tergenang_awal": 19.69116,
+     "keluar_tergenang": 0,
+     "n_non_tergenang_kedua_level": 15498,
+     "stability_rate": 77.506775,
+     "ari": 0.479869,
+     "dominant_transition": {
+      "from": 1,
+      "to": 2,
+      "count": 1474,
+      "menuju": "tipologi lain"
+     },
+     "active_edges": 14,
+     "active_edges_antar_tipologi": 10,
+     "n_berpindah": 7286,
+     "cdvm": 0.205751,
+     "from_level": "sedang",
+     "to_level": "tinggi"
+    },
+    {
+     "matrix": [
+      [
+       1806,
+       1365,
+       862,
+       115,
+       2861
+      ],
+      [
+       4,
+       3981,
+       1587,
+       159,
+       1506
+      ],
+      [
+       1,
+       13,
+       5195,
+       338,
+       2767
+      ],
+      [
+       0,
+       0,
+       0,
+       72,
+       41
+      ],
+      [
+       0,
+       0,
+       0,
+       0,
+       0
+      ]
+     ],
+     "state_labels": [
+      "Klaster 0",
+      "Klaster 1",
+      "Klaster 2",
+      "Klaster 3",
+      "Tergenang"
+     ],
+     "n_grid": 22673,
+     "masuk_tergenang": 7175,
+     "persen_masuk_tergenang_semua_grid": 31.64557,
+     "persen_masuk_tergenang_dari_non_tergenang_awal": 31.64557,
+     "keluar_tergenang": 0,
+     "n_non_tergenang_kedua_level": 15498,
+     "stability_rate": 71.325332,
+     "ari": 0.376122,
+     "dominant_transition": {
+      "from": 0,
+      "to": 4,
+      "count": 2861,
+      "menuju": "Tergenang"
+     },
+     "active_edges": 13,
+     "active_edges_antar_tipologi": 9,
+     "n_berpindah": 11619,
+     "cdvm": 0.34164,
+     "from_level": "baseline",
+     "to_level": "tinggi"
+    }
+   ],
+   "cdvm_vs_baseline": {
+    "baseline": 0.0,
+    "rendah": 0.004146,
+    "sedang": 0.165792,
+    "tinggi": 0.34164
+   },
+   "algorithm_comparison": [
+    {
+     "algoritma": "FCM",
+     "n_init": 10,
+     "time_per_init_sec": 2.122698,
+     "status": "ok",
+     "layak_dibandingkan": true,
+     "n_cluster": 4,
+     "klaster_terbesar_persen": 31.019274,
+     "size_entropy": 1.370793,
+     "seed_terbaik": 44,
+     "objective": 27756.115411,
+     "m": 1.7,
+     "pc": 0.530745,
+     "pe": 0.875942,
+     "silhouette": 0.207961,
+     "calinski_harabasz": 6952.994445,
+     "davies_bouldin": 1.306295,
+     "moran_i": 0.809077,
+     "moran_p": 0.001,
+     "moran_permutasi": 999,
+     "proporsi_tetangga_sama": 0.807043
+    },
+    {
+     "algoritma": "SFCM",
+     "n_init": 10,
+     "time_per_init_sec": 1.412404,
+     "status": "ok",
+     "layak_dibandingkan": true,
+     "n_cluster": 4,
+     "klaster_terbesar_persen": 27.724606,
+     "size_entropy": 1.380766,
+     "seed_terbaik": 43,
+     "objective": 19074.713579,
+     "m": 1.7,
+     "pc": 0.389503,
+     "pe": 1.117537,
+     "silhouette": 0.1619,
+     "calinski_harabasz": 6418.817921,
+     "davies_bouldin": 1.460894,
+     "moran_i": 0.82992,
+     "moran_p": 0.001,
+     "moran_permutasi": 999,
+     "proporsi_tetangga_sama": 0.76125
+    },
+    {
+     "algoritma": "SDWFCM",
+     "n_init": 10,
+     "time_per_init_sec": 1.857559,
+     "status": "ok",
+     "layak_dibandingkan": true,
+     "n_cluster": 4,
+     "klaster_terbesar_persen": 30.631147,
+     "size_entropy": 1.370144,
+     "seed_terbaik": 42,
+     "objective": 27873.442159,
+     "m": 1.7,
+     "pc": 0.49665,
+     "pe": 0.934438,
+     "silhouette": 0.20385,
+     "calinski_harabasz": 6735.017385,
+     "davies_bouldin": 1.29992,
+     "moran_i": 0.844914,
+     "moran_p": 0.001,
+     "moran_permutasi": 999,
+     "proporsi_tetangga_sama": 0.852835
+    },
+    {
+     "algoritma": "REDCAP",
+     "n_init": 1,
+     "time_per_init_sec": 21.734203,
+     "status": "ok",
+     "layak_dibandingkan": true,
+     "n_cluster": 4,
+     "klaster_terbesar_persen": 89.348564,
+     "size_entropy": 0.43947,
+     "seed_terbaik": null,
+     "objective": null,
+     "m": null,
+     "silhouette": 0.001893,
+     "calinski_harabasz": 255.621589,
+     "davies_bouldin": 4.97703,
+     "moran_i": 1.0,
+     "moran_p": 0.001,
+     "moran_permutasi": 999,
+     "proporsi_tetangga_sama": 1.0
+    },
+    {
+     "algoritma": "SKATER",
+     "n_init": 1,
+     "time_per_init_sec": 2.634449,
      "status": "gagal",
      "layak_dibandingkan": false,
      "galat": "ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field."
@@ -2722,38 +4170,101 @@
    ]
   }
  },
- "tabulasi_silang_k2_k3": {
-  "matrix": [
-   [
-    23669,
-    15476,
-    2
+ "tabulasi_silang": {
+  "k2_k3": {
+   "matrix": [
+    [
+     23669,
+     15476,
+     2
+    ],
+    [
+     0,
+     19273,
+     21683
+    ]
    ],
-   [
-    0,
-    19273,
-    21683
-   ]
-  ],
-  "baris": [
-   "K2-0",
-   "K2-1"
-  ],
-  "kolom": [
-   "K3-0",
-   "K3-1",
-   "K3-2"
-  ],
-  "ari": 0.325214
+   "baris": [
+    "K2-0",
+    "K2-1"
+   ],
+   "kolom": [
+    "K3-0",
+    "K3-1",
+    "K3-2"
+   ],
+   "ari": 0.325214
+  },
+  "k2_k4": {
+   "matrix": [
+    [
+     20397,
+     18114,
+     603,
+     33
+    ],
+    [
+     0,
+     8955,
+     30612,
+     1389
+    ]
+   ],
+   "baris": [
+    "K2-0",
+    "K2-1"
+   ],
+   "kolom": [
+    "K4-0",
+    "K4-1",
+    "K4-2",
+    "K4-3"
+   ],
+   "ari": 0.436671
+  },
+  "k3_k4": {
+   "matrix": [
+    [
+     19941,
+     3706,
+     6,
+     16
+    ],
+    [
+     456,
+     22787,
+     11435,
+     71
+    ],
+    [
+     0,
+     576,
+     19774,
+     1335
+    ]
+   ],
+   "baris": [
+    "K3-0",
+    "K3-1",
+    "K3-2"
+   ],
+   "kolom": [
+    "K4-0",
+    "K4-1",
+    "K4-2",
+    "K4-3"
+   ],
+   "ari": 0.495359
+  }
  },
  "waktu_komputasi": {
-  "muat_data": 12.114432,
-  "aksesibilitas_dan_tas": 40.808481,
-  "data_gabungan_praproses_W": 4.908001,
-  "pemilihan_k": 7504.740832,
-  "model_final_dan_transisi": 5.665858,
-  "perbandingan_algoritma": 170.178578,
-  "total": 7738.418886
+  "muat_data": 9.058425,
+  "aksesibilitas_dan_tas": 34.361288,
+  "data_gabungan_praproses_W": 3.826869,
+  "model_k_keluaran": 194.230128,
+  "model_final_dan_transisi": 8.140996,
+  "perbandingan_algoritma": 263.045662,
+  "total": 512.664794
  },
- "elapsed_sec": 7738.418886
+ "elapsed_sec": 512.664794
 }
