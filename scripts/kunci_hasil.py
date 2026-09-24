@@ -115,12 +115,25 @@ def lock(data_dir: Path = PROJECT_ROOT / "data") -> dict:
         "k_terpilih": results.get("k"),
         "files": {f: file_sha256(lock_dir / f) for f in (RESULTS_FILE, GRID_FILE)},
         "fingerprint_hasil_tanpa_waktu": results_fingerprint(lock_dir / RESULTS_FILE),
-        "catatan_fingerprint": "SHA-256 JSON kanonik thesis_results.json tanpa field waktu dan meta.git; "
-                               "dipakai scripts/cek_reproduksi.py.",
+        "sha256_isi_grid_csv": grid_content_sha256(lock_dir / GRID_FILE),
+        "catatan_fingerprint": "fingerprint = SHA-256 JSON kanonik thesis_results.json tanpa field waktu dan "
+                               "meta.git; sha256_isi_grid_csv = SHA-256 isi CSV setelah dekompresi (header gzip "
+                               "memuat stempel waktu). Keduanya dipakai scripts/cek_reproduksi.py.",
     }
     (lock_dir / LOCK_FILE).write_text(json.dumps(meta, ensure_ascii=False, indent=1, default=str),
                                       encoding="utf-8")
     return meta
+
+
+def grid_content_sha256(path: Path) -> str:
+    """SHA-256 isi CSV hasil grid setelah dekompresi gzip."""
+    import gzip
+    import hashlib
+    h = hashlib.sha256()
+    with gzip.open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def _installed(lib: str) -> bool:
