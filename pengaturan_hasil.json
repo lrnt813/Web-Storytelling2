@@ -1,4 +1,4 @@
 {
  "k_utama": 4,
- "keterangan": "K model utama untuk tabel Bab IV (scripts/export_bab4.py) dan tampilan bawaan dashboard. K lainnya dari keluaran analisis (k_keluaran) menjadi sensitivitas. Finalisasi v6: K utama = 4, keputusan peneliti bersama pembimbing dengan kriteria I-Index, Dunn, dan ketegasan partisi (METODOLOGI §9 (h); docs/KEPUTUSAN_K_v6.md). Tidak memengaruhi analisis maupun hasil terkunci."
+ "keterangan": "K model utama untuk tabel Bab IV (scripts/export_bab4.py) dan tampilan bawaan dashboard. K lainnya dari keluaran analisis (k_keluaran) menjadi sensitivitas. Keputusan FINAL: K utama = 4 atas dasar substantif (memisahkan tipologi Terputus), peneliti bersama pembimbing (METODOLOGI §9 (h); docs/KEPUTUSAN_K_v6.md (g)). Tidak memengaruhi analisis maupun hasil terkunci."
 }

@@ -1,6 +1,6 @@
 # Keputusan K utama v6
 
-Sumber: hasil terkunci `hasil-skripsi-v6` (`data/locked/`). Dokumen ini dibuat oleh `python -m scripts.keputusan_k_v6` dan tidak menjalankan klasterisasi ulang. **Keputusan: K utama = 4** (peneliti bersama pembimbing; METODOLOGI §9 (h)). Kriteria akhir ditetapkan **setelah** hasil v6 terlihat; riwayatnya ada di bagian (f).
+Sumber: hasil terkunci `hasil-skripsi-v6` (`data/locked/`). Dokumen ini dibuat oleh `python -m scripts.keputusan_k_v6` dan tidak menjalankan klasterisasi ulang. **Keputusan: K utama = 4** (peneliti bersama pembimbing) atas **dasar substantif**; METODOLOGI §9 (h). Keputusan ditetapkan **setelah** semua hasil terlihat; ringkasannya di bagian (g), riwayatnya di bagian (f).
 
 ## (a) Tabel stabilitas K v6 (data gabungan)
 
@@ -46,7 +46,7 @@ K = 4 berselisih 0,0111 dan tidak berada dalam ambang mana pun. Catatan: subsamp
 | Dunn | 5 | 0,0107 | 0,0105 |
 | Ketegasan partisi | 4 | 0,4565 | 0,4565 |
 
-Kriteria akhir (METODOLOGI §9 (h)) = I-Index, Dunn, dan ketegasan partisi. I-Index dan ketegasan partisi menunjuk K = 4; Dunn menunjuk K = 5 dengan selisih sangat kecil dari K = 4 (0,0107 vs 0,0105; Dunn dihitung pada sampel 2.000 baris). Stabilitas dan Silhouette menunjuk K = 2.
+I-Index dan ketegasan partisi menunjuk K = 4; Dunn menunjuk K = 5 dengan selisih sangat kecil dari K = 4 (0,0107 vs 0,0105; Dunn dihitung pada sampel 2.000 baris). Stabilitas dan Silhouette menunjuk K = 2.
 
 ### Pusat klaster K = 3 dan K = 4 dan komponen I-Index
 
@@ -117,4 +117,20 @@ Transisi dominan = sel matriks transisi terbesar di luar diagonal (perpindahan s
 5. **Putaran 4 (v4).** Pemilihan K tidak dijalankan ulang (data identik v3); keluaran K = 2, 3, 4.
 6. **Putaran 5 (v5).** Peneliti menetapkan K utama = 4 dari himpunan setara {2, 4} setelah hasil v3/v4 terlihat, karena K = 4 memisahkan tipologi Terputus (METODOLOGI §9 (e)).
 7. **Putaran 6 (v6).** Koreksi snapping mengubah data; stabilitas dihitung ulang. Himpunan setara = {2}; K = 4 berselisih 0,0111 dan tidak lagi setara. Sesuai aturan, analisis berhenti sebelum ekspor dan keputusan dikembalikan ke peneliti (CATATAN P6-6).
-8. **Finalisasi v6 (keputusan ini).** Peneliti bersama pembimbing menetapkan **K utama = 4** dengan kriteria akhir I-Index, Dunn, dan ketegasan partisi, sesuai rancangan awal penelitian (draft) yang merujuk Guo dkk. (2015). DESC dan PESC asli dikecualikan karena tidak dinormalisasi terhadap K. Stabilitas subsampel menjadi uji ketahanan. Kriteria akhir ini **ditetapkan setelah hasil v6 terlihat**, bukan direncanakan sejak awal rekonstruksi; keputusan (e) Putaran 5 dan aturan stabilitas v2–v6 sebagai aturan utama digantikan oleh METODOLOGI §9 (h).
+8. **Finalisasi v6.** Pada awal finalisasi sempat diusulkan kriteria berbasis indeks validitas (I-Index, Dunn, ketegasan partisi, mengikuti rancangan draft yang merujuk Guo dkk., 2015). Setelah diagnostik komponen I-Index dan validasi data buatan menunjukkan kelemahan I-Index dan Dunn, kriteria itu diganti: peneliti bersama pembimbing menetapkan **K utama = 4 atas dasar substantif** (bagian (g)). Keputusan ditetapkan **setelah semua hasil terlihat**, bukan direncanakan sejak awal rekonstruksi; METODOLOGI §9 (h) menggantikan semua butir keputusan K sebelumnya.
+
+## (g) Keputusan final
+
+| Kriteria | K yang ditunjuk | Catatan keandalan |
+|---|---|---|
+| Stabilitas subsampel (ARI) | 2 | Himpunan setara (selisih ≤ 0,01) = {2}; K = 4 berselisih 0,011 (juga di luar 1 sd dan 1 SE). |
+| Silhouette | 2 | Tidak spasial; menilai pemisahan di ruang atribut. |
+| Ketegasan partisi | 4 | Keanggotaan dihitung ulang di ruang atribut. |
+| I-Index | 4 | Terdongkrak klaster baris penalti (DK 2,8 → 11,2 dari K = 3 ke K = 4); pada data buatan gagal menemukan K sebenarnya (tertinggi di K = 2, padahal K = 4). |
+| Dunn | 5 | Tidak membedakan K = 4 dan K = 5 (0,0105 vs 0,0107; selisih jauh di bawah sd antarsampel ± 0,004). |
+| DESC-N | 2 | Lulus validasi data buatan hanya lewat klausul "tidak monoton" (tertinggi di K = 2); memihak partisi kontigu. |
+| PESC-N | 2 | Satu-satunya metrik yang memenuhi validasi data buatan secara penuh (tertinggi di K sebenarnya = 4); memihak partisi kontigu. |
+
+Dari 7 kriteria, 4 menunjuk K = 2 dan 2 menunjuk K = 4; K = 4 **bukan** pilihan mayoritas metrik.
+
+**Dasar substantif.** K = 4 dipilih karena memisahkan tipologi grid Terputus: Tipologi 4 (terburuk) berisi 1.389 baris (1,73 % data gabungan) dengan 96,5 % baris Terputus (waktu minimum = T_pen). Kelompok ini relevan bagi perencanaan evakuasi karena menandai grid yang tidak mencapai TES mana pun lewat jaringan jalan; pada K = 2 grid tersebut tercampur dalam tipologi terburuk yang berukuran 51,7 % data. Kesimpulan utama tidak bergantung pada K: perbandingan K = 4 vs K = 2 ada di `output_bab4/temuan_kunci.md` bagian (g) dan tabel S20. K = 2 dan K = 3 dilaporkan sebagai sensitivitas.

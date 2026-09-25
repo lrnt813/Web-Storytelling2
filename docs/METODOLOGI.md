@@ -333,27 +333,31 @@ peneliti, karena data gabungan berubah.
   dan keputusan dikembalikan ke peneliti. Model K = 2, 3, dan 4 = solusi \(J\) terkecil dari seed 42–51
   (solusi data penuh evaluasi stabilitas).
 
-- **(h) Kriteria akhir pemilihan K (Finalisasi v6; menggantikan (e) dan peran stabilitas sebagai aturan
-  utama).** Peneliti bersama pembimbing menetapkan **K utama = 4**. Rinciannya di `docs/KEPUTUSAN_K_v6.md`.
-  - **Kriteria:** K dipilih dengan indeks validitas **I-Index, Dunn, dan ketegasan partisi**, sesuai rancangan
-    awal penelitian (draft) yang merujuk Guo dkk. (2015). Pada v6, I-Index (15,218) dan ketegasan partisi
-    (0,457) tertinggi pada K = 4. Dunn tertinggi pada K = 5 (0,0107), dengan selisih sangat kecil dari K = 4
-    (0,0105; sampel 2.000 baris).
-  - **Metrik yang dikecualikan:** DESC dan PESC asli tidak dipakai memilih K karena tidak dinormalisasi
-    terhadap jumlah klaster. DESC naik monoton sejak K = 4 (0,07 pada K = 3 → 74,9 pada K = 4 → 85,2 pada
-    K = 10), dan PESC tidak stabil (hingga 15.382). Versi ternormalisasinya (DESC-N, PESC-N; §8b) hanya
-    dilaporkan sebagai metrik pendukung.
-  - **Uji ketahanan:** stabilitas subsampel kini dipakai sebagai uji ketahanan, bukan aturan pemilihan.
-    K = 4 memiliki ARI subsampel 0,948 ± 0,004, berselisih 0,011 dari K = 2 (0,959). Pemeriksaan
-    one-standard-error juga menunjuk K = 2 (`KEPUTUSAN_K_v6.md` (b)).
-  - **Riwayat (ditulis apa adanya):** kriteria stabilitas menjadi aturan utama pemilihan K pada v2–v6 dan
-    menunjuk K = 2 pada v6 (himpunan setara {2}; CATATAN P6-6). Kriteria akhir di atas **ditetapkan setelah
-    hasil v6 terlihat**, bukan direncanakan sejak awal rekonstruksi. Butir (g) tidak pernah ada. Butir (e)
-    (K = 4 dipilih dari himpunan setara stabilitas {2, 4} pada v3) digantikan oleh butir ini, karena pada
-    v6 himpunan tersebut tidak lagi memuat K = 4.
-  - **Catatan interpretasi:** lonjakan I-Index pada K = 4 bertepatan dengan terbentuknya klaster baris
-    bernilai penalti (Tipologi 4, 1,73 % baris, 96,5 % Terputus). Pusat klaster itu jauh dari pusat lain
-    sehingga DK membesar.
+- **(h) Kriteria akhir dan keputusan K = 4 (final).** Menggantikan semua butir keputusan K sebelumnya,
+  yaitu (a) aturan stabilitas sebagai aturan utama, (c), dan (e). Keputusan diambil peneliti bersama
+  pembimbing. Rincian: `docs/KEPUTUSAN_K_v6.md`.
+  - **Dasar keputusan: substantif.** K = 4 dipilih karena memisahkan tipologi grid Terputus (Tipologi 4:
+    1.389 baris, 1,73 % data gabungan, 96,5 % Terputus). Tipologi ini relevan bagi perencanaan evakuasi.
+    Pada K = 2, baris Terputus tercampur dalam Tipologi 2 (3,2 % dari klaster itu).
+  - **Indeks validitas tidak searah (ditulis apa adanya):**
+    - Stabilitas subsampel, Silhouette, DESC-N, dan PESC-N menunjuk **K = 2**.
+    - Ketegasan partisi menunjuk **K = 4**.
+    - I-Index menunjuk **K = 4**, tetapi nilainya terdongkrak oleh klaster baris penalti: jarak pusat
+      terjauh DK naik dari 2,8 (K = 3) ke 11,2 (K = 4). Pada data buatan, I-Index juga gagal menemukan K
+      sebenarnya: tertinggi di K = 2, padahal K sebenarnya 4.
+    - Dunn tidak membedakan K = 4 dan K = 5 (0,0105 vs 0,0107). Selisihnya jauh di bawah simpangan baku
+      antarsampel (± 0,004).
+  - **PESC-N** adalah satu-satunya metrik yang memenuhi validasi data buatan secara penuh (tertinggi tepat di
+    K sebenarnya = 4 dan invarian skala). DESC-N lulus hanya lewat klausul "tidak monoton". Pada data
+    penelitian, PESC-N menunjuk K = 2.
+  - **Ketahanan kesimpulan:** kesimpulan utama tidak bergantung pada K. Perbandingan K = 4 vs K = 2 untuk
+    transisi dominan, stability rate, grid masuk Tergenang, tipologi terburuk, dan TAS per tipologi ada di
+    tabel S20 dan `output_bab4/temuan_kunci.md` bagian (g).
+  - **Riwayat (ditulis apa adanya):** aturan stabilitas (v2–v6) menunjuk K = 2 (pada v6 himpunan setara
+    = {2}). Pada awal finalisasi v6 sempat diusulkan kriteria berbasis indeks validitas (I-Index, Dunn,
+    ketegasan partisi). Kriteria itu diganti dengan dasar substantif setelah diagnostik (komponen I-Index) dan
+    validasi data buatan menunjukkan kelemahan I-Index dan Dunn. Keputusan ditetapkan **setelah semua hasil
+    terlihat**; keputusan ini tidak direncanakan sejak awal rekonstruksi.
 
 **Metrik pendukung** pada \(\hat L_K\), ditampilkan di tabel utama: Silhouette (sampel 10.000 baris,
 seed 42), ketegasan partisi \(1 - \mathrm{PE}/\ln K\) (keanggotaan FCM dihitung ulang di ruang

@@ -4,7 +4,9 @@
 
 Menulis docs/KEPUTUSAN_K_v6.md: (a) tabel stabilitas K; (b) pemeriksaan adaptasi aturan one-standard-error;
 (c) K terbaik menurut setiap kriteria, pusat klaster K = 3 dan K = 4, dan komponen I-Index; (d) profil
-tipologi K = 2 dan K = 4 serta tabel silang; (e) transisi dominan K = 2 vs K = 4; (f) riwayat keputusan K.
+tipologi K = 2 dan K = 4 serta tabel silang; (e) transisi dominan K = 2 vs K = 4; (f) riwayat keputusan K;
+(g) keputusan final (tabel kriteria → K yang ditunjuk → catatan keandalan; `kriteria_k_final` dipakai juga oleh
+scripts/export_bab4.py).
 Tidak menjalankan klasterisasi: pusat dan komponen I-Index dihitung dari skor PCA dan keanggotaan terkunci.
 """
 import json
@@ -21,6 +23,37 @@ if str(PROJECT_ROOT) not in sys.path:
 LOCKED = PROJECT_ROOT / "data" / "locked"
 DOC = PROJECT_ROOT / "docs" / "KEPUTUSAN_K_v6.md"
 LEVEL = {"baseline": "Baseline", "rendah": "Rendah", "sedang": "Sedang", "tinggi": "Tinggi"}
+
+
+def kriteria_k_final(R, F=None, S=None):
+    """Tabel keputusan final: kriteria → K yang ditunjuk (argmax pada hasil terkunci / metrik Finalisasi v6) →
+    catatan keandalan. F = metrik_finalisasi_v6.json, S = validasi_sintetis.json (opsional)."""
+    cands = R["k_selection"]["candidates"]
+    best = lambda key: int(max(cands, key=lambda c: c[key])["k"])
+    rows = [
+        ("Stabilitas subsampel (ARI)", best("ari_subsampel_mean"),
+         "Himpunan setara (selisih ≤ 0,01) = {2}; K = 4 berselisih 0,011 (juga di luar 1 sd dan 1 SE)."),
+        ("Silhouette", best("silhouette"), "Tidak spasial; menilai pemisahan di ruang atribut."),
+        ("Ketegasan partisi", best("ketegasan_partisi"), "Keanggotaan dihitung ulang di ruang atribut."),
+        ("I-Index", best("iidx"),
+         "Terdongkrak klaster baris penalti (DK 2,8 → 11,2 dari K = 3 ke K = 4); pada data buatan gagal menemukan K "
+         "sebenarnya (tertinggi di K = 2, padahal K = 4)."),
+        ("Dunn", best("dunn"),
+         "Tidak membedakan K = 4 dan K = 5 (0,0105 vs 0,0107; selisih jauh di bawah sd antarsampel ± 0,004)."),
+    ]
+    if F:
+        b4 = F["b4_desc_n_v6"]
+        bn = lambda key: int(max(b4, key=lambda k: b4[k][key]))
+        lul = (S or {}).get("status", {})
+        rows += [
+            ("DESC-N", bn("desc_n"),
+             "Lulus validasi data buatan hanya lewat klausul \"tidak monoton\" (tertinggi di K = "
+             f"{lul.get('DESC-N', {}).get('K_tertinggi', '–')}); memihak partisi kontigu."),
+            ("PESC-N", bn("pesc_n"),
+             "Satu-satunya metrik yang memenuhi validasi data buatan secara penuh (tertinggi di K sebenarnya = "
+             f"{lul.get('PESC-N', {}).get('K_tertinggi', '–')}); memihak partisi kontigu."),
+        ]
+    return [{"Kriteria": a, "K yang ditunjuk": b, "Catatan keandalan": c} for a, b, c in rows]
 
 
 def f(v, d=3):
@@ -71,8 +104,8 @@ def main():
     L = ["# Keputusan K utama v6", "",
          "Sumber: hasil terkunci `hasil-skripsi-v6` (`data/locked/`). Dokumen ini dibuat oleh "
          "`python -m scripts.keputusan_k_v6` dan tidak menjalankan klasterisasi ulang. **Keputusan: K utama = 4** "
-         "(peneliti bersama pembimbing; METODOLOGI §9 (h)). Kriteria akhir ditetapkan **setelah** hasil v6 terlihat; "
-         "riwayatnya ada di bagian (f).", ""]
+         "(peneliti bersama pembimbing) atas **dasar substantif**; METODOLOGI §9 (h). Keputusan ditetapkan **setelah** "
+         "semua hasil terlihat; ringkasannya di bagian (g), riwayatnya di bagian (f).", ""]
 
     # (a)
     L += ["## (a) Tabel stabilitas K v6 (data gabungan)", "",
@@ -109,8 +142,7 @@ def main():
         rows.append([name, c1["k"], f(c1[key], 4), f(c4[key], 4)])
     L += ["## (c) K terbaik menurut setiap kriteria", ""]
     L += table(["Kriteria", "K terbaik", "Nilai pada K terbaik", "Nilai pada K = 4"], rows)
-    L += ["", "Kriteria akhir (METODOLOGI §9 (h)) = I-Index, Dunn, dan ketegasan partisi. I-Index dan ketegasan partisi "
-          "menunjuk K = 4; Dunn menunjuk K = 5 dengan selisih sangat kecil dari K = 4 "
+    L += ["", "I-Index dan ketegasan partisi menunjuk K = 4; Dunn menunjuk K = 5 dengan selisih sangat kecil dari K = 4 "
           f"({f(next(c for c in cands if c['k'] == 5)['dunn'], 4)} vs {f(next(c for c in cands if c['k'] == 4)['dunn'], 4)}; "
           "Dunn dihitung pada sampel 2.000 baris). Stabilitas dan Silhouette menunjuk K = 2.", ""]
     L += ["### Pusat klaster K = 3 dan K = 4 dan komponen I-Index", "",
@@ -200,12 +232,34 @@ def main():
           "7. **Putaran 6 (v6).** Koreksi snapping mengubah data; stabilitas dihitung ulang. Himpunan setara = {2}; "
           "K = 4 berselisih 0,0111 dan tidak lagi setara. Sesuai aturan, analisis berhenti sebelum ekspor dan keputusan "
           "dikembalikan ke peneliti (CATATAN P6-6).",
-          "8. **Finalisasi v6 (keputusan ini).** Peneliti bersama pembimbing menetapkan **K utama = 4** dengan kriteria "
-          "akhir I-Index, Dunn, dan ketegasan partisi, sesuai rancangan awal penelitian (draft) yang merujuk Guo dkk. "
-          "(2015). DESC dan PESC asli dikecualikan karena tidak dinormalisasi terhadap K. Stabilitas subsampel menjadi "
-          "uji ketahanan. Kriteria akhir ini **ditetapkan setelah hasil v6 terlihat**, bukan direncanakan sejak awal "
-          "rekonstruksi; keputusan (e) Putaran 5 dan aturan stabilitas v2–v6 sebagai aturan utama digantikan oleh "
-          "METODOLOGI §9 (h).", ""]
+          "8. **Finalisasi v6.** Pada awal finalisasi sempat diusulkan kriteria berbasis indeks validitas (I-Index, "
+          "Dunn, ketegasan partisi, mengikuti rancangan draft yang merujuk Guo dkk., 2015). Setelah diagnostik komponen "
+          "I-Index dan validasi data buatan menunjukkan kelemahan I-Index dan Dunn, kriteria itu diganti: peneliti "
+          "bersama pembimbing menetapkan **K utama = 4 atas dasar substantif** (bagian (g)). Keputusan ditetapkan "
+          "**setelah semua hasil terlihat**, bukan direncanakan sejak awal rekonstruksi; METODOLOGI §9 (h) menggantikan "
+          "semua butir keputusan K sebelumnya.", ""]
+
+    # (g)
+    fin_dir = PROJECT_ROOT / "output_bab4" / "finalisasi_v6"
+    F = json.loads((fin_dir / "metrik_finalisasi_v6.json").read_text(encoding="utf-8")) \
+        if (fin_dir / "metrik_finalisasi_v6.json").exists() else None
+    S = json.loads((fin_dir / "validasi_sintetis.json").read_text(encoding="utf-8")) \
+        if (fin_dir / "validasi_sintetis.json").exists() else None
+    krit = kriteria_k_final(R, F, S)
+    L += ["## (g) Keputusan final", ""]
+    L += table(["Kriteria", "K yang ditunjuk", "Catatan keandalan"],
+               [[r["Kriteria"], r["K yang ditunjuk"], r["Catatan keandalan"]] for r in krit])
+    n2 = sum(r["K yang ditunjuk"] == 2 for r in krit)
+    n4 = sum(r["K yang ditunjuk"] == 4 for r in krit)
+    L += ["", f"Dari {len(krit)} kriteria, {n2} menunjuk K = 2 dan {n4} menunjuk K = 4; K = 4 **bukan** pilihan "
+          "mayoritas metrik.", "",
+          f"**Dasar substantif.** K = 4 dipilih karena memisahkan tipologi grid Terputus: {p4['deskripsi']} berisi "
+          f"{f(p4['jumlah_baris'], 0)} baris ({f(p4['persen_baris'], 2)} % data gabungan) dengan "
+          f"{f(p4['proporsi_terputus'] * 100, 1)} % baris Terputus (waktu minimum = T_pen). Kelompok ini relevan bagi "
+          "perencanaan evakuasi karena menandai grid yang tidak mencapai TES mana pun lewat jaringan jalan; pada "
+          "K = 2 grid tersebut tercampur dalam tipologi terburuk yang berukuran 51,7 % data. Kesimpulan utama tidak "
+          "bergantung pada K: perbandingan K = 4 vs K = 2 ada di `output_bab4/temuan_kunci.md` bagian (g) dan tabel S20. "
+          "K = 2 dan K = 3 dilaporkan sebagai sensitivitas.", ""]
     DOC.write_text("\n".join(L), encoding="utf-8")
     print(f"ditulis: {DOC} (A3: K = 4 memisahkan Terputus = {pisah})")
     return pisah
