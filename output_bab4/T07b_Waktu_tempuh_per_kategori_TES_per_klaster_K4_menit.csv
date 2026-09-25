@@ -5,21 +5,21 @@
 0,"Tipologi 1: Akses sangat dekat, jaringan jalan padat",Waktu TES Tempat Ibadah (menit),5.382731,4.805336,3.046549,7.132298,9.688598,0,0.0
 0,"Tipologi 1: Akses sangat dekat, jaringan jalan padat",Waktu TES GOR/Gedung Serbaguna (menit),28.31383,18.285072,10.216057,36.805017,59.854203,117,0.572631
 0,"Tipologi 1: Akses sangat dekat, jaringan jalan padat",Waktu TES minimum (menit),3.595179,3.289654,1.983617,4.822696,6.450357,0,0.0
-1,"Tipologi 2: Akses dekat ke TES terdekat, jaringan jalan lebih jarang",Waktu TES Pendidikan (menit),8.104036,7.342532,4.808479,10.697033,14.30952,0,0.0
-1,"Tipologi 2: Akses dekat ke TES terdekat, jaringan jalan lebih jarang",Waktu TES Kesehatan (menit),45.842989,37.436117,26.095116,55.05086,77.535353,241,0.891965
-1,"Tipologi 2: Akses dekat ke TES terdekat, jaringan jalan lebih jarang",Waktu TES Pemerintahan (menit),22.570066,19.100322,12.871479,26.591172,36.474848,86,0.318295
-1,"Tipologi 2: Akses dekat ke TES terdekat, jaringan jalan lebih jarang",Waktu TES Tempat Ibadah (menit),5.887759,5.212554,3.295111,7.486464,10.469359,4,0.014804
-1,"Tipologi 2: Akses dekat ke TES terdekat, jaringan jalan lebih jarang",Waktu TES GOR/Gedung Serbaguna (menit),58.587296,39.148197,25.69054,57.733999,91.092222,1096,4.056405
-1,"Tipologi 2: Akses dekat ke TES terdekat, jaringan jalan lebih jarang",Waktu TES minimum (menit),4.212199,4.164037,2.700595,5.602637,6.829502,0,0.0
-2,"Tipologi 3: Akses sedang, TES kesehatan/GOR jauh",Waktu TES Pendidikan (menit),22.8171,13.671946,10.221274,18.292978,25.483464,624,1.99597
-2,"Tipologi 3: Akses sedang, TES kesehatan/GOR jauh",Waktu TES Kesehatan (menit),64.661659,45.972788,31.852308,66.279477,97.657981,1291,4.129482
-2,"Tipologi 3: Akses sedang, TES kesehatan/GOR jauh",Waktu TES Pemerintahan (menit),45.080693,28.193873,19.849458,40.180877,58.321573,1157,3.70086
-2,"Tipologi 3: Akses sedang, TES kesehatan/GOR jauh",Waktu TES Tempat Ibadah (menit),13.363143,11.422678,8.535827,15.106558,20.750727,36,0.115152
-2,"Tipologi 3: Akses sedang, TES kesehatan/GOR jauh",Waktu TES GOR/Gedung Serbaguna (menit),79.141797,48.212781,31.296914,79.702571,139.310061,2190,7.005086
-2,"Tipologi 3: Akses sedang, TES kesehatan/GOR jauh",Waktu TES minimum (menit),11.657803,9.761348,7.716736,13.047097,18.090186,19,0.060775
-3,Tipologi 4: Terputus dari TES,Waktu TES Pendidikan (menit),400.79758,403.289718,403.289718,403.289718,403.289718,1380,99.352052
-3,Tipologi 4: Terputus dari TES,Waktu TES Kesehatan (menit),401.159953,403.289718,403.289718,403.289718,403.289718,1381,99.424046
-3,Tipologi 4: Terputus dari TES,Waktu TES Pemerintahan (menit),401.146874,403.289718,403.289718,403.289718,403.289718,1381,99.424046
-3,Tipologi 4: Terputus dari TES,Waktu TES Tempat Ibadah (menit),390.627327,403.289718,403.289718,403.289718,403.289718,1341,96.544276
-3,Tipologi 4: Terputus dari TES,Waktu TES GOR/Gedung Serbaguna (menit),401.376862,403.289718,403.289718,403.289718,403.289718,1381,99.424046
-3,Tipologi 4: Terputus dari TES,Waktu TES minimum (menit),390.565602,403.289718,403.289718,403.289718,403.289718,1341,96.544276
+1,"Tipologi 2: Akses dekat, jaringan jalan jarang",Waktu TES Pendidikan (menit),8.104036,7.342532,4.808479,10.697033,14.30952,0,0.0
+1,"Tipologi 2: Akses dekat, jaringan jalan jarang",Waktu TES Kesehatan (menit),45.842989,37.436117,26.095116,55.05086,77.535353,241,0.891965
+1,"Tipologi 2: Akses dekat, jaringan jalan jarang",Waktu TES Pemerintahan (menit),22.570066,19.100322,12.871479,26.591172,36.474848,86,0.318295
+1,"Tipologi 2: Akses dekat, jaringan jalan jarang",Waktu TES Tempat Ibadah (menit),5.887759,5.212554,3.295111,7.486464,10.469359,4,0.014804
+1,"Tipologi 2: Akses dekat, jaringan jalan jarang",Waktu TES GOR/Gedung Serbaguna (menit),58.587296,39.148197,25.69054,57.733999,91.092222,1096,4.056405
+1,"Tipologi 2: Akses dekat, jaringan jalan jarang",Waktu TES minimum (menit),4.212199,4.164037,2.700595,5.602637,6.829502,0,0.0
+2,"Tipologi 3: Akses sedang, jaringan jalan jarang",Waktu TES Pendidikan (menit),22.8171,13.671946,10.221274,18.292978,25.483464,624,1.99597
+2,"Tipologi 3: Akses sedang, jaringan jalan jarang",Waktu TES Kesehatan (menit),64.661659,45.972788,31.852308,66.279477,97.657981,1291,4.129482
+2,"Tipologi 3: Akses sedang, jaringan jalan jarang",Waktu TES Pemerintahan (menit),45.080693,28.193873,19.849458,40.180877,58.321573,1157,3.70086
+2,"Tipologi 3: Akses sedang, jaringan jalan jarang",Waktu TES Tempat Ibadah (menit),13.363143,11.422678,8.535827,15.106558,20.750727,36,0.115152
+2,"Tipologi 3: Akses sedang, jaringan jalan jarang",Waktu TES GOR/Gedung Serbaguna (menit),79.141797,48.212781,31.296914,79.702571,139.310061,2190,7.005086
+2,"Tipologi 3: Akses sedang, jaringan jalan jarang",Waktu TES minimum (menit),11.657803,9.761348,7.716736,13.047097,18.090186,19,0.060775
+3,"Tipologi 4: Akses terputus, jaringan jalan paling jarang",Waktu TES Pendidikan (menit),400.79758,403.289718,403.289718,403.289718,403.289718,1380,99.352052
+3,"Tipologi 4: Akses terputus, jaringan jalan paling jarang",Waktu TES Kesehatan (menit),401.159953,403.289718,403.289718,403.289718,403.289718,1381,99.424046
+3,"Tipologi 4: Akses terputus, jaringan jalan paling jarang",Waktu TES Pemerintahan (menit),401.146874,403.289718,403.289718,403.289718,403.289718,1381,99.424046
+3,"Tipologi 4: Akses terputus, jaringan jalan paling jarang",Waktu TES Tempat Ibadah (menit),390.627327,403.289718,403.289718,403.289718,403.289718,1341,96.544276
+3,"Tipologi 4: Akses terputus, jaringan jalan paling jarang",Waktu TES GOR/Gedung Serbaguna (menit),401.376862,403.289718,403.289718,403.289718,403.289718,1381,99.424046
+3,"Tipologi 4: Akses terputus, jaringan jalan paling jarang",Waktu TES minimum (menit),390.565602,403.289718,403.289718,403.289718,403.289718,1341,96.544276

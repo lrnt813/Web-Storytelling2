@@ -1,0 +1,5 @@
+﻿Transisi,Dominan K2,SR K2 (%),ARI K2,Dominan K3,SR K3 (%),ARI K3,Dominan K4,SR K4 (%),ARI K4
+Baseline → Rendah,Tipologi 1 → Tipologi 2 (48),99.78351153132455,0.991358,Tipologi 1 → Tipologi 2 (61),99.51842361049749,0.984845,Tipologi 1 → Tipologi 2 (61),99.48749668640099,0.985982
+Rendah → Sedang,Tipologi 1 → Tipologi 2 (1.437),92.37744844025288,0.718323,Tipologi 1 → Tipologi 2 (1.182),86.79137734480257,0.640343,Tipologi 1 → Tipologi 2 (1.128),87.08156285625454,0.682365
+Sedang → Tinggi,Tipologi 1 → Tipologi 2 (2.638),82.875209704478,0.431975,Tipologi 2 → Tipologi 3 (2.819),70.18970189701898,0.317238,Tipologi 2 → Tipologi 3 (1.488),77.50677506775068,0.479869
+Baseline → Tinggi,Tipologi 1 → Tipologi 2 (3.534),77.09381855723319,0.293228,Tipologi 2 → Tipologi 3 (3.287),62.41450509743193,0.222161,Tipologi 2 → Tipologi 3 (1.614),71.18337850045167,0.373061

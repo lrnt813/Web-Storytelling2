@@ -1,4 +1,4 @@
-﻿Level,"Tipologi 1: Akses sangat dekat, jaringan jalan padat (grid)","Tipologi 1: Akses sangat dekat, jaringan jalan padat (%)","Tipologi 2: Akses dekat, jaringan jalan lebih jarang (grid)","Tipologi 2: Akses dekat, jaringan jalan lebih jarang (%)","Tipologi 3: Akses jauh, sebagian terputus (grid)","Tipologi 3: Akses jauh, sebagian terputus (%)",Status: Tergenang (di luar klasterisasi) (grid),Status: Tergenang (di luar klasterisasi) (%)
+﻿Level,"Tipologi 1: Akses sangat dekat, jaringan jalan padat (grid)","Tipologi 1: Akses sangat dekat, jaringan jalan padat (%)","Tipologi 2: Akses dekat, jaringan jalan jarang (grid)","Tipologi 2: Akses dekat, jaringan jalan jarang (%)","Tipologi 3: Akses jauh, jaringan jalan paling jarang (grid)","Tipologi 3: Akses jauh, jaringan jalan paling jarang (%)",Status: Tergenang (di luar klasterisasi) (grid),Status: Tergenang (di luar klasterisasi) (%)
 Baseline,7883,34.768227,9942,43.849513,4848,21.382261,0,0.0
 Rendah,7818,34.481542,9959,43.924492,4857,21.421956,39,0.172011
 Sedang,5616,24.76955,8790,38.768579,4892,21.576324,3375,14.885547

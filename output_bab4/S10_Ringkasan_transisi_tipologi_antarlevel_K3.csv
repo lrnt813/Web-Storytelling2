@@ -1,0 +1,5 @@
+﻿Transisi,Grid non-Tergenang di kedua level,Stability rate (%),ARI,Transisi dominan,Jumlah (dominan),Arah dominan,Edge aktif,Edge mungkin,CDVM
+Baseline → Rendah,22634,99.51842361049749,0.984845,Tipologi 1 → Tipologi 2,61,ke tipologi lebih buruk,3,6,0.0026950605284085938
+Rendah → Sedang,19298,86.79137734480257,0.640343,Tipologi 1 → Tipologi 2,1182,ke tipologi lebih buruk,6,6,0.06700176184060526
+Sedang → Tinggi,15498,70.18970189701898,0.317238,Tipologi 2 → Tipologi 3,2819,ke tipologi lebih buruk,5,6,0.21493095883339786
+Baseline → Tinggi,15498,62.41450509743193,0.222161,Tipologi 2 → Tipologi 3,3287,ke tipologi lebih buruk,5,6,0.26442121564072785

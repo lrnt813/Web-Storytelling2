@@ -547,3 +547,17 @@ Bab IV, dashboard, dan `KEPUTUSAN_K_v6.md`.
   peringkat. Deskripsi disimpan di `pengaturan_hasil.json` → `deskripsi_tipologi`, dan dasar profilnya di
   METODOLOGI §10. Deskripsi adalah tafsiran peneliti atas profil, bukan keluaran algoritma. — *SELESAI, perlu
   dikonfirmasi pembimbing*
+- **K-4. Revisi lanjutan (permintaan peneliti).** Tidak ada perubahan pada model maupun hasil terkunci.
+  - **Grid Tergenang tidak ditampilkan** pada peta tipologi (Bab IV, termasuk peta keanggotaan, dan dashboard),
+    karena sudah ada pada peta grid Tergenang.
+  - **Label tipologi hanya kombinasi akses dan jaringan jalan:**
+    - K = 4: "Akses sangat dekat, jaringan jalan padat" / "Akses dekat, jaringan jalan jarang" / "Akses sedang,
+      jaringan jalan jarang" / "Akses terputus, jaringan jalan paling jarang";
+    - K = 2 dan K = 3 mengikuti aturan yang sama (METODOLOGI §10).
+  - **Grid Tergenang dihapus dari transisi tipologi:** T09 menjadi submatriks K × K; T10, T16, S20, `temuan_kunci`
+    (g), `KEPUTUSAN_K_v6` (e), dan dashboard memakai transisi antartipologi. Kolom "masuk Tergenang" dihapus dari
+    tabel transisi. Stability rate dan ARI tidak berubah.
+  - **Transisi dominan berubah** karena sel menuju Tergenang tidak lagi dihitung. Contoh K = 4, Rendah → Sedang:
+    semula Tipologi 3 → Tergenang, kini Tipologi 1 → Tipologi 2 (1.128 grid).
+
+  — *SELESAI*

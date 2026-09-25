@@ -400,28 +400,43 @@ baris penalti; median ≤ 10 menit "Akses Baik", 10–30 "Akses Sedang", > 30 "A
 karena tidak membedakan klaster: kedua klaster K = 2 mendapat label "Akses Baik" (CATATAN P3-9).
 Model, keanggotaan, dan penomoran tidak berubah.
 
-**Label deskriptif dan status Tergenang (koreksi penyajian setelah finalisasi).** Nomor tipologi tetap
-peringkat. Setiap tipologi diberi deskripsi yang ditulis dari profilnya: median waktu minimum, kepadatan
-jalan, waktu ke TES kesehatan/GOR, dan % Terputus. Deskripsi disimpan di `pengaturan_hasil.json` →
-`deskripsi_tipologi` dan dipakai oleh ekspor Bab IV, dashboard, dan `docs/KEPUTUSAN_K_v6.md`. Untuk K = 4:
+**Label deskriptif dan grid Tergenang (koreksi penyajian setelah finalisasi).** Nomor tipologi tetap
+menyatakan peringkat. Deskripsinya adalah **kombinasi akses dan jaringan jalan** yang ditulis dari profil
+klaster:
 
-| Tipologi | Deskripsi | Dasar profil (T07) |
-|---|---|---|
-| 1 | Akses sangat dekat, jaringan jalan padat | median 3,29 mnt; kepadatan 0,97 (tertinggi); kesehatan/GOR ± 18 mnt |
-| 2 | Akses dekat ke TES terdekat, jaringan jalan lebih jarang | median 4,16 mnt; kepadatan 0,71; kesehatan/GOR ± 38 mnt |
-| 3 | Akses sedang, TES kesehatan/GOR jauh | median 9,76 mnt (P90 18,09); kesehatan 46, GOR 48 mnt |
-| 4 | Terputus dari TES | 96,5 % Terputus; opsi rute 0,06 |
+- akses = median waktu minimum ke TES; "terputus" bila mayoritas baris Terputus;
+- jaringan jalan = rerata kepadatan jalan.
 
-Sensitivitas K = 2: Tipologi 1 "Akses dekat, jaringan jalan padat" (3,58 mnt; 0,86) dan Tipologi 2 "Akses lebih
-jauh, jaringan jalan lebih jarang" (8,70 mnt; 3,2 % Terputus). Sensitivitas K = 3: "Akses sangat dekat, jaringan
-jalan padat" (3,12; 0,94), "Akses dekat, jaringan jalan lebih jarang" (5,64; 0,72), dan "Akses jauh, sebagian
-terputus" (11,70; P90 28,94; 5,8 % Terputus).
+Deskripsi disimpan di `pengaturan_hasil.json` → `deskripsi_tipologi` dan dipakai oleh ekspor Bab IV,
+dashboard, dan `docs/KEPUTUSAN_K_v6.md`. Untuk K = 4:
 
-**Grid Tergenang tidak diklasterkan** dan ditampilkan sebagai status di luar klasterisasi, bukan sebagai
-tipologi:
-- Peta tipologi: warna abu-abu dengan legenda terpisah.
-- Tabel distribusi: kolom "Status: Tergenang (di luar klasterisasi)".
-- Matriks dan ringkasan transisi: state "Tergenang (di luar klasterisasi)".
+| Tipologi | Deskripsi | Akses (median waktu minimum) | Jaringan jalan (rerata kepadatan) |
+|---|---|---|---|
+| 1 | Akses sangat dekat, jaringan jalan padat | 3,29 menit | 0,972 (tertinggi) |
+| 2 | Akses dekat, jaringan jalan jarang | 4,16 menit | 0,707 |
+| 3 | Akses sedang, jaringan jalan jarang | 9,76 menit | 0,691 |
+| 4 | Akses terputus, jaringan jalan paling jarang | 96,5 % Terputus | 0,620 (terendah) |
+
+Sensitivitas K = 2:
+
+| Tipologi | Deskripsi | Akses | Jaringan jalan |
+|---|---|---|---|
+| 1 | Akses dekat, jaringan jalan padat | 3,58 menit | 0,861 |
+| 2 | Akses lebih jauh, jaringan jalan jarang | 8,70 menit | 0,679 |
+
+Sensitivitas K = 3:
+
+| Tipologi | Deskripsi | Akses | Jaringan jalan |
+|---|---|---|---|
+| 1 | Akses sangat dekat, jaringan jalan padat | 3,12 menit | 0,935 |
+| 2 | Akses dekat, jaringan jalan jarang | 5,64 menit | 0,723 |
+| 3 | Akses jauh, jaringan jalan paling jarang | 11,70 menit | 0,655 |
+
+Istilah akses dan kepadatan bersifat relatif di dalam satu K.
+
+**Grid Tergenang tidak diklasterkan**, sehingga tidak ditampilkan pada peta tipologi (Bab IV dan dashboard) dan
+tidak termasuk transisi tipologi (§12). Grid Tergenang dilaporkan terpisah: peta grid Tergenang, T03, dan kolom
+"Status: Tergenang (di luar klasterisasi)" pada tabel distribusi T08.
 
 Model, label numerik, dan semua angka tidak berubah.
 
@@ -554,6 +569,20 @@ hotspot, serta tabel Bab IV: TAS struktural (A/B/C/D), TAS akibat banjir (G), da
 Rincian keputusan implementasi: CATATAN P6-4.
 
 ## 12. Analisis transisi dengan state Tergenang
+
+**Penyajian (koreksi setelah finalisasi): transisi tipologi saja.** Tabel dan diagram transisi Bab IV (T09, T10,
+T16, S20) serta dashboard hanya memuat submatriks tipologi × tipologi \(M_{kl},\ k, l < K\), yaitu grid yang
+tidak Tergenang di kedua level:
+
+- stability rate \(= 100 \cdot \sum_k M_{kk} / |G|\);
+- transisi dominan = sel terbesar di luar diagonal submatriks, disertai arahnya ke tipologi yang lebih buruk
+  atau lebih baik;
+- edge aktif dihitung dari \(K(K-1)\) kemungkinan;
+- CDVM dihitung atas distribusi tipologi pada \(G\).
+
+Stability rate dan ARI identik dengan hasil terkunci. Transisi dominan dan CDVM terkunci (yang memuat state
+Tergenang) tetap tersimpan di `data/locked/`, tetapi tidak lagi disajikan. Uraian di bawah adalah definisi
+lengkap dalam hasil terkunci.
 
 Untuk pasangan Baseline→Rendah, Rendah→Sedang, Sedang→Tinggi, dan Baseline→Tinggi
 (\(a \to b\)), matriks \(M \in \mathbb{N}^{(K+1)\times(K+1)}\) dengan \(M_{kl} = |\{i : z_{i,a} = k,\ z_{i,b} = l\}|\):
