@@ -22,6 +22,9 @@ ini belum ada parameter yang dinyatakan demikian.
 | T_aktual minimum pada aturan TAS | ≥ 30 menit (= batas waktu evakuasi) | `thesis.TAS_T_AKTUAL_MIN = EVAC_TIME_MIN` | sama dengan batas waktu evakuasi | — | **perlu verifikasi peneliti** |
 | Batas snapping ke jaringan jalan | 300 m | `engine.SNAP_MAX_M` | — | — | **ditetapkan peneliti** |
 | Jarak minimum T_ideal dan T_aktual | 50 m | `thesis.TAS_MIN_EUCLID_M` | — | — | **ditetapkan peneliti** |
+| Toleransi atribusi banjir ("diperparah" > 1 menit; "tidak berubah" ≤ 1 menit) | 1 menit | `thesis.ATRIBUSI_TOL_MENIT` | — (alasan operasional: toleransi numerik dan perbedaan pembulatan; METODOLOGI §16) | — | **ditetapkan peneliti** (Putaran 6) |
+| Batas waktu Baseline kelompok "dipicu banjir" | < 30 menit (= batas waktu evakuasi) | `engine.EVAC_TIME_MIN` | sama dengan batas waktu evakuasi | — | **perlu verifikasi peneliti** |
+| Radius hotspot validasi (DBSCAN) | 350 m | `scripts/lembar_validasi_TAS.HOTSPOT_EPS_M` | — (alat bantu validasi, tidak memengaruhi hasil) | — | **ditetapkan peneliti** (Putaran 6) |
 | Ambang isolasi REDCAP | 30 menit (= batas waktu evakuasi) | `Cfg.isolation_time_threshold = EVAC_TIME_MIN` | sama dengan batas waktu evakuasi | — | **perlu verifikasi peneliti** |
 
 ## Konteks praktik Indonesia (bukan dasar ambang banjir)
@@ -39,4 +42,4 @@ Dicatat sebagai konteks, tidak dipakai sebagai dasar parameter:
   30 menit (termasuk status Chelariu dkk. 2022), sensitivitas 20/40 menit, padanan kategori akses,
   T_aktual ≥ 30 menit, ambang isolasi REDCAP 30 menit.
 - **ditetapkan peneliti (belum ada rujukan):** T_ideal ≤ 5 menit, DI_t ≥ 2, snapping 300 m, jarak
-  minimum 50 m.
+  minimum 50 m, toleransi atribusi banjir 1 menit, radius hotspot validasi 350 m.

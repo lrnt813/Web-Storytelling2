@@ -1,12 +1,14 @@
-# Metodologi — sebagaimana diimplementasikan (hasil final v5)
+# Metodologi — sebagaimana diimplementasikan (hasil v6)
 
 Dokumen ini menjelaskan pipeline analisis **persis seperti kode** di `backend/engine.py`,
 `backend/hazard_raster.py`, `backend/thesis.py`, dan `scripts/thesis_analysis.py` (tag
-`hasil-skripsi-v5`; model, data, dan ambang sama dengan v4). Rujukan setiap parameter beserta status verifikasinya: `docs/RUJUKAN_PARAMETER.md`. Nilai parameter yang dipakai pada run final tercatat di `data/locked/LOCK.json`.
+`hasil-skripsi-v6`; snapping ke ruas terdekat, pemilihan K dihitung ulang, atribusi banjir pada TAS; ambang
+dan aturan lain sama dengan v5). Rujukan setiap parameter beserta status verifikasinya: `docs/RUJUKAN_PARAMETER.md`. Nilai parameter yang dipakai pada run final tercatat di `data/locked/LOCK.json`.
 Hal yang masih perlu diputuskan tercatat di `docs/CATATAN_TEMUAN.md`. Versi sebelumnya diarsipkan:
 v1 di `data/locked/arsip_v1/` (model per level + Hungarian) dan v2 di `data/locked/arsip_v2/`
 (kelas bahaya grid dari atribut GPKG, aturan TAS persentil, keluaran K = 2 saja), dan v3 di
-`data/locked/arsip_v3/` (keluaran K = 2 dan 3, label ambang median, TAS tanpa syarat T_aktual).
+`data/locked/arsip_v3/` (keluaran K = 2 dan 3, label ambang median, TAS tanpa syarat T_aktual), v4 di
+`data/locked/arsip_v4/`, dan v5 di `data/locked/arsip_v5/` (snapping ke verteks terdekat).
 
 ## 1. Unit analisis dan data
 
@@ -217,6 +219,14 @@ peneliti, karena data gabungan berubah.
   (`verifikasi_v3` di hasil). Model K = 2, 3, dan 4 adalah solusi J terkecil dari seed 42–51 pada data
   gabungan, praproses, dan W yang sama; label K = 2 dan K = 3 diverifikasi identik dengan v3.
 
+- **(f) Pemilihan K dihitung ulang pada Putaran 6.** Koreksi snapping (§4) mengubah waktu tempuh, sehingga
+  data gabungan berbeda dari v3/v5 dan tabel stabilitas v3 tidak lagi berlaku. Evaluasi stabilitas (a)–(b)
+  dijalankan ulang pada data v6 dengan aturan, seed, dan jumlah subsampel yang sama. Aturan K utama
+  ditetapkan peneliti **sebelum** hasil v6 terlihat: K utama tetap 4 bila K = 4 masih termasuk himpunan
+  setara stabilitas (selisih rerata ARI subsampel ≤ 0,01 dari K terbaik); bila tidak, analisis berhenti
+  dan keputusan dikembalikan ke peneliti. Model K = 2, 3, dan 4 = solusi \(J\) terkecil dari seed 42–51
+  (solusi data penuh evaluasi stabilitas).
+
 **Metrik pendukung** pada \(\hat L_K\), ditampilkan di tabel utama: Silhouette (sampel 10.000 baris,
 seed 42), ketegasan partisi \(1 - \mathrm{PE}/\ln K\) (keanggotaan FCM dihitung ulang di ruang
 atribut), *size entropy*, dan ukuran klaster terbesar (%).
@@ -331,6 +341,61 @@ akses 4 × 4 untuk empat pasangan level (pada 30 menit). Konstanta \(T_{\text{ev
 ambang isolasi REDCAP dan syarat \(T^{\text{aktual}}\) TAS (`EVAC_TIME_MIN`; nilai sensitivitas dari
 `EVAC_TIME_SENS`).
 
+## 11c. Atribusi pengaruh banjir pada TAS (Putaran 6)
+
+Untuk setiap TAS pada level \(s \in\) {Rendah, Sedang, Tinggi}, dengan \(e_s(i)\) = TES terdekat secara
+Euclidean (ID TES = kategori + indeks baris layer TES) dan \(T^{\text{aktual}}_{i,s}\) seperti §11.
+Aturan ditetapkan peneliti sebelum hasil v6 terlihat. **TES sama** ⇔ \(e_s(i) = e_{\text{Baseline}}(i)\).
+
+| Kelompok | Syarat |
+|---|---|
+| dipicu banjir | bukan TAS di Baseline, TES sama, dan \(T^{\text{aktual}}_{i,\text{Baseline}} <\) 30 menit |
+| diperparah banjir | TAS di Baseline, TES sama, dan \(T^{\text{aktual}}_{i,s} - T^{\text{aktual}}_{i,\text{Baseline}} > 1\) menit |
+| tidak berubah | TAS di Baseline, TES sama, dan \(\lvert T^{\text{aktual}}_{i,s} - T^{\text{aktual}}_{i,\text{Baseline}}\rvert \le 1\) menit |
+| lainnya | selain itu; alasan dicatat (TES terdekat berubah; T_aktual turun; TES tidak terjangkau di Baseline; waktu Baseline ≥ 30 menit) |
+
+Karena TES sama, "waktu Baseline ke TES itu" = \(T^{\text{aktual}}_{i,\text{Baseline}}\). Untuk kelompok
+dipicu dan diperparah disimpan: waktu Baseline, waktu level, selisihnya, serta jumlah dan total panjang segmen
+jalan yang **ditutup pada level itu dan dilalui rute Baseline** grid ke TES yang sama. Rute direkonstruksi
+dengan snapping ke ruas yang sama (`thesis.tas_routes`). Sisi pecahan dipetakan ke segmen induknya,
+termasuk segmen tempat ruas snapping mendarat.
+
+Yang dilaporkan per level (T11f): jumlah dan persentase tiap kelompok terhadap TAS level itu, median waktu
+Baseline kelompok dipicu, median tambahan waktu kelompok dipicu dan diperparah, serta peta atribusi untuk
+Sedang dan Tinggi. Ambang 1 menit ditetapkan peneliti (§16).
+
+## 11d. Validasi manual TAS dan kode penyebab (Putaran 6)
+
+Lembar `output_bab4/validasi/validasi_TAS_v6.xlsx` (satu baris per grid TAS per level) memakai kode
+penyebab:
+
+| Kode | Penyebab | Valid |
+|---|---|---|
+| A | Sungai/waduk | Y |
+| B | Kawasan tertutup/bandara | Y |
+| C | Topografi perbukitan | Y |
+| D | Jaringan jalan memang jarang | Y |
+| E | Jaringan OSM tidak lengkap | T |
+| F | Kesalahan snapping | T |
+| G | Penutupan ruas akibat banjir | Y |
+| H | TES lebih dekat tidak tercatat | T |
+| I | Belum terjelaskan | cek |
+
+Y = TAS nyata, T = artefak data/metode. Isian awal otomatis mengikuti prioritas yang ditetapkan peneliti:
+
+- **(a) Baseline:** kode dari teks lembar v5 lewat aturan kata kunci, bila grid juga TAS di v5 dengan TES
+  sama dan \(\lvert\Delta T^{\text{aktual}}\rvert \le\) 1 menit. Status "perlu konfirmasi peneliti".
+  Teks berkode F (snapping) tidak dibawa bila grid masih TAS di v6.
+- **(b) Dipicu banjir:** G, status otomatis.
+- **(c) Diperparah banjir:** kode Baseline + G.
+- **(d) Tidak berubah:** kode Baseline.
+- **(e) Selain itu:** kosong, status "perlu divalidasi".
+
+Grid yang perlu divalidasi/dikonfirmasi dikelompokkan menjadi hotspot (DBSCAN 350 m). Rekap
+(`scripts/rekap_validasi_TAS.py`) menyajikan per level jumlah per kode dan Valid, atribusi × kode, per
+hotspot, serta tabel Bab IV: TAS struktural (A/B/C/D), TAS akibat banjir (G), dan artefak data/metode (E/F/H).
+Rincian keputusan implementasi: CATATAN P6-4.
+
 ## 12. Analisis transisi dengan state Tergenang
 
 Untuk pasangan Baseline→Rendah, Rendah→Sedang, Sedang→Tinggi, dan Baseline→Tinggi
@@ -402,6 +467,13 @@ bersifat operasional:
 - **Snapping ≤ 300 m.** Tiga lebar grid. Menghubungkan centroid di area bangunan jarang ke jalan
   terdekat tanpa menghubungkan grid yang jelas terpisah dari jaringan; grid di luar batas ini menjadi
   Terputus.
+- **Toleransi 1 menit pada atribusi banjir (Putaran 6).** "Diperparah" bila T_aktual naik > 1 menit, "tidak
+  berubah" bila perubahan ≤ 1 menit. Toleransi operasional: menyerap perbedaan numerik kecil (pembulatan,
+  perubahan titik proyeksi snapping saat ruas di dekat grid ditutup) yang tidak bermakna bagi evakuasi,
+  sehingga hanya kenaikan yang jelas dihitung sebagai pengaruh banjir.
+- **Hotspot validasi 350 m (Putaran 6).** DBSCAN 350 m (± 3,5 lebar grid) mengelompokkan grid TAS yang
+  berdekatan agar satu lokasi cukup diperiksa sekali pada citra satelit. Hanya alat bantu validasi, tidak
+  memengaruhi hasil.
 - **Jarak minimum 50 m pada T_ideal dan T_aktual.** Setengah lebar grid. Mencegah penyebut DI mendekati
   nol ketika TES berada di dalam atau sangat dekat centroid grid. Dipasang pada kedua jarak agar
   T_aktual ≥ T_ideal (CATATAN P2-B2).
