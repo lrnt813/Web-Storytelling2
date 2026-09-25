@@ -463,3 +463,12 @@ Semua aturan putaran ini ditetapkan sebelum hasil v6 terlihat (instruksi penelit
   "sama". Peta per TAS dibuat ulang di `output_bab4/validasi/peta/`; peta v5 ada di
   `output_bab4/arsip_v5/validasi/peta/`. Rekap (`scripts/rekap_validasi_TAS.py`) belum dijalankan. —
   *MENUNGGU PENGISIAN*
+
+# Finalisasi v6 (branch `finalisasi-v6`)
+
+Hasil terkunci `hasil-skripsi-v6` tidak diubah; model utama tidak dijalankan ulang.
+
+- **F-1. K utama v6 = 4** (keputusan peneliti bersama pembimbing; METODOLOGI §9 (h), `docs/KEPUTUSAN_K_v6.md`).
+  Titik berhenti A3 tidak terpicu: Tipologi 4 K = 4 berisi 1.389 baris (1,73 %), 96,5 % Terputus. Dari tiga
+  kriteria akhir, I-Index dan ketegasan partisi menunjuk K = 4; **Dunn menunjuk K = 5** (0,0107 vs 0,0105). Cara
+  menggabungkan ketiga kriteria bila berbeda tidak ditetapkan instruksi. — *DICATAT, perlu dibahas*

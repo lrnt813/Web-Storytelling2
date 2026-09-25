@@ -24,6 +24,7 @@ ini belum ada parameter yang dinyatakan demikian.
 | Jarak minimum T_ideal dan T_aktual | 50 m | `thesis.TAS_MIN_EUCLID_M` | — | — | **ditetapkan peneliti** |
 | Toleransi atribusi banjir ("diperparah" > 1 menit; "tidak berubah" ≤ 1 menit) | 1 menit | `thesis.ATRIBUSI_TOL_MENIT` | — (alasan operasional: toleransi numerik dan perbedaan pembulatan; METODOLOGI §16) | — | **ditetapkan peneliti** (Putaran 6) |
 | Batas waktu Baseline kelompok "dipicu banjir" | < 30 menit (= batas waktu evakuasi) | `engine.EVAC_TIME_MIN` | sama dengan batas waktu evakuasi | — | **perlu verifikasi peneliti** |
+| Toleransi kesetaraan stabilitas K (selisih rerata ARI subsampel) | 0,01 | `thesis.K_ARI_TOLERANCE` | — (diperiksa dengan adaptasi aturan one-standard-error: Hastie, Tibshirani & Friedman, 2009, *The Elements of Statistical Learning*, ed. 2, hlm. 61 dan 244; `docs/KEPUTUSAN_K_v6.md` (b)) | — | **ditetapkan peneliti**; sejak Finalisasi v6 stabilitas berperan sebagai **uji ketahanan**, bukan aturan pemilihan K (METODOLOGI §9 (h)) |
 | Radius hotspot validasi (DBSCAN) | 350 m | `scripts/lembar_validasi_TAS.HOTSPOT_EPS_M` | — (alat bantu validasi, tidak memengaruhi hasil) | — | **ditetapkan peneliti** (Putaran 6) |
 | Ambang isolasi REDCAP | 30 menit (= batas waktu evakuasi) | `Cfg.isolation_time_threshold = EVAC_TIME_MIN` | sama dengan batas waktu evakuasi | — | **perlu verifikasi peneliti** |
 
