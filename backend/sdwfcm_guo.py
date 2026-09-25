@@ -1,7 +1,9 @@
 """SDWFCM versi asli Guo dkk. (2015) sebagai algoritma PEMBANDING (bukan model utama).
 
-Rujukan: Guo, X., Chen, J., Xu, L., & Guo, H. (2015). A spatial distance weighted fuzzy c-means algorithm and
-its application. WSEAS Transactions on Computers, 14, 369–380 (algoritma: hlm. 372; λ terbaik: hlm. 375).
+Rujukan: Guo, Y., Liu, K., Wu, Q., Hong, Q., & Zhang, H. (2015). A new spatial fuzzy c-means for spatial
+clustering. WSEAS Transactions on Computers, 14, 369–381 (algoritma: hlm. 372, pers. 7–10; λ terbaik: hlm. 375).
+Artikel memakai nama SDWFCM dan DWSFCM untuk algoritma yang sama; kriteria henti di artikel = perubahan pusat
+klaster (langkah 6), sedangkan di sini disamakan dengan model utama (instruksi Finalisasi v6).
 
 Bentuk harfiah (fungsi `sdwfcm_guo`, `kuadrat=False`):
   pusat (pers. 7)   v_i  = Σ_j u_ij^m x_j / Σ_j u_ij^m

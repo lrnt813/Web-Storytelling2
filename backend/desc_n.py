@@ -1,7 +1,8 @@
 """DESC-N dan PESC-N: modifikasi ternormalisasi indeks DESC/PESC Guo dkk. (2015).
 
-Rujukan: Guo, X., Chen, J., Xu, L., & Guo, H. (2015). A spatial distance weighted fuzzy c-means algorithm
-and its application. WSEAS Transactions on Computers, 14, 369–380 (DESC dan PESC: hlm. 374).
+Rujukan: Guo, Y., Liu, K., Wu, Q., Hong, Q., & Zhang, H. (2015). A new spatial fuzzy c-means for spatial
+clustering. WSEAS Transactions on Computers, 14, 369–381 (DESC dan PESC: hlm. 374, pers. 11–14).
+Catatan: artikel menetapkan d̄ = 1 untuk blok satu sampel dan D_ij = jarak pasangan sampel terdekat antarblok.
 
 DESC dan PESC asli (thesis.desc_pesc) tidak dapat dibandingkan antar-K: pembagi d̄ (DESC) dan D·d (PESC)
 mendekati nol pada blok beratribut identik, tidak ada normalisasi terhadap K, dan satuannya bergantung skala.
