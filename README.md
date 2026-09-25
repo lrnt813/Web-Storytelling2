@@ -35,8 +35,10 @@ python -m scripts.export_bab4              # bangun ulang output_bab4/ dari data
 
 **Hasil final: `hasil-skripsi-v6`** (snapping ke ruas terdekat; kelas bahaya dari raster InaRisk; TAS dengan
 syarat T_aktual ≥ 30 menit; kategori akses; atribusi banjir pada TAS). Keluaran Bab IV v6 (`output_bab4/`)
-dibangun dengan **`k_utama = 4`** (Finalisasi v6, `docs/KEPUTUSAN_K_v6.md`); K = 2 dan K = 3 sebagai
-sensitivitas. Hash yang diharapkan:
+dibangun dengan **`k_utama = 4`** (keputusan final atas dasar substantif; METODOLOGI §9 (h),
+`docs/KEPUTUSAN_K_v6.md`); K = 2 dan K = 3 sebagai sensitivitas. Keluaran Bab IV final diberi tag
+**`bab4-final`**. Analisis dinyatakan final; perubahan berikutnya hanya pengisian validasi TAS dan rekapnya
+(`docs/CATATAN_TEMUAN.md`, "Penutupan analisis"). Hash yang diharapkan:
 
 | Besaran | SHA-256 |
 |---|---|

@@ -469,6 +469,8 @@ Semua aturan putaran ini ditetapkan sebelum hasil v6 terlihat (instruksi penelit
 Hasil terkunci `hasil-skripsi-v6` tidak diubah; model utama tidak dijalankan ulang.
 
 - **F-1. K utama v6 = 4** (keputusan peneliti bersama pembimbing; METODOLOGI §9 (h), `docs/KEPUTUSAN_K_v6.md`).
+  *Diperbarui pada penutupan:* dasar keputusan menjadi substantif; kriteria indeks validitas yang sempat diusulkan
+  diganti (lihat "Penutupan analisis").
   Titik berhenti A3 tidak terpicu: Tipologi 4 K = 4 berisi 1.389 baris (1,73 %), 96,5 % Terputus. Dari tiga
   kriteria akhir, I-Index dan ketegasan partisi menunjuk K = 4; **Dunn menunjuk K = 5** (0,0107 vs 0,0105). Cara
   menggabungkan ketiga kriteria bila berbeda tidak ditetapkan instruksi. — *DICATAT, perlu dibahas*
@@ -502,3 +504,27 @@ Hasil terkunci `hasil-skripsi-v6` tidak diubah; model utama tidak dijalankan ula
 - **F-8. `output_bab4/diagnostik/`** berisi diagnostik data kelas bahaya v3 (`docs/DIAGNOSTIK_JALAN_GRID.md`),
   bukan keluaran bergantung versi hasil. Folder ini dibiarkan. Keluaran tingkat atas lainnya dibangun ulang dari
   v6 dengan K utama 4. — *DICATAT*
+
+# Penutupan analisis (branch `finalisasi-v6`)
+
+- **Keputusan K final: K utama = 4 atas dasar substantif** (peneliti bersama pembimbing). K = 4 memisahkan
+  tipologi grid Terputus (Tipologi 4: 1.389 baris, 1,73 %, 96,5 % Terputus). K = 2 dan K = 3 menjadi
+  sensitivitas.
+- **Indeks validitas tidak searah dan ditulis apa adanya:**
+  - stabilitas subsampel, Silhouette, DESC-N, dan PESC-N menunjuk K = 2;
+  - ketegasan partisi dan I-Index menunjuk K = 4, tetapi I-Index terdongkrak klaster baris penalti dan gagal
+    pada data buatan;
+  - Dunn menunjuk K = 5 dengan selisih jauh di bawah sd.
+
+  Kriteria berbasis indeks validitas yang sempat diusulkan di awal finalisasi (F-1) digantikan. Keputusan
+  ditetapkan setelah semua hasil terlihat. Rujukan: METODOLOGI §9 (h) dan `docs/KEPUTUSAN_K_v6.md` (g).
+- **Ketahanan terhadap K** (tabel S20, `temuan_kunci.md` (g)):
+  - jumlah grid masuk Tergenang dan jumlah TAS identik pada K = 4 dan K = 2;
+  - jenis transisi dominan (menuju Tergenang atau antartipologi) sama pada keempat pasangan level;
+  - stability rate, % grid di tipologi terburuk, dan pembagian TAS per tipologi berbeda.
+- **Hasil final** = `hasil-skripsi-v6` (tidak berubah). Keluaran Bab IV di `output_bab4/` dibangun dengan
+  `k_utama = 4` dan diberi tag `bab4-final`.
+- **Analisis dinyatakan FINAL.** Perubahan analisis berikutnya hanya boleh berupa pengisian lembar validasi TAS
+  (`output_bab4/validasi/validasi_TAS_v6.xlsx`) dan rekapnya (`python -m scripts.rekap_validasi_TAS`). Perubahan
+  lain (metode, parameter, data, keputusan K) memerlukan putaran baru dengan hasil terkunci baru dan persetujuan
+  pembimbing.
