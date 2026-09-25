@@ -168,6 +168,112 @@ monoton (CATATAN B2).
 
 **Multi-start.** 10 inisialisasi (seed 42–51), dipilih solusi dengan \(J\) terkecil.
 
+### 8a. Perbedaan dengan Guo dkk. (2015): "SDWFCM termodifikasi"
+
+Rujukan: Guo, Liu, Wu, Hong, & Zhang (2015), *A new spatial fuzzy c-means for spatial clustering*, WSEAS
+Transactions on Computers 14, 369–381. Implementasi skripsi disebut **SDWFCM termodifikasi**. Versi harfiah
+artikel diimplementasikan terpisah sebagai pembanding (`backend/sdwfcm_guo.py`, "SDWFCM-Guo").
+
+**Rumus asli Guo dkk. (hlm. 372, pers. 7–10).** Dengan \(d_{ij} = \lVert x_j - v_i\rVert\) (jarak Euclidean,
+tidak dikuadratkan) dan \(NB(j)\) = tetangga spasial sampel \(j\):
+\[
+f_{ij} = \frac{\sum_{k \in NB(j)} d_{ik}}{\min_{l} \sum_{k \in NB(j)} d_{lk}}, \qquad
+D_{ij} = (1-\lambda)\, d_{ij}\, f_{ij} + \lambda\, d_{ij}, \qquad
+u_{ij} = \left[\sum_{k=1}^{c} \left(\frac{D_{ij}}{D_{kj}}\right)^{1/(m-1)}\right]^{-1}.
+\]
+
+**Rumus yang diimplementasikan (§8).** \(d^t = (1-\alpha)\, d^a + \alpha\, d^s\), dengan \(d^a\) jarak
+Euclidean **kuadrat** dan \(d^s\) rata-rata tertimbang \(d^a\cdot u^m\) tetangga dengan bobot Gaussian
+KNN-8 (blok-diagonal per level).
+
+**Perbedaan dan alasannya:**
+
+1. **Penjumlahan vs perkalian.** Guo memakai faktor spasial perkalian (\(d\cdot f\)), yaitu rasio jumlah jarak
+   tetangga terhadap minimumnya. Implementasi memakai penjumlahan jarak atribut dan jarak spasial tertimbang,
+   sehingga suku spasial berada pada satuan yang sama dengan \(d^a\) dan bobotnya dikendalikan langsung
+   oleh \(\alpha\).
+2. **Bobot kontinu.** Tetangga diberi bobot Gaussian menurut jarak, bukan himpunan tetangga biner.
+   Keanggotaan tetangga ikut sebagai bobot (\(u^m\)).
+3. **Fungsi objektif.** Implementasi merumuskan \(J(U) = \sum u^m d^t\). J dipakai untuk memilih solusi
+   multi-start dan untuk memeriksa konvergensi secara **empiris**: kriteria henti \(\lVert\Delta U\rVert_F <
+   10^{-4}\) tercapai, dan \(J\) turun hampir monoton, dengan kenaikan relatif ± \(10^{-7}\) pada beberapa
+   iterasi akhir (CATATAN B2; uji `xfail`). Konvergensi **tidak terbukti secara teoretis**. Artikel Guo tidak
+   merumuskan fungsi objektif.
+4. **Pangkat keanggotaan.** Implementasi memakai \(1/(m-1)\) pada jarak **kuadrat**, setara dengan FCM baku.
+   Artikel menulis \(1/(m-1)\) pada \(D\) yang dibentuk dari jarak **tak-kuadrat**. Ini ambigu: bila dibaca
+   harfiah, bentuknya berbeda dari FCM baku (Bezdek), yang memakai pangkat \(2/(m-1)\) pada jarak
+   tak-kuadrat. Karena itu SDWFCM-Guo dijalankan dalam bentuk harfiah dan dalam varian \(d^2\).
+5. **Inkonsistensi λ pada artikel.** Teks menyatakan informasi spasial makin berperan saat \(\lambda \to 1\)
+   (hlm. 372). Namun pada \(\lambda = 1\) rumus (9) menjadi \(D = d\), sehingga faktor spasial hilang.
+   Menurut rumusnya, peran spasial justru membesar saat \(\lambda \to 0\). Artikel melaporkan hasil terbaik
+   pada \(\lambda = 0{,}5\) (hlm. 375), dan nilai itulah yang dipakai untuk SDWFCM-Guo. Varian
+   \(\lambda = 0{,}3\) dan \(0{,}7\) dilaporkan sebagai sensitivitas.
+6. **Kriteria henti.** Artikel berhenti bila perubahan pusat klaster memenuhi kriteria (langkah 6). Atas
+   instruksi Finalisasi v6, kedua versi memakai kriteria henti model utama, dan SDWFCM-Guo memilih run dengan
+   \(J_{FCM} = \sum u^m \lVert x - v\rVert^2\) terkecil.
+
+Hasil perbandingan pada Baseline (T06/S06, L02): {{HASIL_GUO}}
+
+### 8b. DESC-N dan PESC-N (modifikasi Guo dkk., 2015)
+
+DESC dan PESC asli (Guo dkk., 2015, hlm. 374, pers. 11–14) dirancang untuk membandingkan algoritma pada K tetap.
+Keduanya tidak dapat dibandingkan antar-K:
+
+- DESC melonjak dari 0,07 (K = 3) ke 74,9 (K = 4), lalu naik monoton.
+- PESC tidak stabil (hingga 15.382).
+
+Dugaan penyebabnya:
+
+- pembagi \(\bar d\) (DESC) dan \(D\cdot d\) (PESC) mendekati nol pada blok beratribut hampir identik;
+- tidak ada normalisasi terhadap K;
+- satuan bergantung skala.
+
+Catatan implementasi repo: DESC di repo mengabaikan blok satu sampel, sedangkan artikel memakai
+\(\bar d = 1\) untuk blok satu sampel. PESC di repo memakai jarak antarpusat blok (km), sedangkan artikel memakai
+jarak pasangan sampel terdekat.
+
+**Diagnostik (B1).** {{HASIL_B1}}
+
+**Definisi (ditetapkan sebelum dihitung; `backend/desc_n.py`).** Blok = komponen terhubung baris ber-label sama
+(label tegas) pada ketetanggaan rook, dihitung per level lalu digabung. Notasi:
+
+- \(N\) = jumlah baris non-Tergenang; \(Cn_k\) = ukuran klaster \(k\);
+- \(v_i\) = ukuran blok \(i\); \(V_i = v_i/Cn_k\);
+- \(\bar d_i\) = rata-rata jarak atribut anggota blok ke pusat blok;
+- \(s\) = rata-rata jarak Euclidean semua baris ke pusat global (satu konstanta per data);
+- \(g(x) = 1/(1+x^2)\).
+
+\[
+\tilde d_i = \begin{cases} \bar d_i / s & v_i \ge 2 \\ 1 & v_i = 1 \end{cases}, \qquad
+\mathrm{DESC\text{-}N} = \sum_k \frac{Cn_k}{N} \sum_{i \in k} V_i^2\, g(\tilde d_i),
+\]
+dengan dua komponen
+\[
+\mathrm{Kontiguitas} = \sum_k \frac{Cn_k}{N} \sum_{i\in k} V_i^2, \qquad
+\mathrm{Homogenitas} = \sum_k \frac{Cn_k}{N} \cdot \frac{\sum_{i\in k} v_i\, g(\tilde d_i)}{Cn_k},
+\]
+\[
+\mathrm{PESC\text{-}N} = \sum_k \frac{Cn_k}{N} P_k, \qquad
+P_k = \begin{cases} \dfrac{\sum_{i<j} V_i V_j\, \tilde D_{ij}^{-1}\, g(\tilde d_{ij})}{\sum_{i<j} V_i V_j} & Bn_k \ge 2 \\[1ex] 1 & Bn_k = 1 \end{cases},
+\]
+dengan \(\tilde D_{ij}\) = jarak terdekat antara sel-sel blok \(i\) dan \(j\) dibagi 100 m (minimal 1), dan
+\(\tilde d_{ij}\) = jarak atribut antarpusat blok dibagi \(s\). Keduanya bernilai \((0, 1]\); makin besar makin
+baik.
+
+**Alasan setiap modifikasi:**
+
+- \(g\) terbatas dan \(g(0) = 1\), sehingga tidak meledak bila \(\bar d = 0\).
+- Pembagian dengan \(s\) membuat metrik invarian terhadap skala atribut.
+- Bobot \(Cn_k/N\) dan \(V_i = v_i/Cn_k\) menormalisasi terhadap K dan ukuran klaster.
+- \(\tilde D\) dalam satuan sel (minimal 1) menghindari pembagian dengan nol.
+- PESC-N dinormalisasi dengan \(\sum V_iV_j\) sehingga menjadi rata-rata tertimbang.
+
+Perhitungan PESC-N eksak bila jumlah pasangan per klaster ≤ 2 juta. Bila lebih, pasangan antarblok berukuran
+≥ 2 dihitung eksak dan sisanya diperkirakan dengan 200.000 pasangan acak berbobot \(V_iV_j\) (seed 42).
+Pada data gabungan, pasangan blok lintas level ikut dihitung dengan jarak pada koordinat grid.
+
+**Validasi data buatan (B3).** {{HASIL_B3}}
+
 ## 9. Pemilihan K berbasis stabilitas
 
 Untuk setiap \(K = 2, \dots, 10\) pada data gabungan:

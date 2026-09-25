@@ -17,7 +17,8 @@ Keluaran:
                            Tinggi), atribusi banjir pada TAS (Sedang, Tinggi), dan kategori akses (Baseline,
                            Sedang, Tinggi) (PNG)
 
-Skrip ini hanya membaca data/locked/ (termasuk arsip_v5/ untuk perbandingan), pengaturan_hasil.json,
+Skrip ini hanya membaca data/locked/ (termasuk arsip_v5/ untuk perbandingan), keluaran turunan Finalisasi v6
+(output_bab4/finalisasi_v6/: metrik_finalisasi_v6.json dan validasi_sintetis.json, bila ada), pengaturan_hasil.json,
 dan geometri statis grid (frontend/static_grid_kulonprogo.geojson) untuk peta.
 Folder arsip di output_bab4/ tidak disentuh.
 """
@@ -34,6 +35,22 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOCKED = PROJECT_ROOT / "data" / "locked"
 ARSIP_V5 = LOCKED / "arsip_v5" / "thesis_results.json"
 VERSI = "hasil-skripsi-v6"
+FIN_DIR = PROJECT_ROOT / "output_bab4" / "finalisasi_v6"
+
+
+def load_finalisasi():
+    """Metrik Finalisasi v6 (DESC-N/PESC-N, perbandingan algoritma dengan SDWFCM-Guo) dan status validasi data
+    buatan; None bila belum dihitung."""
+    fin = FIN_DIR / "metrik_finalisasi_v6.json"
+    sin = FIN_DIR / "validasi_sintetis.json"
+    F = json.loads(fin.read_text(encoding="utf-8")) if fin.exists() else None
+    S = json.loads(sin.read_text(encoding="utf-8")) if sin.exists() else None
+    return F, S
+
+
+def lulus_b3(S) -> list:
+    """Metrik ternormalisasi yang lulus validasi data buatan (boleh menjadi metrik pendukung pemilihan K)."""
+    return [m for m in ("DESC-N", "PESC-N") if S and S["status"].get(m, {}).get("lulus")]
 ATRIBUSI = ["dipicu banjir", "diperparah banjir", "tidak berubah", "lainnya"]
 TES_TT = "TES terdekat tidak terjangkau"   # status TAS 2 (berbeda dengan kategori akses "Terputus")
 NYARIS_DEGENERATIF = 0.85   # catatan penyajian: klaster terbesar ≥ 85% (batas degeneratif tetap 90%)
@@ -107,7 +124,7 @@ def state_name(s, k):
 
 
 # ── tabel tidak bergantung K ────────────────────────────────────────────────
-def tables_common(R):
+def tables_common(R, F=None, S=None):
     T = []
     lv, ds, pool = R["levels"], R["data_summary"], R["data_gabungan"]
     rows = [("Grid analisis 100 × 100 m", ds["n_grid"]), ("Segmen jaringan jalan", ds["n_road_segments"])]
@@ -160,6 +177,14 @@ def tables_common(R):
              "Size entropy": c["size_entropy"], "Klaster terbesar (%)": c["klaster_terbesar_persen"],
              "Setara secara stabilitas dengan K terbaik": bool(best - c["ari_subsampel_mean"] <= ks["toleransi"] + 1e-12)}
             for c in ks["candidates"]]
+    ok = lulus_b3(S)
+    if F:
+        for r in rows:
+            n = F["b4_desc_n_v6"][str(r["K"])]
+            for m in ok:
+                r[m] = n["desc_n" if m == "DESC-N" else "pesc_n"]
+            if "DESC-N" in ok:
+                r["Kontiguitas"], r["Homogenitas"] = n["kontiguitas"], n["homogenitas"]
     df = pd.DataFrame(rows)
     T.append(Table("T05", "Pemilihan K berbasis stabilitas (data gabungan)", df,
                    {c: 3 for c in df.columns if c not in ("K", "Klaster terbesar (%)",
@@ -172,16 +197,29 @@ def tables_common(R):
                    f"stabilitas: {', '.join(str(r['K']) for r in rows if r['Setara secara stabilitas dengan K terbaik'])}; "
                    f"K yang tidak setara di antara K keluaran: "
                    f"{', '.join(str(k) for k in R['k_keluaran'] if not next(r for r in rows if r['K'] == k)['Setara secara stabilitas dengan K terbaik']) or '–'}. "
-                   f"Dihitung ulang pada data v6 (snapping ke ruas). K utama ditetapkan peneliti dari himpunan K yang "
-                   f"setara secara stabilitas (METODOLOGI §9)."))
+                   f"Dihitung ulang pada data v6 (snapping ke ruas). Kriteria akhir pemilihan K (Finalisasi v6, METODOLOGI "
+                   f"§9 (h)): I-Index, Dunn, dan ketegasan partisi (L01); K utama = 4. Stabilitas subsampel = uji "
+                   f"ketahanan. DESC-N/PESC-N ditampilkan hanya bila lulus validasi data buatan (L03): "
+                   f"{', '.join(ok) if ok else 'tidak ada yang lulus'}."))
     rows = [{"K": c["k"], "I-Index": c["iidx"], "Dunn (rerata)": c["dunn"], "Dunn (sd)": c["dunn_sd"],
+             "Ketegasan partisi": c["ketegasan_partisi"],
              "DESC": c["desc"], "PESC": c["pesc"], "Komposit +DESC": c["komposit_dengan_desc"],
              "Komposit −DESC": c["komposit_tanpa_desc"]} for c in ks["candidates"]]
+    if F:
+        for r in rows:
+            n = F["b4_desc_n_v6"][str(r["K"])]
+            r.update({"DESC-N": n["desc_n"], "PESC-N": n["pesc_n"], "Kontiguitas": n["kontiguitas"],
+                      "Homogenitas": n["homogenitas"], "PESC-N aproksimasi": n["aproksimasi"]})
     df = pd.DataFrame(rows)
-    T.append(Table("L01", "Lampiran: metrik pendukung pemilihan K (tidak dipakai memilih)", df,
-                   {"K": 0, "I-Index": 3, "Dunn (rerata)": 4, "Dunn (sd)": 4, "DESC": 3, "PESC": 4,
-                    "Komposit +DESC": 3, "Komposit −DESC": 3},
-                   "DESC/PESC: blok rook; Dunn: 5 sampel 2.000 baris (seed 42–46). PESC tidak stabil antar-K."))
+    T.append(Table("L01", "Lampiran: indeks validitas pemilihan K (kriteria akhir: I-Index, Dunn, ketegasan partisi)", df,
+                   {"K": 0, "I-Index": 3, "Dunn (rerata)": 4, "Dunn (sd)": 4, "Ketegasan partisi": 3, "DESC": 3,
+                    "PESC": 4, "Komposit +DESC": 3, "Komposit −DESC": 3, "DESC-N": 4, "PESC-N": 4, "Kontiguitas": 4,
+                    "Homogenitas": 4, "PESC-N aproksimasi": 0},
+                   "Kriteria akhir pemilihan K (METODOLOGI §9 (h)): I-Index, Dunn, dan ketegasan partisi. DESC/PESC asli "
+                   "(Guo dkk., 2015; blok rook) tidak dipakai memilih karena tidak dinormalisasi terhadap K. DESC-N/PESC-N = "
+                   "versi ternormalisasi (METODOLOGI §8b); label K = 5..10 direproduksi dan diverifikasi "
+                   "(output_bab4/finalisasi_v6/verifikasi_label.json). Dunn: 5 sampel 2.000 baris (seed 42–46). "
+                   "Skor komposit lama hanya arsip."))
 
     rows, rows_s, rows_d, rows_k = [], [], [], []
     for key in LEVEL_ORDER:
@@ -363,12 +401,107 @@ def algo_note(a) -> str:
     return ""
 
 
-def tables_for_k(R, k, prefix):
+ALGO_COLS = [("Silhouette", "silhouette", 3), ("Calinski-Harabasz", "calinski_harabasz", 1),
+             ("Davies-Bouldin", "davies_bouldin", 3), ("Moran's I label", "moran_i", 3),
+             ("Proporsi tetangga rook sama", "proporsi_tetangga_sama", 3), ("Size entropy", "size_entropy", 3),
+             ("Klaster terbesar (%)", "klaster_terbesar_persen", 2), ("I-Index", "iidx", 4), ("Dunn", "dunn", 4),
+             ("DESC", "desc", 3), ("PESC", "pesc", 4), ("DESC-N", "desc_n", 4), ("PESC-N", "pesc_n", 4),
+             ("Kontiguitas", "kontiguitas", 4), ("Homogenitas", "homogenitas", 4),
+             ("Waktu per inisialisasi (detik)", "time_per_init_sec", 2)]
+STATUS_LABEL = {"ok": "layak", "degeneratif": "degeneratif — tidak layak dibandingkan",
+                "gagal": "gagal — tidak layak dibandingkan"}
+
+
+def _algo_table(rows, extra=()):
+    out = []
+    for a in rows:
+        r = {"Algoritma": a["algoritma"], "Status": STATUS_LABEL[a["status"]]}
+        for lab, key, _ in ALGO_COLS:
+            r[lab] = a.get(key)
+        for lab, key in extra:
+            r[lab] = a.get(key)
+        r["ARI vs SDWFCM termodifikasi"] = a.get("ari_vs_sdwfcm_termodifikasi")
+        r["Catatan"] = algo_note(a)
+        out.append(r)
+    return pd.DataFrame(out)
+
+
+def tables_algo_finalisasi(F, k, prefix):
+    """T06/S06 (Finalisasi v6): SDWFCM termodifikasi, SDWFCM-Guo, FCM, SFCM, REDCAP, SKATER pada K tetap."""
+    rows = F["d_perbandingan_algoritma"][str(k)]
+    df = _algo_table(rows)
+    fmt = {lab: d for lab, _, d in ALGO_COLS} | {"ARI vs SDWFCM termodifikasi": 3}
+    guo = next(r for r in rows if r["algoritma"].startswith("SDWFCM-Guo"))
+    kon = sum(c["konvergen"] for c in guo["konvergensi"])
+    return Table(f"{prefix}06", f"Perbandingan algoritma pada Baseline K{k} (termasuk SDWFCM versi asli Guo dkk., 2015)",
+                 df, fmt,
+                 "Pada K tetap, mengikuti cara Guo dkk. (2015) membandingkan algoritma. SDWFCM termodifikasi, FCM (α = 0), "
+                 "SFCM: m = 1,7, 10 inisialisasi (J terkecil). SDWFCM-Guo: bentuk harfiah (d tak dikuadratkan, pangkat "
+                 f"1/(m−1)), λ = 0,5, NB = 8 tetangga, 10 inisialisasi, run dengan J_FCM terkecil; konvergen {kon}/10 seed. "
+                 "I-Index dengan centroid tegas untuk semua algoritma; Dunn rerata 5 sampel 2.000 baris; Moran's I label "
+                 "999 permutasi; DESC/PESC asli dan DESC-N/PESC-N dengan blok rook Baseline. Label algoritma selain "
+                 "SDWFCM-Guo direproduksi dan diverifikasi terhadap metrik terkunci. Degeneratif = klaster terbesar > 90 %.")
+
+
+def tables_guo_varian(F):
+    rows = []
+    for k in ("4", "2"):
+        for a in F["d_varian_guo"].get(k, []):
+            rows.append({**a, "algoritma": f"{a['algoritma']} — K = {k}",
+                         "konvergen_seed": sum(c["konvergen"] for c in a["konvergensi"])})
+    df = _algo_table(rows, extra=(("ARI vs SDWFCM-Guo harfiah", "ari_vs_guo_harfiah"),
+                                  ("Seed konvergen (dari 10)", "konvergen_seed")))
+    fmt = {lab: d for lab, _, d in ALGO_COLS} | {"ARI vs SDWFCM termodifikasi": 3, "ARI vs SDWFCM-Guo harfiah": 3,
+                                                 "Seed konvergen (dari 10)": 0}
+    return Table("L02", "Lampiran: varian sensitivitas SDWFCM-Guo (d², λ = 0,3, λ = 0,7) pada Baseline", df, fmt,
+                 "Varian d²: jarak atribut dikuadratkan pada f dan D (menjawab ambiguitas pangkat keanggotaan). λ = 0,3 dan "
+                 "0,7: bentuk harfiah. Metrik sama dengan T06.")
+
+
+def tables_validasi_sintetis():
+    f = FIN_DIR / "validasi_sintetis.csv"
+    if not f.exists():
+        return []
+    df = pd.read_csv(f)
+    S = json.loads((FIN_DIR / "validasi_sintetis.json").read_text(encoding="utf-8"))
+    cols = ["K", "DESC", "PESC", "DESC-N", "PESC-N", "Kontiguitas", "Homogenitas", "I-Index", "Dunn", "Silhouette",
+            "ARI vs kelas"]
+    st = "; ".join(f"{m}: K tertinggi {v['K_tertinggi']}, monoton {'ya' if v['monoton'] else 'tidak'}, invarian ×10 "
+                   f"{'ya' if v['kriteria_b'] else 'tidak'} → {'LULUS' if v['lulus'] else 'TIDAK LULUS'}"
+                   for m, v in S["status"].items())
+    return [Table("L03", "Lampiran: validasi DESC-N/PESC-N pada data buatan (meniru Guo dkk., 2015, hlm. 377–378)",
+                  df[cols], {"K": 0} | {c: 4 for c in cols if c != "K"},
+                  "Grid 100 × 100, 4 wilayah kelas (seed 42), 4 atribut acak seragam dengan rentang per kelas sesuai "
+                  "artikel; SDWFCM termodifikasi, parameter skripsi, K = 2..8. Kriteria lulus (ditetapkan sebelum "
+                  f"dihitung): (a) tertinggi di K = 4 atau tidak monoton; (b) invarian terhadap atribut × 10. {st}.")]
+
+
+def tables_diag_desc(F):
+    rows = []
+    for k in ("3", "4"):
+        d = F["b1_diagnostik_desc"][k]
+        for i, b in enumerate(d["top10"], start=1):
+            rows.append({"K": int(k), "Peringkat": i, "Klaster": b["klaster"], "Level": b["level"], "v_i": b["v"],
+                         "V_i": b["V"], "d̄_i": b["d_bar"], "Kontribusi V²/d̄²": b["kontribusi"],
+                         "% DESC": b["persen_kontribusi"], "% baris penalti": b["persen_baris_penalti"]})
+    df = pd.DataFrame(rows)
+    note = "; ".join(f"K = {k}: DESC {id_num(F['b1_diagnostik_desc'][k]['desc_dihitung_ulang'], 3)}, "
+                     f"{id_num(F['b1_diagnostik_desc'][k]['persen_desc_dari_blok_dbar_lt_0_01'], 1)} % dari blok d̄ < 0,01"
+                     for k in ("3", "4"))
+    return [Table("L04", "Lampiran: diagnostik DESC asli — 10 blok dengan kontribusi terbesar (K = 3 dan K = 4)", df,
+                  {"K": 0, "Peringkat": 0, "Klaster": 0, "v_i": 0, "V_i": 4, "d̄_i": 6, "Kontribusi V²/d̄²": 3,
+                   "% DESC": 2, "% baris penalti": 1},
+                  f"Blok = komponen rook ber-label sama di dalam level (data gabungan). {note}.")]
+
+
+def tables_for_k(R, k, prefix, F=None):
     T = []
     M = R["model"][str(k)]
     sfx = f"K{k}"
 
-    if M.get("algorithm_comparison"):
+    if F and str(k) in F.get("d_perbandingan_algoritma", {}):
+        T.append(tables_algo_finalisasi(F, k, prefix))
+    elif M.get("algorithm_comparison"):
         rows = []
         for a in M["algorithm_comparison"]:
             rows.append({"Algoritma": a["algoritma"],
@@ -917,11 +1050,15 @@ def main(argv=None):
     for old in ("perbandingan_v1_vs_v2.md", "perbandingan_v2_vs_v3.md", "perbandingan_v3_vs_v4.md",
                 "perbandingan_v4_vs_v5.md"):   # di arsip
         (out_dir / old).unlink(missing_ok=True)
-    tables = (tables_common(R) + tables_access_extra(grid) + tables_common_tail(R) + tables_for_k(R, k_utama, "T")
-              + tables_k_compare(R, grid))
+    F, S = load_finalisasi()
+    tables = (tables_common(R, F, S) + tables_access_extra(grid) + tables_common_tail(R)
+              + tables_for_k(R, k_utama, "T", F) + tables_k_compare(R, grid))
     for k in ks:
         if k != k_utama:
-            tables += tables_for_k(R, k, "S")
+            tables += tables_for_k(R, k, "S", F)
+    if F:
+        tables += [tables_guo_varian(F)] + tables_diag_desc(F)
+    tables += tables_validasi_sintetis()
     order = lambda t: ({"T": 0, "L": 1, "S": 2}[t.code[0]], int("".join(ch for ch in t.code[1:3] if ch.isdigit())), t.code)
     tables.sort(key=order)
     write_csv(tables, out_dir)

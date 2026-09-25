@@ -33,22 +33,28 @@ python -m scripts.cek_reproduksi           # jalankan ulang ke folder sementara 
 python -m scripts.export_bab4              # bangun ulang output_bab4/ dari data/locked/ (beberapa detik)
 ```
 
-**Hasil final: `hasil-skripsi-v5`** (model utama K = 4; K = 2 dan K = 3 sebagai sensitivitas; kelas
-bahaya dari raster InaRisk; TAS dengan syarat T_aktual ≥ 30 menit; kategori akses). Hash yang diharapkan:
+**Hasil final: `hasil-skripsi-v6`** (snapping ke ruas terdekat; kelas bahaya dari raster InaRisk; TAS dengan
+syarat T_aktual ≥ 30 menit; kategori akses; atribusi banjir pada TAS). Keluaran Bab IV v6 (`output_bab4/`)
+dibangun dengan **`k_utama = 4`** (Finalisasi v6, `docs/KEPUTUSAN_K_v6.md`); K = 2 dan K = 3 sebagai
+sensitivitas. Hash yang diharapkan:
 
 | Besaran | SHA-256 |
 |---|---|
-| Fingerprint `thesis_results.json` tanpa field waktu dan `meta.git` | `8b0b47eee51e5974ca2567e5b42d57e7d104066d7d39a474e4913f7426c6e0dc` |
-| Isi `thesis_grid_results.csv` (setelah dekompresi) | `ca705355f0a47d78e8c4c6200b13562a3e08625bcfae5da0b866922c6067f80a` |
-| Isi `thesis_pooled_results.csv` (setelah dekompresi) | `398451698bd772f376025f974c63445d9e228b04c4f95349d4c34d41779426f4` |
+| Fingerprint `thesis_results.json` tanpa field waktu dan `meta.git` | `e58b6e7e7814fc8d8e08f90ae64495da4f3259aeae1e4837c8de0995e9481a00` |
+| Isi `thesis_grid_results.csv` (setelah dekompresi) | `9e9dc36860e7d57c873e9fee2f0b46e59bea623601342cadae1da974544f4de0` |
+| Isi `thesis_pooled_results.csv` (setelah dekompresi) | `d4ea0ec5eba98ff9748fd6466a7de9e71a4e61354f7d868e60db0253a981c6f9` |
 
 Hash berkas mentah di `LOCK.json` memuat stempel waktu (field waktu JSON dan header gzip), sehingga
-yang dibandingkan saat reproduksi adalah hash di atas. Pemilihan K diambil dari
-`data/locked/arsip_v3/` setelah data gabungan diverifikasi identik. Satu run penuh memakan waktu ±9
-menit. Determinisme diperiksa dengan dua run yang menghasilkan hash identik. Hasil lama diarsipkan di
-`data/locked/arsip_v1/` sampai `arsip_v4/`.
+yang dibandingkan saat reproduksi adalah hash di atas. Pemilihan K (stabilitas) dihitung ulang pada data v6;
+satu run penuh memakan waktu ±1 jam 46 menit. Determinisme diperiksa dengan dua run yang menghasilkan hash
+identik. Hasil lama diarsipkan di `data/locked/arsip_v1/` sampai `arsip_v5/`.
 
-Validasi manual TAS: isi `output_bab4/validasi/validasi_TAS.xlsx` (dibuat oleh
+Metrik Finalisasi v6 (DESC-N/PESC-N, perbandingan dengan SDWFCM versi asli Guo dkk., validasi data buatan) ada di
+`output_bab4/finalisasi_v6/` dan dibuat dengan `python -m scripts.reproduksi_label_v6`,
+`python -m scripts.validasi_desc_n_sintetis`, lalu `python -m scripts.metrik_finalisasi_v6`; hasil terkunci
+tidak berubah.
+
+Validasi manual TAS: isi `output_bab4/validasi/validasi_TAS_v6.xlsx` (dibuat oleh
 `python -m scripts.lembar_validasi_TAS`), lalu jalankan `python -m scripts.rekap_validasi_TAS`.
 
 K model utama untuk tabel Bab IV dan dashboard diatur di `pengaturan_hasil.json`
@@ -56,7 +62,7 @@ K model utama untuk tabel Bab IV dan dashboard diatur di `pengaturan_hasil.json`
 
 Menjalankan ulang analisis dan mengunci hasil baru mengikuti `docs/ALUR_KERJA.md`. Semua angka
 skripsi diambil dari `output_bab4/` (tabel CSV, `Tabel_Bab4.docx`, `ringkasan_angka_bab4.md`,
-`temuan_kunci.md`, `perbandingan_v4_vs_v5.md`). Metode lengkap ada di `docs/METODOLOGI.md`, rujukan parameter di
+`temuan_kunci.md`, `perbandingan_v5_vs_v6.md`). Metode lengkap ada di `docs/METODOLOGI.md`, rujukan parameter di
 `docs/RUJUKAN_PARAMETER.md`; diagnostik sumber
 kelas bahaya di `docs/DIAGNOSTIK_JALAN_GRID.md`.
 

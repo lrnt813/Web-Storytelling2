@@ -25,6 +25,11 @@ ini belum ada parameter yang dinyatakan demikian.
 | Toleransi atribusi banjir ("diperparah" > 1 menit; "tidak berubah" ≤ 1 menit) | 1 menit | `thesis.ATRIBUSI_TOL_MENIT` | — (alasan operasional: toleransi numerik dan perbedaan pembulatan; METODOLOGI §16) | — | **ditetapkan peneliti** (Putaran 6) |
 | Batas waktu Baseline kelompok "dipicu banjir" | < 30 menit (= batas waktu evakuasi) | `engine.EVAC_TIME_MIN` | sama dengan batas waktu evakuasi | — | **perlu verifikasi peneliti** |
 | Toleransi kesetaraan stabilitas K (selisih rerata ARI subsampel) | 0,01 | `thesis.K_ARI_TOLERANCE` | — (diperiksa dengan adaptasi aturan one-standard-error: Hastie, Tibshirani & Friedman, 2009, *The Elements of Statistical Learning*, ed. 2, hlm. 61 dan 244; `docs/KEPUTUSAN_K_v6.md` (b)) | — | **ditetapkan peneliti**; sejak Finalisasi v6 stabilitas berperan sebagai **uji ketahanan**, bukan aturan pemilihan K (METODOLOGI §9 (h)) |
+| Fungsi redaman DESC-N/PESC-N | g(x) = 1/(1 + x²) | `desc_n.g` | — | — | **ditetapkan peneliti** (Finalisasi v6; terbatas di (0, 1], g(0) = 1) |
+| Skala atribut DESC-N/PESC-N | s = rata-rata jarak baris ke pusat global | `desc_n.scale_s` | — | — | **ditetapkan peneliti** (invarian skala) |
+| Batas pasangan blok eksak PESC-N | 2.000.000 per klaster; sampel 200.000 pasangan berbobot V_iV_j (seed 42) | `desc_n.MAX_PAIRS`, `desc_n.N_SAMPLE` | — | — | **ditetapkan peneliti** (komputasi) |
+| λ SDWFCM-Guo (pembanding) | 0,5 (sensitivitas 0,3 dan 0,7) | `sdwfcm_guo.LAMBDA_GUO` | Guo, Liu, Wu, Hong & Zhang (2015), *WSEAS Trans. Computers* 14, 369–381: hasil terbaik pada λ = 0,5 | hlm. 375 | **perlu verifikasi peneliti** |
+| Tetangga SDWFCM-Guo | NB = 8 tetangga terdekat (pola W KNN-8 model utama, tanpa bobot) | `sdwfcm_guo.neighbor_matrix` | Guo dkk. (2015) mendefinisikan NB(j) sebagai himpunan tetangga tanpa menetapkan jumlahnya | hlm. 372 | **ditetapkan peneliti** (disamakan dengan model utama) |
 | Radius hotspot validasi (DBSCAN) | 350 m | `scripts/lembar_validasi_TAS.HOTSPOT_EPS_M` | — (alat bantu validasi, tidak memengaruhi hasil) | — | **ditetapkan peneliti** (Putaran 6) |
 | Ambang isolasi REDCAP | 30 menit (= batas waktu evakuasi) | `Cfg.isolation_time_threshold = EVAC_TIME_MIN` | sama dengan batas waktu evakuasi | — | **perlu verifikasi peneliti** |
 
