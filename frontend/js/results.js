@@ -332,6 +332,12 @@ function renderTasTab(r) {
         return { cells: [l.label, fmtInt(c.tas_baru), fmtInt(c.tas_hilang), fmtInt(c.tas_hilang_jadi_tergenang), fmtInt(c.tas_hilang_jadi_tes_terdekat_tidak_terjangkau), fmtInt(c.tas_hilang_lainnya)] };
     });
     const dist = LEVELS.map(l => { const s = r.levels?.[l.key]?.tas || {}; return { cells: [l.label, q(s.sebaran_di_tas), q(s.sebaran_di_non_tas)] }; });
+    const grpAtr = ['dipicu banjir', 'diperparah banjir', 'tidak berubah', 'lainnya'];
+    const atrRows = LEVELS.slice(1).filter(l => r.levels?.[l.key]?.atribusi_banjir).map(l => {
+        const a = r.levels[l.key].atribusi_banjir;
+        return { cells: [l.label, fmtInt(a.jumlah_tas), ...grpAtr.map(g => `${fmtInt(a.kelompok?.[g]?.jumlah)} <span class="muted">(${fmtNum(a.kelompok?.[g]?.persen, 1)}%)</span>`),
+                         fmtNum(a.median_waktu_baseline_dipicu), fmtNum(a.median_tambahan_waktu_dipicu), fmtNum(a.median_tambahan_waktu_diperparah)] };
+    });
     const kat = Object.keys(tesCategories);
     const katRows = LEVELS.map(l => { const s = r.levels?.[l.key]?.tas || {}; return { cells: [l.label, ...kat.map(k => fmtInt(s.tas_per_kategori_tes_terdekat?.[k] || 0))] }; });
     const aksesRows = [];
@@ -344,6 +350,8 @@ function renderTasTab(r) {
         table(['Level', 'TAS', 'Non-TAS', 'TES terdekat tidak terjangkau', 'Tergenang', '% TAS', 'TAS (≥ 20 mnt)', 'TAS (≥ 40 mnt)', 'TAS utama yang tetap pada 40 mnt', 'Absolut v3', 'Persentil', 'Median T<sub>ideal</sub> TAS', 'Median T<sub>aktual</sub> TAS'], rows))
         + section('Perubahan TAS terhadap Baseline', 'TAS baru = bukan TAS di Baseline, menjadi TAS di level ini. TAS hilang dipecah menurut status di level ini.',
             table(['Level', 'TAS baru akibat banjir', 'TAS hilang', 'jadi Tergenang', 'jadi TES terdekat tidak terjangkau', 'lainnya'], chg))
+        + (atrRows.length ? section('Atribusi Banjir pada TAS', 'TES sama = TES terdekat (Euclidean) identik dengan Baseline. Dipicu = bukan TAS di Baseline dan waktu Baseline ke TES itu &lt; 30 menit; diperparah = TAS di Baseline dan T<sub>aktual</sub> naik &gt; 1 menit; tidak berubah = TAS di Baseline, perubahan ≤ 1 menit; lainnya = selain itu.',
+            table(['Level', 'TAS', 'Dipicu banjir', 'Diperparah banjir', 'Tidak berubah', 'Lainnya', 'Median waktu Baseline (dipicu)', 'Median tambahan (dipicu)', 'Median tambahan (diperparah)'], atrRows)) : '')
         + section('Sebaran Detour Index', 'Deskriptif; perbedaan DI TAS vs Non-TAS mengikuti definisi aturan, bukan bukti keberhasilan deteksi.',
             table(['Level', 'DI TAS: median [P25–P75; P90]', 'DI Non-TAS: median [P25–P75; P90]'], dist))
         + section('TAS per kategori TES terdekat', '', table(['Level', ...kat.map(k => tesCategories[k].label)], katRows))
