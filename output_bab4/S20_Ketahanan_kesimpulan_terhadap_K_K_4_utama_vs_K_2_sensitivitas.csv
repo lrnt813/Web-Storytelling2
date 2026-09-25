@@ -1,0 +1,9 @@
+﻿Bagian,Level / pasangan,K = 4: transisi dominan,K = 4: SR (%),K = 4: masuk Tergenang,K = 2: transisi dominan,K = 2: SR (%),K = 2: masuk Tergenang,K = 4: % grid di tipologi terburuk,K = 4: TAS di tipologi terburuk,K = 4: TAS di tipologi lain,K = 2: % grid di tipologi terburuk,K = 2: TAS di tipologi terburuk,K = 2: TAS di tipologi lain
+Transisi,Baseline → Rendah,Tipologi 1 → Tipologi 2 (61),99.487497,39.0,Tipologi 1 → Tipologi 2 (48),99.783512,39.0,,,,,,
+Transisi,Rendah → Sedang,Tipologi 3 → Tergenang (1.870),87.081563,3336.0,Tipologi 2 → Tergenang (1.956),92.377448,3336.0,,,,,,
+Transisi,Sedang → Tinggi,Tipologi 2 → Tipologi 3 (1.488),77.506775,3800.0,Tipologi 1 → Tipologi 2 (2.638),82.87521,3800.0,,,,,,
+Transisi,Baseline → Tinggi,Tipologi 1 → Tergenang (2.845),71.183379,7175.0,Tipologi 1 → Tergenang (4.121),77.093819,7175.0,,,,,,
+Tipologi terburuk dan TAS,Baseline,,,,,,,0.44987429982798927,0.0,68.0,45.69311515899969,50.0,18.0
+Tipologi terburuk dan TAS,Rendah,,,,,,,0.5160322850968112,0.0,76.0,45.74604154721475,58.0,18.0
+Tipologi terburuk dan TAS,Sedang,,,,,,,2.209676707978653,0.0,76.0,43.30701715697084,72.0,4.0
+Tipologi terburuk dan TAS,Tinggi,,,,,,,2.950646142989459,0.0,44.0,47.739602169981914,44.0,0.0

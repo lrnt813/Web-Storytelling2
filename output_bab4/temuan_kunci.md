@@ -66,3 +66,28 @@ Sumber: `T11f` (Atribusi pengaruh banjir pada TAS (Rendah, Sedang, Tinggi)).
 | Tinggi | 44 | 20 (45,5 %) | 3 (6,8 %) | 14 (31,8 %) | 7 (15,9 %) | 25,43 menit | 8,93 menit | 1,35 menit |
 
 Dipicu = bukan TAS di Baseline, TES terdekat sama, waktu Baseline ke TES itu < 30 menit; diperparah = TAS di Baseline, TES sama, T_aktual naik > 1 menit; tidak berubah = TAS di Baseline, TES sama, perubahan ≤ 1 menit; lainnya = selain itu. Persentase terhadap TAS level tersebut.
+
+## (g) Ketahanan kesimpulan terhadap K: K = 4 (utama) vs K = 2 (sensitivitas)
+
+Sumber: `S20` (Ketahanan kesimpulan terhadap K: K = 4 (utama) vs K = 2 (sensitivitas)). K utama = 4 atas dasar substantif (METODOLOGI §9 (h)).
+
+| Pasangan level | K = 4: transisi dominan | K = 4: SR | K = 2: transisi dominan | K = 2: SR | Masuk Tergenang (K = 4 / K = 2) |
+|---|---|---:|---|---:|---:|
+| Baseline → Rendah | Tipologi 1 → Tipologi 2 (61) | 99,49 % | Tipologi 1 → Tipologi 2 (48) | 99,78 % | 39 / 39 |
+| Rendah → Sedang | Tipologi 3 → Tergenang (1.870) | 87,08 % | Tipologi 2 → Tergenang (1.956) | 92,38 % | 3.336 / 3.336 |
+| Sedang → Tinggi | Tipologi 2 → Tipologi 3 (1.488) | 77,51 % | Tipologi 1 → Tipologi 2 (2.638) | 82,88 % | 3.800 / 3.800 |
+| Baseline → Tinggi | Tipologi 1 → Tergenang (2.845) | 71,18 % | Tipologi 1 → Tergenang (4.121) | 77,09 % | 7.175 / 7.175 |
+
+| Level | % grid di tipologi terburuk (K = 4 / K = 2) | TAS di tipologi terburuk (K = 4 / K = 2) | TAS di tipologi lain (K = 4 / K = 2) |
+|---|---:|---:|---:|
+| Baseline | 0,45 % / 45,69 % | 0 / 50 | 68 / 18 |
+| Rendah | 0,52 % / 45,75 % | 0 / 58 | 76 / 18 |
+| Sedang | 2,21 % / 43,31 % | 0 / 72 | 76 / 4 |
+| Tinggi | 2,95 % / 47,74 % | 0 / 44 | 44 / 0 |
+
+Kesimpulan:
+- Sama: jumlah grid masuk Tergenang identik pada kedua K (tidak bergantung tipologi); jumlah TAS per level sama (TAS tidak bergantung K).
+- Sama: jenis transisi dominan (menuju Tergenang atau antartipologi) pada pasangan Baseline → Rendah, Rendah → Sedang, Sedang → Tinggi, Baseline → Tinggi.
+- Berbeda: SR K = 4 lebih rendah atau sama dengan K = 2 pada semua pasangan level.
+- Berbeda: persentase grid di tipologi terburuk Baseline 0,45 % (K = 4) vs 45,69 % (K = 2); Rendah 0,52 % (K = 4) vs 45,75 % (K = 2); Sedang 2,21 % (K = 4) vs 43,31 % (K = 2); Tinggi 2,95 % (K = 4) vs 47,74 % (K = 2).
+- Berbeda: TAS di tipologi terburuk Baseline 0 (K = 4) vs 50 (K = 2); Rendah 0 (K = 4) vs 58 (K = 2); Sedang 0 (K = 4) vs 72 (K = 2); Tinggi 0 (K = 4) vs 44 (K = 2).
