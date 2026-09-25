@@ -472,3 +472,33 @@ Hasil terkunci `hasil-skripsi-v6` tidak diubah; model utama tidak dijalankan ula
   Titik berhenti A3 tidak terpicu: Tipologi 4 K = 4 berisi 1.389 baris (1,73 %), 96,5 % Terputus. Dari tiga
   kriteria akhir, I-Index dan ketegasan partisi menunjuk K = 4; **Dunn menunjuk K = 5** (0,0107 vs 0,0105). Cara
   menggabungkan ketiga kriteria bila berbeda tidak ditetapkan instruksi. — *DICATAT, perlu dibahas*
+- **F-2. Label K = 5..10 dan label algoritma pembanding tidak tersimpan di hasil terkunci v6** (bertentangan
+  dengan asumsi instruksi B4/D). Keputusan peneliti: label direproduksi secara deterministik
+  (`scripts/reproduksi_label_v6.py`) dan hanya dipakai karena semua metrik terkunci terreproduksi (J, seed,
+  Silhouette, I-Index per K; label K = 4 identik ARI = 1; metrik tabel algoritma K = 4 dan K = 2). T_pen dan
+  praproses dihitung ulang seperti pipeline, karena nilai JSON terkunci dibulatkan 6 desimal
+  (`verifikasi_label.json`). Hasil terkunci tidak berubah. — *SELESAI*
+- **F-3. Rujukan Guo dkk. (2015)** = Guo, Y., Liu, K., Wu, Q., Hong, Q., & Zhang, H. (2015). *A new spatial fuzzy
+  c-means for spatial clustering*. WSEAS Transactions on Computers 14, 369–381 (PDF ada di komputer peneliti).
+  Temuan terhadap implementasi repo:
+  - DESC repo mengabaikan blok satu sampel, sedangkan artikel memakai d̄ = 1 untuk blok satu sampel;
+  - PESC repo memakai jarak antarpusat blok (km), sedangkan artikel memakai pasangan sampel terdekat;
+  - artikel memakai nama SDWFCM dan DWSFCM bergantian.
+
+  DESC/PESC repo **tidak diubah** (hasil terkunci). — *DICATAT*
+- **F-4. DESC-N lulus validasi data buatan hanya lewat klausul "tidak monoton"** (tertinggi di K = 2, bukan
+  K = 4). PESC-N tertinggi di K = 4. Pada v6 keduanya tertinggi di K = 2, jadi tidak mendukung K = 4 (METODOLOGI
+  §8b). Kriteria lulus tidak diubah setelah hasil terlihat. — *DICATAT, perlu dibahas*
+- **F-5. SDWFCM-Guo** (bentuk harfiah, λ = 0,5) konvergen 10/10 seed pada K = 4 dan K = 2; varian λ = 0,7 pada
+  K = 4 konvergen 8/10. ARI terhadap SDWFCM termodifikasi 0,760 (K = 4) dan 0,895 (K = 2). Kriteria henti
+  disamakan dengan model utama (‖ΔU‖_F < 10⁻⁴), bukan perubahan pusat seperti artikel; perubahan pusat akhir
+  tetap dicatat per seed. — *SELESAI*
+- **F-6. REDCAP K = 4 kini berstatus "layak"** (klaster terbesar 82,2 %; batas degeneratif 90 %) dan memperoleh
+  DESC-N/PESC-N tertinggi, karena partisi kontigu secara konstruksi, tetapi Silhouette-nya terendah (0,058).
+  Status ini sama dengan hasil terkunci v6. — *DICATAT*
+- **F-7. Tabel algoritma memakai I-Index dengan centroid tegas** untuk semua algoritma, agar setara (FCM/SFCM
+  tidak menyimpan pusat fuzzy di hasil terkunci). Nilainya berbeda dengan I-Index pemilihan K, yang memakai
+  pusat fuzzy. — *DICATAT*
+- **F-8. `output_bab4/diagnostik/`** berisi diagnostik data kelas bahaya v3 (`docs/DIAGNOSTIK_JALAN_GRID.md`),
+  bukan keluaran bergantung versi hasil. Folder ini dibiarkan. Keluaran tingkat atas lainnya dibangun ulang dari
+  v6 dengan K utama 4. — *DICATAT*

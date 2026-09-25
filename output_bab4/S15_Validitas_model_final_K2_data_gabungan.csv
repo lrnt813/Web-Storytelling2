@@ -1,13 +1,13 @@
 ﻿Metrik,Nilai
-I-Index,1.249668
-Ketegasan partisi,0.339917
-Koefisien partisi (PC),0.684787
-Entropi partisi (PE),0.481745
-Dunn (rerata 5 sampel),0.005648
-Dunn (sd 5 sampel),0.001843
-DESC (blok rook),0.044361
-PESC (km),66.52237855113364
-Silhouette (sampel 10.000),0.242711
-Size entropy,0.692892
-Klaster terbesar (%),51.129171
-Proporsi tetangga rook berlabel sama,0.919838
+I-Index,1.252006
+Ketegasan partisi,0.340924
+Koefisien partisi (PC),0.68525
+Entropi partisi (PE),0.481152
+Dunn (rerata 5 sampel),0.006134
+Dunn (sd 5 sampel),0.003175
+DESC (blok rook),0.043645
+PESC (km),25.268761337601862
+Silhouette (sampel 10.000),0.243172
+Size entropy,0.692601
+Klaster terbesar (%),51.652248
+Proporsi tetangga rook berlabel sama,0.919823

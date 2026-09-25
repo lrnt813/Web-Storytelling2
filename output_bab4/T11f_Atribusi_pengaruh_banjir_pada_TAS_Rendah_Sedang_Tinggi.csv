@@ -1,0 +1,4 @@
+﻿Level,TAS,dipicu banjir (grid),dipicu banjir (%),diperparah banjir (grid),diperparah banjir (%),tidak berubah (grid),tidak berubah (%),lainnya (grid),lainnya (%),"Median waktu Baseline, dipicu (menit)","Median tambahan waktu, dipicu (menit)","Median tambahan waktu, diperparah (menit)","Median ruas tertutup di rute Baseline, dipicu","Median ruas tertutup di rute Baseline, diperparah",Alasan 'lainnya'
+Rendah,76,8,10.526316,9,11.842105,59,77.631579,0,0.0,19.849142,18.286512,11.98714,2.0,15.0,–
+Sedang,76,52,68.421053,7,9.210526,15,19.736842,2,2.631579,12.026199,26.489214,11.411585,11.0,7.0,TES terdekat berubah 1; T_aktual turun 1
+Tinggi,44,20,45.454545,3,6.818182,14,31.818182,7,15.909091,25.427818,8.931194,1.352573,26.0,27.0,TES terdekat berubah 7

@@ -1,92 +1,92 @@
 # Ringkasan angka kunci Bab IV
 
-Sumber: `data/locked/` — commit analisis `0bcb860004b90ed9bcf6ed4c09b27f7ff27d8432`, dikunci 2026-09-25T03:00:41+07:00. K utama = **4** (pengaturan_hasil.json); K lain = sensitivitas.
+Sumber: `data/locked/` — commit analisis `1fdcec2ca57cadc3e03dc603b59f3259f2a6911c`, dikunci 2026-09-25T12:30:37+07:00. K utama = **4** (pengaturan_hasil.json); K lain = sensitivitas.
 
 ## Data dan level
 
-- Grid 22.673; segmen jalan 162.608; TES 1.647; T_pen 403,87 menit
+- Grid 22.673; segmen jalan 162.608; TES 1.647; T_pen 403,29 menit
 - Data gabungan 80.103 baris
-- Baseline (tidak ada kelas ditutup): Tergenang 0 (0,00 %); ruas ditutup 0; TES valid 1.434; rerata waktu minimum 9,04 menit (median 5,81); TAS 62 (0,27 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 254 / 34; absolut v3 5.758; persentil 1.842; TES terdekat tidak terjangkau 168
-  - Kategori akses (30 menit): Terjangkau 22.357 (98,61 %); Jauh 205 (0,90 %); Terputus 111 (0,49 %); Tergenang 0 (0,00 %)
-- Level Rendah (kelas 3 ditutup): Tergenang 39 (0,17 %); ruas ditutup 710; TES valid 1.434; rerata waktu minimum 9,33 menit (median 5,80); TAS 70 (0,31 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 258 / 36; absolut v3 5.757; persentil 1.811; TES terdekat tidak terjangkau 182
-  - Kategori akses (30 menit): Terjangkau 22.254 (98,15 %); Jauh 254 (1,12 %); Terputus 126 (0,56 %); Tergenang 39 (0,17 %)
+- Baseline (tidak ada kelas ditutup): Tergenang 0 (0,00 %); ruas ditutup 0; TES valid 1.434; rerata waktu minimum 8,73 menit (median 5,69); TAS 68 (0,30 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 249 / 38; absolut v3 5.108; persentil 1.668; TES terdekat tidak terjangkau 157
+  - Kategori akses (30 menit): Terjangkau 22.371 (98,67 %); Jauh 202 (0,89 %); Terputus 100 (0,44 %); Tergenang 0 (0,00 %)
+- Level Rendah (kelas 3 ditutup): Tergenang 39 (0,17 %); ruas ditutup 710; TES valid 1.434; rerata waktu minimum 9,02 menit (median 5,69); TAS 76 (0,34 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 253 / 39; absolut v3 5.108; persentil 1.634; TES terdekat tidak terjangkau 171
+  - Kategori akses (30 menit): Terjangkau 22.269 (98,22 %); Jauh 250 (1,10 %); Terputus 115 (0,51 %); Tergenang 39 (0,17 %)
   - TAS baru akibat banjir 8; TAS hilang 0 (jadi Tergenang 0, jadi TES terdekat tidak terjangkau 0, lainnya 0)
-- Level Sedang (kelas ≥ 2 ditutup): Tergenang 3.375 (14,89 %); ruas ditutup 20.963; TES valid 1.367; rerata waktu minimum 16,67 menit (median 5,48); TAS 77 (0,40 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 218 / 37; absolut v3 5.092; persentil 1.485; TES terdekat tidak terjangkau 600
-  - Kategori akses (30 menit): Terjangkau 18.732 (82,62 %); Jauh 64 (0,28 %); Terputus 502 (2,21 %); Tergenang 3.375 (14,89 %)
-  - TAS baru akibat banjir 54; TAS hilang 39 (jadi Tergenang 31, jadi TES terdekat tidak terjangkau 7, lainnya 1)
-- Level Tinggi (kelas ≥ 1 ditutup): Tergenang 7.175 (31,65 %); ruas ditutup 44.096; TES valid 989; rerata waktu minimum 24,41 menit (median 6,29); TAS 44 (0,28 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 209 / 16; absolut v3 3.685; persentil 1.047; TES terdekat tidak terjangkau 951
-  - Kategori akses (30 menit): Terjangkau 14.529 (64,08 %); Jauh 318 (1,40 %); Terputus 651 (2,87 %); Tergenang 7.175 (31,65 %)
-  - TAS baru akibat banjir 27; TAS hilang 45 (jadi Tergenang 35, jadi TES terdekat tidak terjangkau 8, lainnya 2)
+- Level Sedang (kelas ≥ 2 ditutup): Tergenang 3.375 (14,89 %); ruas ditutup 20.963; TES valid 1.367; rerata waktu minimum 16,59 menit (median 5,34); TAS 76 (0,39 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 210 / 37; absolut v3 4.507; persentil 1.338; TES terdekat tidak terjangkau 593
+  - Kategori akses (30 menit): Terjangkau 18.732 (82,62 %); Jauh 61 (0,27 %); Terputus 505 (2,23 %); Tergenang 3.375 (14,89 %)
+  - TAS baru akibat banjir 53; TAS hilang 45 (jadi Tergenang 36, jadi TES terdekat tidak terjangkau 6, lainnya 3)
+- Level Tinggi (kelas ≥ 1 ditutup): Tergenang 7.175 (31,65 %); ruas ditutup 44.096; TES valid 989; rerata waktu minimum 24,00 menit (median 6,17); TAS 44 (0,28 % non-Tergenang); TAS ≥ 20 / ≥ 40 menit 203 / 16; absolut v3 3.288; persentil 964; TES terdekat tidak terjangkau 939
+  - Kategori akses (30 menit): Terjangkau 14.544 (64,15 %); Jauh 314 (1,38 %); Terputus 640 (2,82 %); Tergenang 7.175 (31,65 %)
+  - TAS baru akibat banjir 27; TAS hilang 51 (jadi Tergenang 41, jadi TES terdekat tidak terjangkau 7, lainnya 3)
 
 ## Pemilihan K
 
-- K = 2: ARI subsampel 0,957 ± 0,004; ARI inisialisasi 1,000; Silhouette 0,243
-- K = 3: ARI subsampel 0,940 ± 0,006; ARI inisialisasi 0,999; Silhouette 0,156
-- K = 4: ARI subsampel 0,949 ± 0,003; ARI inisialisasi 1,000; Silhouette 0,203
-- Aturan stabilitas (pemecah seri K terkecil) memilih K = 2; kandidat dalam toleransi: 2, 4
+- K = 2: ARI subsampel 0,959 ± 0,003; ARI inisialisasi 1,000; Silhouette 0,243
+- K = 3: ARI subsampel 0,942 ± 0,007; ARI inisialisasi 0,999; Silhouette 0,155
+- K = 4: ARI subsampel 0,948 ± 0,004; ARI inisialisasi 1,000; Silhouette 0,201
+- Aturan stabilitas (pemecah seri K terkecil) memilih K = 2; kandidat dalam toleransi: 2
 
 ## Model
 
 ### Model K = 4
 
-- Validitas: Silhouette (sampel) 0,203, ketegasan partisi 0,456, PC 0,542, PE 0,793, klaster terbesar 38,97 %
-- K0 — **Tipologi 1 (terbaik)**: 20.397 baris (25,46 %); waktu minimum median 3,44 [P75 4,99; P90 6,61] menit, rerata 3,73; > 30 menit 0,00 %; Terputus 0,00 %; terisolasi 0,000
-- K1 — **Tipologi 2**: 27.069 baris (33,79 %); waktu minimum median 4,28 [P75 5,72; P90 6,92] menit, rerata 4,31; > 30 menit 0,00 %; Terputus 0,00 %; terisolasi 0,000
-- K2 — **Tipologi 3**: 31.215 baris (38,97 %); waktu minimum median 9,89 [P75 13,16; P90 18,23] menit, rerata 11,80; > 30 menit 2,65 %; Terputus 0,07 %; terisolasi 0,001
-- K3 — **Tipologi 4 (terburuk)**: 1.422 baris (1,78 %); waktu minimum median 403,87 [P75 403,87; P90 403,87] menit, rerata 390,12; > 30 menit 98,80 %; Terputus 96,27 %; terisolasi 0,963
-- Baseline: K0 = 7.009 (30,91 %), K1 = 7.237 (31,92 %), K2 = 8.314 (36,67 %), K3 = 113 (0,50 %), Tergenang = 0 (0,00 %)
-- Rendah: K0 = 6.938 (30,60 %), K1 = 7.277 (32,10 %), K2 = 8.291 (36,57 %), K3 = 128 (0,56 %), Tergenang = 39 (0,17 %)
-- Sedang: K0 = 4.639 (20,46 %), K1 = 7.196 (31,74 %), K2 = 6.966 (30,72 %), K3 = 497 (2,19 %), Tergenang = 3.375 (14,89 %)
-- Tinggi: K0 = 1.811 (7,99 %), K1 = 5.359 (23,64 %), K2 = 7.644 (33,71 %), K3 = 684 (3,02 %), Tergenang = 7.175 (31,65 %)
-- Baseline → Rendah: masuk Tergenang 39; SR 99,51 %; ARI 0,987; dominan K0 → K1 (66); CDVM 0,004
-- Rendah → Sedang: masuk Tergenang 3.336; SR 87,31 %; ARI 0,687; dominan K2 → Tergenang (1.876); CDVM 0,163
-- Sedang → Tinggi: masuk Tergenang 3.800; SR 77,51 %; ARI 0,480; dominan K1 → K2 (1.474); CDVM 0,206
-- Baseline → Tinggi: masuk Tergenang 7.175; SR 71,33 %; ARI 0,376; dominan K0 → Tergenang (2.861); CDVM 0,342
-- Grid turun ke tipologi terburuk Sedang → Tinggi: 510
-- FCM: Silhouette 0,208, CH 6.953,0, DB 1,306, Moran's I 0,809, PC 0,531, PE 0,876, klaster terbesar 31,02 %
-- SFCM: Silhouette 0,162, CH 6.418,8, DB 1,461, Moran's I 0,830, PC 0,390, PE 1,118, klaster terbesar 27,72 %
-- SDWFCM: Silhouette 0,204, CH 6.735,0, DB 1,300, Moran's I 0,845, PC 0,497, PE 0,934, klaster terbesar 30,63 %
-- REDCAP: Silhouette 0,002, CH 255,6, DB 4,977, Moran's I 1,000, PC –, PE –, klaster terbesar 89,35 %
+- Validitas: Silhouette (sampel) 0,201, ketegasan partisi 0,457, PC 0,541, PE 0,793, klaster terbesar 39,03 %
+- K0 — **Tipologi 1 (terbaik)**: 20.432 baris (25,51 %); waktu minimum median 3,29 [P75 4,82; P90 6,45] menit, rerata 3,60; > 30 menit 0,00 %; Terputus 0,00 %; terisolasi 0,000
+- K1 — **Tipologi 2**: 27.019 baris (33,73 %); waktu minimum median 4,16 [P75 5,60; P90 6,83] menit, rerata 4,21; > 30 menit 0,00 %; Terputus 0,00 %; terisolasi 0,000
+- K2 — **Tipologi 3**: 31.263 baris (39,03 %); waktu minimum median 9,76 [P75 13,05; P90 18,09] menit, rerata 11,66; > 30 menit 2,60 %; Terputus 0,06 %; terisolasi 0,001
+- K3 — **Tipologi 4 (terburuk)**: 1.389 baris (1,73 %); waktu minimum median 403,29 [P75 403,29; P90 403,29] menit, rerata 390,57; > 30 menit 98,92 %; Terputus 96,54 %; terisolasi 0,965
+- Baseline: K0 = 7.009 (30,91 %), K1 = 7.246 (31,96 %), K2 = 8.316 (36,68 %), K3 = 102 (0,45 %), Tergenang = 0 (0,00 %)
+- Rendah: K0 = 6.945 (30,63 %), K1 = 7.275 (32,09 %), K2 = 8.297 (36,59 %), K3 = 117 (0,52 %), Tergenang = 39 (0,17 %)
+- Sedang: K0 = 4.647 (20,50 %), K1 = 7.183 (31,68 %), K2 = 6.967 (30,73 %), K3 = 501 (2,21 %), Tergenang = 3.375 (14,89 %)
+- Tinggi: K0 = 1.831 (8,08 %), K1 = 5.315 (23,44 %), K2 = 7.683 (33,89 %), K3 = 669 (2,95 %), Tergenang = 7.175 (31,65 %)
+- Baseline → Rendah: masuk Tergenang 39; SR 99,49 %; ARI 0,986; dominan K0 → K1 (61); CDVM 0,004
+- Rendah → Sedang: masuk Tergenang 3.336; SR 87,08 %; ARI 0,682; dominan K2 → Tergenang (1.870); CDVM 0,164
+- Sedang → Tinggi: masuk Tergenang 3.800; SR 77,51 %; ARI 0,480; dominan K1 → K2 (1.488); CDVM 0,207
+- Baseline → Tinggi: masuk Tergenang 7.175; SR 71,18 %; ARI 0,373; dominan K0 → Tergenang (2.845); CDVM 0,341
+- Grid turun ke tipologi terburuk Sedang → Tinggi: 497
+- FCM: Silhouette 0,211, CH 7.102,1, DB 1,302, Moran's I 0,808, PC 0,532, PE 0,874, klaster terbesar 31,14 %
+- SFCM: Silhouette 0,165, CH 6.584,6, DB 1,453, Moran's I 0,833, PC 0,391, PE 1,114, klaster terbesar 27,89 %
+- SDWFCM: Silhouette 0,205, CH 6.885,2, DB 1,297, Moran's I 0,847, PC 0,497, PE 0,933, klaster terbesar 30,40 %
+- REDCAP: Silhouette 0,058, CH 229,5, DB 7,410, Moran's I 1,000, PC –, PE –, klaster terbesar 82,19 %
 - SKATER: **gagal** — ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field.
 
 ### Model K = 2
 
-- Validitas: Silhouette (sampel) 0,243, ketegasan partisi 0,340, PC 0,685, PE 0,482, klaster terbesar 51,13 %
-- K0 — **Tipologi 1 (terbaik)**: 39.147 baris (48,87 %); waktu minimum median 3,72 [P75 5,34; P90 6,94] menit, rerata 4,31; > 30 menit 0,08 %; Terputus 0,08 %; terisolasi 0,001
-- K1 — **Tipologi 2 (terburuk)**: 40.956 baris (51,13 %); waktu minimum median 8,87 [P75 12,55; P90 19,22] menit, rerata 23,13; > 30 menit 5,37 %; Terputus 3,31 %; terisolasi 0,033
-- Baseline: K0 = 12.440 (54,87 %), K1 = 10.233 (45,13 %), Tergenang = 0 (0,00 %)
-- Rendah: K0 = 12.389 (54,64 %), K1 = 10.245 (45,19 %), Tergenang = 39 (0,17 %)
-- Sedang: K0 = 9.567 (42,20 %), K1 = 9.731 (42,92 %), Tergenang = 3.375 (14,89 %)
-- Tinggi: K0 = 4.751 (20,95 %), K1 = 10.747 (47,40 %), Tergenang = 7.175 (31,65 %)
+- Validitas: Silhouette (sampel) 0,243, ketegasan partisi 0,341, PC 0,685, PE 0,481, klaster terbesar 51,65 %
+- K0 — **Tipologi 1 (terbaik)**: 38.728 baris (48,35 %); waktu minimum median 3,58 [P75 5,19; P90 6,81] menit, rerata 4,24; > 30 menit 0,10 %; Terputus 0,10 %; terisolasi 0,001
+- K1 — **Tipologi 2 (terburuk)**: 41.375 baris (51,65 %); waktu minimum median 8,70 [P75 12,36; P90 18,91] menit, rerata 22,48; > 30 menit 5,19 %; Terputus 3,20 %; terisolasi 0,032
+- Baseline: K0 = 12.313 (54,31 %), K1 = 10.360 (45,69 %), Tergenang = 0 (0,00 %)
+- Rendah: K0 = 12.262 (54,08 %), K1 = 10.372 (45,75 %), Tergenang = 39 (0,17 %)
+- Sedang: K0 = 9.479 (41,81 %), K1 = 9.819 (43,31 %), Tergenang = 3.375 (14,89 %)
+- Tinggi: K0 = 4.674 (20,61 %), K1 = 10.824 (47,74 %), Tergenang = 7.175 (31,65 %)
 - Baseline → Rendah: masuk Tergenang 39; SR 99,78 %; ARI 0,991; dominan K0 → K1 (48); CDVM 0,002
-- Rendah → Sedang: masuk Tergenang 3.336; SR 92,25 %; ARI 0,714; dominan K1 → Tergenang (1.951); CDVM 0,147
-- Sedang → Tinggi: masuk Tergenang 3.800; SR 82,86 %; ARI 0,432; dominan K0 → K1 (2.641); CDVM 0,212
-- Baseline → Tinggi: masuk Tergenang 7.175; SR 76,91 %; ARI 0,289; dominan K0 → Tergenang (4.144); CDVM 0,339
-- Grid turun ke tipologi terburuk Sedang → Tinggi: 2.641
-- FCM: Silhouette 0,303, CH 10.279,8, DB 1,247, Moran's I 0,769, PC 0,739, PE 0,411, klaster terbesar 56,15 %
-- SFCM: Silhouette 0,295, CH 10.025,9, DB 1,261, Moran's I 0,760, PC 0,635, PE 0,544, klaster terbesar 54,11 %
-- SDWFCM: Silhouette 0,296, CH 9.960,1, DB 1,262, Moran's I 0,835, PC 0,715, PE 0,443, klaster terbesar 57,68 %
-- REDCAP (**degeneratif**): Silhouette 0,055, CH 202,0, DB 2,212, Moran's I 1,000, PC –, PE –, klaster terbesar 98,20 %
+- Rendah → Sedang: masuk Tergenang 3.336; SR 92,38 %; ARI 0,718; dominan K1 → Tergenang (1.956); CDVM 0,147
+- Sedang → Tinggi: masuk Tergenang 3.800; SR 82,88 %; ARI 0,432; dominan K0 → K1 (2.638); CDVM 0,212
+- Baseline → Tinggi: masuk Tergenang 7.175; SR 77,09 %; ARI 0,293; dominan K0 → Tergenang (4.121); CDVM 0,337
+- Grid turun ke tipologi terburuk Sedang → Tinggi: 2.638
+- FCM: Silhouette 0,305, CH 10.468,0, DB 1,242, Moran's I 0,768, PC 0,741, PE 0,409, klaster terbesar 56,54 %
+- SFCM: Silhouette 0,299, CH 10.298,1, DB 1,252, Moran's I 0,762, PC 0,637, PE 0,541, klaster terbesar 54,31 %
+- SDWFCM: Silhouette 0,299, CH 10.166,3, DB 1,256, Moran's I 0,834, PC 0,717, PE 0,441, klaster terbesar 57,93 %
+- REDCAP (**degeneratif**): Silhouette 0,172, CH 72,2, DB 8,075, Moran's I 1,000, PC –, PE –, klaster terbesar 94,40 %
 - SKATER: **gagal** — ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field.
 
 ### Model K = 3
 
-- Validitas: Silhouette (sampel) 0,156, ketegasan partisi 0,301, PC 0,526, PE 0,800, klaster terbesar 43,38 %
-- K0 — **Tipologi 1 (terbaik)**: 23.669 baris (29,55 %); waktu minimum median 3,25 [P75 4,73; P90 6,16] menit, rerata 3,78; > 30 menit 0,07 %; Terputus 0,07 %; terisolasi 0,001
-- K1 — **Tipologi 2**: 34.749 baris (43,38 %); waktu minimum median 5,75 [P75 7,73; P90 9,59] menit, rerata 6,72; > 30 menit 0,20 %; Terputus 0,20 %; terisolasi 0,002
-- K2 — **Tipologi 3 (terburuk)**: 21.685 baris (27,07 %); waktu minimum median 11,86 [P75 16,53; P90 29,75] menit, rerata 36,57; > 30 menit 9,89 %; Terputus 6,01 %; terisolasi 0,060
-- Baseline: K0 = 7.866 (34,69 %), K1 = 9.991 (44,07 %), K2 = 4.816 (21,24 %), Tergenang = 0 (0,00 %)
-- Rendah: K0 = 7.797 (34,39 %), K1 = 10.013 (44,16 %), K2 = 4.824 (21,28 %), Tergenang = 39 (0,17 %)
-- Sedang: K0 = 5.630 (24,83 %), K1 = 8.794 (38,79 %), K2 = 4.874 (21,50 %), Tergenang = 3.375 (14,89 %)
-- Tinggi: K0 = 2.376 (10,48 %), K1 = 5.951 (26,25 %), K2 = 7.171 (31,63 %), Tergenang = 7.175 (31,65 %)
-- Baseline → Rendah: masuk Tergenang 39; SR 99,51 %; ARI 0,985; dominan K0 → K1 (66); CDVM 0,003
-- Rendah → Sedang: masuk Tergenang 3.336; SR 86,97 %; ARI 0,645; dominan K2 → Tergenang (1.260); CDVM 0,149
-- Sedang → Tinggi: masuk Tergenang 3.800; SR 70,23 %; ARI 0,317; dominan K1 → K2 (2.810); CDVM 0,269
-- Baseline → Tinggi: masuk Tergenang 7.175; SR 62,52 %; ARI 0,222; dominan K1 → K2 (3.280); CDVM 0,420
-- Grid turun ke tipologi terburuk Sedang → Tinggi: 3.347
-- FCM: Silhouette 0,194, CH 7.558,7, DB 1,524, Moran's I 0,831, PC 0,584, PE 0,710, klaster terbesar 40,25 %
-- SFCM: Silhouette 0,161, CH 7.194,0, DB 1,622, Moran's I 0,821, PC 0,472, PE 0,885, klaster terbesar 36,35 %
-- SDWFCM: Silhouette 0,209, CH 7.313,5, DB 1,498, Moran's I 0,888, PC 0,564, PE 0,746, klaster terbesar 39,22 %
-- REDCAP (**degeneratif**): Silhouette 0,023, CH 180,1, DB 2,881, Moran's I 1,000, PC –, PE –, klaster terbesar 95,78 %
+- Validitas: Silhouette (sampel) 0,155, ketegasan partisi 0,301, PC 0,526, PE 0,801, klaster terbesar 43,21 %
+- K0 — **Tipologi 1 (terbaik)**: 23.690 baris (29,57 %); waktu minimum median 3,12 [P75 4,57; P90 6,00] menit, rerata 3,74; > 30 menit 0,09 %; Terputus 0,09 %; terisolasi 0,001
+- K1 — **Tipologi 2**: 34.612 baris (43,21 %); waktu minimum median 5,64 [P75 7,61; P90 9,47] menit, rerata 6,66; > 30 menit 0,22 %; Terputus 0,22 %; terisolasi 0,002
+- K2 — **Tipologi 3 (terburuk)**: 21.801 baris (27,22 %); waktu minimum median 11,70 [P75 16,36; P90 28,94] menit, rerata 35,56; > 30 menit 9,59 %; Terputus 5,80 %; terisolasi 0,058
+- Baseline: K0 = 7.883 (34,77 %), K1 = 9.942 (43,85 %), K2 = 4.848 (21,38 %), Tergenang = 0 (0,00 %)
+- Rendah: K0 = 7.818 (34,48 %), K1 = 9.959 (43,92 %), K2 = 4.857 (21,42 %), Tergenang = 39 (0,17 %)
+- Sedang: K0 = 5.616 (24,77 %), K1 = 8.790 (38,77 %), K2 = 4.892 (21,58 %), Tergenang = 3.375 (14,89 %)
+- Tinggi: K0 = 2.373 (10,47 %), K1 = 5.921 (26,11 %), K2 = 7.204 (31,77 %), Tergenang = 7.175 (31,65 %)
+- Baseline → Rendah: masuk Tergenang 39; SR 99,52 %; ARI 0,985; dominan K0 → K1 (61); CDVM 0,003
+- Rendah → Sedang: masuk Tergenang 3.336; SR 86,79 %; ARI 0,640; dominan K2 → Tergenang (1.258); CDVM 0,149
+- Sedang → Tinggi: masuk Tergenang 3.800; SR 70,19 %; ARI 0,317; dominan K1 → K2 (2.819); CDVM 0,270
+- Baseline → Tinggi: masuk Tergenang 7.175; SR 62,41 %; ARI 0,222; dominan K1 → K2 (3.287); CDVM 0,420
+- Grid turun ke tipologi terburuk Sedang → Tinggi: 3.352
+- FCM: Silhouette 0,196, CH 7.690,4, DB 1,521, Moran's I 0,831, PC 0,585, PE 0,708, klaster terbesar 40,16 %
+- SFCM: Silhouette 0,163, CH 7.346,1, DB 1,619, Moran's I 0,824, PC 0,474, PE 0,882, klaster terbesar 36,63 %
+- SDWFCM: Silhouette 0,212, CH 7.463,1, DB 1,492, Moran's I 0,888, PC 0,564, PE 0,745, klaster terbesar 39,51 %
+- REDCAP: Silhouette 0,076, CH 326,3, DB 6,879, Moran's I 1,000, PC –, PE –, klaster terbesar 82,19 %
 - SKATER: **gagal** — ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field.
 

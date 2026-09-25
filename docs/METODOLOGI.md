@@ -212,7 +212,7 @@ KNN-8 (blok-diagonal per level).
    instruksi Finalisasi v6, kedua versi memakai kriteria henti model utama, dan SDWFCM-Guo memilih run dengan
    \(J_{FCM} = \sum u^m \lVert x - v\rVert^2\) terkecil.
 
-Hasil perbandingan pada Baseline (T06/S06, L02): {{HASIL_GUO}}
+Hasil perbandingan pada Baseline (T06/S06, L02): Pada K = 4 (T06), SDWFCM termodifikasi vs SDWFCM-Guo (λ = 0,5): Silhouette 0,205 vs 0,180, Davies-Bouldin 1,297 vs 1,417, Moran's I 0,847 vs 0,771, I-Index 1,6151 vs 1,4711; ARI antara keduanya 0,760. Pada K = 2 (S06): Silhouette 0,299 vs 0,298; ARI 0,895. SDWFCM-Guo konvergen pada 10/10 seed (K = 4) dan 10/10 (K = 2). Varian λ = 0,7 pada K = 4 konvergen 8/10 (L02). REDCAP K = 4 berstatus layak (klaster terbesar 82,2 %) dengan DESC-N/PESC-N tertinggi, karena partisinya kontigu secara konstruksi, tetapi Silhouette-nya terendah. SKATER gagal pada kedua K, sama dengan hasil terkunci.
 
 ### 8b. DESC-N dan PESC-N (modifikasi Guo dkk., 2015)
 
@@ -232,7 +232,7 @@ Catatan implementasi repo: DESC di repo mengabaikan blok satu sampel, sedangkan 
 \(\bar d = 1\) untuk blok satu sampel. PESC di repo memakai jarak antarpusat blok (km), sedangkan artikel memakai
 jarak pasangan sampel terdekat.
 
-**Diagnostik (B1).** {{HASIL_B1}}
+**Diagnostik (B1).** Dugaan **terkonfirmasi**. Pada K = 4, 97,5 % DESC berasal dari blok dengan d̄ < 0,01, dan 99,9 % dari blok yang mayoritas barisnya bernilai penalti. Empat blok teratas (masing-masing 2 grid Tipologi 4 yang sama pada keempat level, d̄ = 3.45e-04) menyumbang 93,4 % DESC. Pada K = 3 hanya 5,0 % DESC berasal dari blok d̄ < 0,01; kontribusi terbesarnya dari blok besar (v ≈ 2.860) dengan d̄ ≈ 1,3. Jadi lonjakan DESC 0,07 → 74,9 disebabkan blok kecil ber-d̄ ≈ 0 pada klaster penalti, bukan oleh peningkatan kontiguitas. Kepekaan ini terlihat juga dari DESC K = 4 yang dihitung ulang dari skor PCA terkunci (dibulatkan 6 desimal): 74,761 vs 74,871. Rincian: L04.
 
 **Definisi (ditetapkan sebelum dihitung; `backend/desc_n.py`).** Blok = komponen terhubung baris ber-label sama
 (label tegas) pada ketetanggaan rook, dihitung per level lalu digabung. Notasi:
@@ -272,7 +272,7 @@ Perhitungan PESC-N eksak bila jumlah pasangan per klaster ≤ 2 juta. Bila lebih
 ≥ 2 dihitung eksak dan sisanya diperkirakan dengan 200.000 pasangan acak berbobot \(V_iV_j\) (seed 42).
 Pada data gabungan, pasangan blok lintas level ikut dihitung dengan jarak pada koordinat grid.
 
-**Validasi data buatan (B3).** {{HASIL_B3}}
+**Validasi data buatan (B3).** Data buatan (grid 100 × 100, 4 wilayah kelas, rentang atribut sesuai Guo dkk. hlm. 377–378; SDWFCM termodifikasi K = 2..8; L03). DESC-N tertinggi di K = 2 dan tidak monoton, sehingga **lulus** lewat klausul (a) "tidak monoton". PESC-N tertinggi di K = 4: **lulus**. Keduanya invarian terhadap atribut × 10 (selisih < 10⁻⁹). Catatan: DESC-N tidak menunjuk K sebenarnya (4); komponen Kontiguitas-nya tertinggi di K = 2 (partisi kasar membentuk blok besar), sedangkan PESC-N tertinggi di K = 4. DESC asli pada data buatan juga tertinggi di K = 4. Karena lulus, DESC-N dan PESC-N ditampilkan sebagai metrik pendukung pada T05. Pada v6, keduanya tertinggi di K = 2 (DESC-N 0,0210, PESC-N 0,1112; K = 4: 0,0142 dan 0,0610), sehingga tidak mendukung K = 4. Hal ini dilaporkan apa adanya dan tidak mengubah keputusan K (§9 (h)).
 
 ## 9. Pemilihan K berbasis stabilitas
 

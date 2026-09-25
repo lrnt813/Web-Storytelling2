@@ -1,5 +1,5 @@
 ﻿Transisi,Masuk Tergenang (grid),Masuk Tergenang (% semua grid),Grid non-Tergenang di kedua level,Stability rate (%),ARI,Transisi dominan,Jumlah (dominan),Dominan menuju,Active edges,Edge mungkin,CDVM
-Baseline → Rendah,39,0.172011,22634,99.505169,0.986573,K0 → K1,66,tipologi lain,9,20,0.004146
-Rendah → Sedang,3336,14.713536,19298,87.309566,0.686857,K2 → Tergenang,1876,Tergenang,14,20,0.16341
-Sedang → Tinggi,3800,16.760023,15498,77.506775,0.479869,K1 → K2,1474,tipologi lain,14,20,0.205751
-Baseline → Tinggi,7175,31.64557,15498,71.325332,0.376122,K0 → Tergenang,2861,Tergenang,13,20,0.34164
+Baseline → Rendah,39,0.172011,22634,99.487497,0.985982,K0 → K1,61,tipologi lain,9,20,0.003661
+Rendah → Sedang,3336,14.713536,19298,87.081563,0.682365,K2 → Tergenang,1870,Tergenang,14,20,0.164072
+Sedang → Tinggi,3800,16.760023,15498,77.506775,0.479869,K1 → K2,1488,tipologi lain,15,20,0.206589
+Baseline → Tinggi,7175,31.64557,15498,71.183379,0.373061,K0 → Tergenang,2845,Tergenang,13,20,0.341463

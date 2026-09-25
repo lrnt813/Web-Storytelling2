@@ -1,0 +1,1809 @@
+{
+ "s_gabungan": 1.9563777833919072,
+ "catatan": "(ditetapkan sebelum dihitung):\n  * Ruang fitur = skor PCA terkunci (kolom pc*). Blok spasial = rook di dalam level (data gabungan) atau rook\n    Baseline (perbandingan algoritma).\n  * I-Index pada tabel perbandingan algoritma memakai centroid tegas untuk SEMUA algoritma (agar setara; algoritma\n    non-fuzzy tidak punya pusat fuzzy). Dunn = rerata 5 sampel 2.000 baris (seed 42–46).\n  * SDWFCM-Guo: λ = 0,5 bentuk harfiah (tabel utama); varian d², λ = 0,3, dan λ = 0,7 (lampiran). NB = pola tetangga\n    W KNN-8 Baseline. 10 inisialisasi seed 42–51, run dengan J_FCM terkecil.",
+ "b1_diagnostik_desc": {
+  "desc_pesc_terkunci": {
+   "2": {
+    "desc": 0.043645,
+    "pesc": 25.268761337601862
+   },
+   "3": {
+    "desc": 0.069775,
+    "pesc": 10.233920074615462
+   },
+   "4": {
+    "desc": 74.871358,
+    "pesc": 203.57190795990292
+   },
+   "5": {
+    "desc": 77.450441,
+    "pesc": 671.1851933665064
+   },
+   "6": {
+    "desc": 78.861374,
+    "pesc": 5.937881180125511
+   },
+   "7": {
+    "desc": 80.58839,
+    "pesc": 15382.194711477909
+   },
+   "8": {
+    "desc": 82.257914,
+    "pesc": 1298.7422175821619
+   },
+   "9": {
+    "desc": 84.375871,
+    "pesc": 5337.876733023542
+   },
+   "10": {
+    "desc": 85.247735,
+    "pesc": 5088.738133574677
+   }
+  },
+  "3": {
+   "desc_dihitung_ulang": 0.06977507328260403,
+   "desc_terkunci": 0.069775,
+   "jumlah_blok": 3182,
+   "jumlah_blok_v_ge_2": 2199,
+   "top10": [
+    {
+     "blok": 5,
+     "klaster": 0,
+     "level": "baseline",
+     "v": 2862,
+     "V": 0.1208104685521317,
+     "d_bar": 1.331566197347723,
+     "kontribusi": 0.008231587781098929,
+     "persen_kontribusi": 11.797318718332592,
+     "persen_baris_penalti": 0.0
+    },
+    {
+     "blok": 801,
+     "klaster": 0,
+     "level": "rendah",
+     "v": 2859,
+     "V": 0.12068383284086112,
+     "d_bar": 1.3315303552556,
+     "kontribusi": 0.008214782060835164,
+     "persen_kontribusi": 11.773233153856438,
+     "persen_baris_penalti": 0.0
+    },
+    {
+     "blok": 3054,
+     "klaster": 2,
+     "level": "tinggi",
+     "v": 3,
+     "V": 0.0001376083665886886,
+     "d_bar": 0.0025238256368745634,
+     "kontribusi": 0.0029728362256173637,
+     "persen_kontribusi": 4.260599216537886,
+     "persen_baris_penalti": 100.0
+    },
+    {
+     "blok": 820,
+     "klaster": 2,
+     "level": "rendah",
+     "v": 576,
+     "V": 0.02642080638502821,
+     "d_bar": 0.5356542422817787,
+     "kontribusi": 0.0024328931714081682,
+     "persen_kontribusi": 3.4867654836483344,
+     "persen_baris_penalti": 0.0
+    },
+    {
+     "blok": 24,
+     "klaster": 2,
+     "level": "baseline",
+     "v": 572,
+     "V": 0.02623732856290996,
+     "d_bar": 0.5365252561033299,
+     "kontribusi": 0.002391436682788472,
+     "persen_kontribusi": 3.4273510156021474,
+     "persen_baris_penalti": 0.0
+    },
+    {
+     "blok": 1616,
+     "klaster": 2,
+     "level": "sedang",
+     "v": 749,
+     "V": 0.03435622219164258,
+     "d_bar": 0.7425236507908688,
+     "kontribusi": 0.0021408696376882747,
+     "persen_kontribusi": 3.068244198063817,
+     "persen_baris_penalti": 1.0680907877169559
+    },
+    {
+     "blok": 2463,
+     "klaster": 2,
+     "level": "tinggi",
+     "v": 945,
+     "V": 0.04334663547543691,
+     "d_bar": 1.0010683286298827,
+     "kontribusi": 0.0018749226001572544,
+     "persen_kontribusi": 2.687095135770643,
+     "persen_baris_penalti": 2.6455026455026456
+    },
+    {
+     "blok": 2464,
+     "klaster": 2,
+     "level": "tinggi",
+     "v": 1165,
+     "V": 0.053437915691940736,
+     "d_bar": 1.3486481254431435,
+     "kontribusi": 0.001570007455510652,
+     "persen_kontribusi": 2.250097895493115,
+     "persen_baris_penalti": 4.721030042918455
+    },
+    {
+     "blok": 802,
+     "klaster": 1,
+     "level": "rendah",
+     "v": 1045,
+     "V": 0.030191840980006934,
+     "d_bar": 0.8649177156706598,
+     "kontribusi": 0.001218511424926818,
+     "persen_kontribusi": 1.7463420210131273,
+     "persen_baris_penalti": 0.0
+    },
+    {
+     "blok": 6,
+     "klaster": 1,
+     "level": "baseline",
+     "v": 1042,
+     "V": 0.030105165838437534,
+     "d_bar": 0.8632537867207943,
+     "kontribusi": 0.0012162001808756454,
+     "persen_kontribusi": 1.7430296001980154,
+     "persen_baris_penalti": 0.0
+    }
+   ],
+   "persen_desc_dari_blok_dbar_lt_0_01": 4.954815770948617,
+   "persen_desc_dari_blok_penalti_mayoritas": 9.2091664148493
+  },
+  "4": {
+   "desc_dihitung_ulang": 74.76141496368072,
+   "desc_terkunci": 74.871358,
+   "jumlah_blok": 3486,
+   "jumlah_blok_v_ge_2": 2504,
+   "top10": [
+    {
+     "blok": 1485,
+     "klaster": 3,
+     "level": "rendah",
+     "v": 2,
+     "V": 0.0014398848092152627,
+     "d_bar": 0.0003445772772544481,
+     "kontribusi": 17.461527402184917,
+     "persen_kontribusi": 23.356336167082674,
+     "persen_baris_penalti": 100.0
+    },
+    {
+     "blok": 3232,
+     "klaster": 3,
+     "level": "tinggi",
+     "v": 2,
+     "V": 0.0014398848092152627,
+     "d_bar": 0.0003445772772544481,
+     "kontribusi": 17.461527402184917,
+     "persen_kontribusi": 23.356336167082674,
+     "persen_baris_penalti": 100.0
+    },
+    {
+     "blok": 2365,
+     "klaster": 3,
+     "level": "sedang",
+     "v": 2,
+     "V": 0.0014398848092152627,
+     "d_bar": 0.0003445772772544481,
+     "kontribusi": 17.461527402184917,
+     "persen_kontribusi": 23.356336167082674,
+     "persen_baris_penalti": 100.0
+    },
+    {
+     "blok": 600,
+     "klaster": 3,
+     "level": "baseline",
+     "v": 2,
+     "V": 0.0014398848092152627,
+     "d_bar": 0.0003445772772544481,
+     "kontribusi": 17.461527402184917,
+     "persen_kontribusi": 23.356336167082674,
+     "persen_baris_penalti": 100.0
+    },
+    {
+     "blok": 3362,
+     "klaster": 3,
+     "level": "tinggi",
+     "v": 4,
+     "V": 0.0028797696184305254,
+     "d_bar": 0.003814907657179312,
+     "kontribusi": 0.569832783313509,
+     "persen_kontribusi": 0.762201710053689,
+     "persen_baris_penalti": 100.0
+    },
+    {
+     "blok": 3156,
+     "klaster": 3,
+     "level": "tinggi",
+     "v": 3,
+     "V": 0.0021598272138228943,
+     "d_bar": 0.0030448700301248383,
+     "kontribusi": 0.5031535009222493,
+     "persen_kontribusi": 0.6730122766759865,
+     "persen_baris_penalti": 100.0
+    },
+    {
+     "blok": 1512,
+     "klaster": 3,
+     "level": "rendah",
+     "v": 2,
+     "V": 0.0014398848092152627,
+     "d_bar": 0.002291100663436677,
+     "kontribusi": 0.3949727717531147,
+     "persen_kontribusi": 0.5283109902949181,
+     "persen_baris_penalti": 100.0
+    },
+    {
+     "blok": 626,
+     "klaster": 3,
+     "level": "baseline",
+     "v": 2,
+     "V": 0.0014398848092152627,
+     "d_bar": 0.002291100663436677,
+     "kontribusi": 0.3949727717531147,
+     "persen_kontribusi": 0.5283109902949181,
+     "persen_baris_penalti": 100.0
+    },
+    {
+     "blok": 2384,
+     "klaster": 3,
+     "level": "sedang",
+     "v": 2,
+     "V": 0.0014398848092152627,
+     "d_bar": 0.002291100663436677,
+     "kontribusi": 0.3949727717531147,
+     "persen_kontribusi": 0.5283109902949181,
+     "persen_baris_penalti": 100.0
+    },
+    {
+     "blok": 2984,
+     "klaster": 3,
+     "level": "tinggi",
+     "v": 2,
+     "V": 0.0014398848092152627,
+     "d_bar": 0.0026254615784657718,
+     "kontribusi": 0.30077668303202554,
+     "persen_kontribusi": 0.40231539648914294,
+     "persen_baris_penalti": 100.0
+    }
+   ],
+   "persen_desc_dari_blok_dbar_lt_0_01": 97.4932324357684,
+   "persen_desc_dari_blok_penalti_mayoritas": 99.91418767462143
+  }
+ },
+ "b4_desc_n_v6": {
+  "2": {
+   "desc_n": 0.02098975389181172,
+   "pesc_n": 0.11121789425821176,
+   "kontiguitas": 0.030309945718569587,
+   "homogenitas": 0.7538501391681163,
+   "n_blok": 2109,
+   "aproksimasi": false,
+   "pesc_per_klaster": {
+    "0": {
+     "Bn": 811,
+     "pasangan": 328455,
+     "metode": "eksak",
+     "P_k": 0.1603349839648112
+    },
+    "1": {
+     "Bn": 1298,
+     "pasangan": 841753,
+     "metode": "eksak",
+     "P_k": 0.06524311117284179
+    }
+   },
+   "detik": 22.058924913406372
+  },
+  "3": {
+   "desc_n": 0.015017126064115963,
+   "pesc_n": 0.06843276587404369,
+   "kontiguitas": 0.0204141528534066,
+   "homogenitas": 0.8069560096013372,
+   "n_blok": 3182,
+   "aproksimasi": false,
+   "pesc_per_klaster": {
+    "0": {
+     "Bn": 716,
+     "pasangan": 255970,
+     "metode": "eksak",
+     "P_k": 0.10167554132721665
+    },
+    "1": {
+     "Bn": 1349,
+     "pasangan": 909226,
+     "metode": "eksak",
+     "P_k": 0.06288085428629639
+    },
+    "2": {
+     "Bn": 1117,
+     "pasangan": 623286,
+     "metode": "eksak",
+     "P_k": 0.0411239916613673
+    }
+   },
+   "detik": 22.886393308639526
+  },
+  "4": {
+   "desc_n": 0.01424835722646247,
+   "pesc_n": 0.060958720091382514,
+   "kontiguitas": 0.01889855776450963,
+   "homogenitas": 0.8478493500690791,
+   "n_blok": 3486,
+   "aproksimasi": false,
+   "pesc_per_klaster": {
+    "0": {
+     "Bn": 463,
+     "pasangan": 106953,
+     "metode": "eksak",
+     "P_k": 0.11859486710251839
+    },
+    "1": {
+     "Bn": 1328,
+     "pasangan": 881128,
+     "metode": "eksak",
+     "P_k": 0.03383139768524847
+    },
+    "2": {
+     "Bn": 1416,
+     "pasangan": 1001820,
+     "metode": "eksak",
+     "P_k": 0.048021881078897995
+    },
+    "3": {
+     "Bn": 279,
+     "pasangan": 38781,
+     "metode": "eksak",
+     "P_k": 0.03199958863501912
+    }
+   },
+   "detik": 23.421082735061646
+  },
+  "5": {
+   "desc_n": 0.012128767765553203,
+   "pesc_n": 0.05835389113899828,
+   "kontiguitas": 0.014849624412300257,
+   "homogenitas": 0.8706666983830527,
+   "n_blok": 3984,
+   "aproksimasi": false,
+   "pesc_per_klaster": {
+    "0": {
+     "Bn": 1245,
+     "pasangan": 774390,
+     "metode": "eksak",
+     "P_k": 0.01892147457775558
+    },
+    "1": {
+     "Bn": 1095,
+     "pasangan": 598965,
+     "metode": "eksak",
+     "P_k": 0.05382166735545597
+    },
+    "2": {
+     "Bn": 1054,
+     "pasangan": 554931,
+     "metode": "eksak",
+     "P_k": 0.07357172073287223
+    },
+    "3": {
+     "Bn": 264,
+     "pasangan": 34716,
+     "metode": "eksak",
+     "P_k": 0.03312222458555162
+    },
+    "4": {
+     "Bn": 326,
+     "pasangan": 52975,
+     "metode": "eksak",
+     "P_k": 0.08917962026428239
+    }
+   },
+   "detik": 19.910457134246826
+  },
+  "6": {
+   "desc_n": 0.012155550672560833,
+   "pesc_n": 0.055827936414858725,
+   "kontiguitas": 0.01484806483916513,
+   "homogenitas": 0.881826968527268,
+   "n_blok": 4859,
+   "aproksimasi": false,
+   "pesc_per_klaster": {
+    "0": {
+     "Bn": 1231,
+     "pasangan": 757065,
+     "metode": "eksak",
+     "P_k": 0.01841323039109774
+    },
+    "1": {
+     "Bn": 868,
+     "pasangan": 376278,
+     "metode": "eksak",
+     "P_k": 0.07623320946954971
+    },
+    "2": {
+     "Bn": 257,
+     "pasangan": 32896,
+     "metode": "eksak",
+     "P_k": 0.03365584351510931
+    },
+    "3": {
+     "Bn": 239,
+     "pasangan": 28441,
+     "metode": "eksak",
+     "P_k": 0.10478597467185423
+    },
+    "4": {
+     "Bn": 1200,
+     "pasangan": 719400,
+     "metode": "eksak",
+     "P_k": 0.036592877490051925
+    },
+    "5": {
+     "Bn": 1064,
+     "pasangan": 565516,
+     "metode": "eksak",
+     "P_k": 0.04496709439174098
+    }
+   },
+   "detik": 19.457324981689453
+  },
+  "7": {
+   "desc_n": 0.015781225454894177,
+   "pesc_n": 0.06769291541812919,
+   "kontiguitas": 0.019470728202642725,
+   "homogenitas": 0.873953625113355,
+   "n_blok": 4848,
+   "aproksimasi": false,
+   "pesc_per_klaster": {
+    "0": {
+     "Bn": 365,
+     "pasangan": 66430,
+     "metode": "eksak",
+     "P_k": 0.07339773936764059
+    },
+    "1": {
+     "Bn": 191,
+     "pasangan": 18145,
+     "metode": "eksak",
+     "P_k": 0.13594106373988651
+    },
+    "2": {
+     "Bn": 674,
+     "pasangan": 226801,
+     "metode": "eksak",
+     "P_k": 0.09410757557170618
+    },
+    "3": {
+     "Bn": 883,
+     "pasangan": 389403,
+     "metode": "eksak",
+     "P_k": 0.042879079829442335
+    },
+    "4": {
+     "Bn": 256,
+     "pasangan": 32640,
+     "metode": "eksak",
+     "P_k": 0.03477499953487306
+    },
+    "5": {
+     "Bn": 1335,
+     "pasangan": 890445,
+     "metode": "eksak",
+     "P_k": 0.05532945910877965
+    },
+    "6": {
+     "Bn": 1144,
+     "pasangan": 653796,
+     "metode": "eksak",
+     "P_k": 0.01803319443709721
+    }
+   },
+   "detik": 16.83881449699402
+  },
+  "8": {
+   "desc_n": 0.015039598758534004,
+   "pesc_n": 0.060643025696010364,
+   "kontiguitas": 0.01834559337544233,
+   "homogenitas": 0.8855355313146931,
+   "n_blok": 5690,
+   "aproksimasi": false,
+   "pesc_per_klaster": {
+    "0": {
+     "Bn": 1050,
+     "pasangan": 550725,
+     "metode": "eksak",
+     "P_k": 0.044059215737418465
+    },
+    "1": {
+     "Bn": 686,
+     "pasangan": 234955,
+     "metode": "eksak",
+     "P_k": 0.04364268857923727
+    },
+    "2": {
+     "Bn": 1229,
+     "pasangan": 754606,
+     "metode": "eksak",
+     "P_k": 0.01734683207903917
+    },
+    "3": {
+     "Bn": 1329,
+     "pasangan": 882456,
+     "metode": "eksak",
+     "P_k": 0.02492217093387244
+    },
+    "4": {
+     "Bn": 210,
+     "pasangan": 21945,
+     "metode": "eksak",
+     "P_k": 0.1313319329535268
+    },
+    "5": {
+     "Bn": 636,
+     "pasangan": 201930,
+     "metode": "eksak",
+     "P_k": 0.09967179427970864
+    },
+    "6": {
+     "Bn": 297,
+     "pasangan": 43956,
+     "metode": "eksak",
+     "P_k": 0.07884241784769223
+    },
+    "7": {
+     "Bn": 253,
+     "pasangan": 31878,
+     "metode": "eksak",
+     "P_k": 0.035552625306736516
+    }
+   },
+   "detik": 16.981939792633057
+  },
+  "9": {
+   "desc_n": 0.014874816491995648,
+   "pesc_n": 0.059444762409804924,
+   "kontiguitas": 0.018010455632587005,
+   "homogenitas": 0.8910589500934748,
+   "n_blok": 6095,
+   "aproksimasi": false,
+   "pesc_per_klaster": {
+    "0": {
+     "Bn": 580,
+     "pasangan": 167910,
+     "metode": "eksak",
+     "P_k": 0.044681987153671825
+    },
+    "1": {
+     "Bn": 1214,
+     "pasangan": 736291,
+     "metode": "eksak",
+     "P_k": 0.01753958806800335
+    },
+    "2": {
+     "Bn": 201,
+     "pasangan": 20100,
+     "metode": "eksak",
+     "P_k": 0.13570209354477017
+    },
+    "3": {
+     "Bn": 252,
+     "pasangan": 31626,
+     "metode": "eksak",
+     "P_k": 0.03597037004944225
+    },
+    "4": {
+     "Bn": 941,
+     "pasangan": 442270,
+     "metode": "eksak",
+     "P_k": 0.05020581359532433
+    },
+    "5": {
+     "Bn": 484,
+     "pasangan": 116886,
+     "metode": "eksak",
+     "P_k": 0.10840817978466069
+    },
+    "6": {
+     "Bn": 253,
+     "pasangan": 31878,
+     "metode": "eksak",
+     "P_k": 0.0745903482253807
+    },
+    "7": {
+     "Bn": 1157,
+     "pasangan": 668746,
+     "metode": "eksak",
+     "P_k": 0.023496047610811685
+    },
+    "8": {
+     "Bn": 1013,
+     "pasangan": 512578,
+     "metode": "eksak",
+     "P_k": 0.03567107835991508
+    }
+   },
+   "detik": 16.026381731033325
+  },
+  "10": {
+   "desc_n": 0.01477772909446924,
+   "pesc_n": 0.05698242776498167,
+   "kontiguitas": 0.01764755590144724,
+   "homogenitas": 0.8970251447521762,
+   "n_blok": 6717,
+   "aproksimasi": false,
+   "pesc_per_klaster": {
+    "0": {
+     "Bn": 743,
+     "pasangan": 275653,
+     "metode": "eksak",
+     "P_k": 0.05899767804374989
+    },
+    "1": {
+     "Bn": 252,
+     "pasangan": 31626,
+     "metode": "eksak",
+     "P_k": 0.13575546097169502
+    },
+    "2": {
+     "Bn": 247,
+     "pasangan": 30381,
+     "metode": "eksak",
+     "P_k": 0.03627367500480898
+    },
+    "3": {
+     "Bn": 929,
+     "pasangan": 431056,
+     "metode": "eksak",
+     "P_k": 0.05603016574571798
+    },
+    "4": {
+     "Bn": 493,
+     "pasangan": 121278,
+     "metode": "eksak",
+     "P_k": 0.08820823903060128
+    },
+    "5": {
+     "Bn": 516,
+     "pasangan": 132870,
+     "metode": "eksak",
+     "P_k": 0.04808017904165828
+    },
+    "6": {
+     "Bn": 912,
+     "pasangan": 415416,
+     "metode": "eksak",
+     "P_k": 0.025119665662532417
+    },
+    "7": {
+     "Bn": 1352,
+     "pasangan": 913276,
+     "metode": "eksak",
+     "P_k": 0.01525272743484316
+    },
+    "8": {
+     "Bn": 1041,
+     "pasangan": 541320,
+     "metode": "eksak",
+     "P_k": 0.030106560326619358
+    },
+    "9": {
+     "Bn": 232,
+     "pasangan": 26796,
+     "metode": "eksak",
+     "P_k": 0.07526491818016649
+    }
+   },
+   "detik": 15.578392267227173
+  }
+ },
+ "s_baseline": 1.6404443486890288,
+ "d_perbandingan_algoritma": {
+  "4": [
+   {
+    "algoritma": "SDWFCM termodifikasi",
+    "n_init": 10,
+    "time_per_init_sec": 2.057075,
+    "seed_terbaik": 50,
+    "status": "ok",
+    "klaster_terbesar_persen": 30.40179949719931,
+    "size_entropy": 1.3705480785153825,
+    "n_cluster": 4,
+    "silhouette": 0.20536850899577186,
+    "calinski_harabasz": 6885.198778935364,
+    "davies_bouldin": 1.2973725026834666,
+    "moran_i": 0.846598470267397,
+    "proporsi_tetangga_sama": 0.8537040349577083,
+    "iidx": 1.6151308802157707,
+    "dunn": 0.004952802596928191,
+    "desc": 0.3411270059015691,
+    "pesc": 0.0013680760958200396,
+    "desc_n": 0.045190891490205796,
+    "pesc_n": 0.03287600583048125,
+    "kontiguitas": 0.06102621181164896,
+    "homogenitas": 0.8073859518703632,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 1.0
+   },
+   {
+    "algoritma": "SDWFCM-Guo (λ = 0,5)",
+    "n_init": 10,
+    "time_per_init_sec": 1.7137650966644287,
+    "seed_terbaik": 49,
+    "J_FCM": 28291.109999168657,
+    "konvergensi": [
+     {
+      "seed": 42,
+      "n_iter": 108,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.239106119009163e-05,
+      "perubahan_pusat_akhir": 1.2617901655742614e-06,
+      "J_FCM": 28291.110129973342
+     },
+     {
+      "seed": 43,
+      "n_iter": 120,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.142384936991e-05,
+      "perubahan_pusat_akhir": 1.2487937907090796e-06,
+      "J_FCM": 28291.11004521136
+     },
+     {
+      "seed": 44,
+      "n_iter": 114,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.77438137886432e-05,
+      "perubahan_pusat_akhir": 1.3349672656204348e-06,
+      "J_FCM": 28291.110597018593
+     },
+     {
+      "seed": 45,
+      "n_iter": 120,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.135521521738902e-05,
+      "perubahan_pusat_akhir": 1.247806046711375e-06,
+      "J_FCM": 28291.11003930358
+     },
+     {
+      "seed": 46,
+      "n_iter": 115,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.176654519496817e-05,
+      "perubahan_pusat_akhir": 1.2534037474587478e-06,
+      "J_FCM": 28291.110075235196
+     },
+     {
+      "seed": 47,
+      "n_iter": 95,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.342721874779725e-05,
+      "perubahan_pusat_akhir": 1.2654263645828223e-06,
+      "J_FCM": 28291.11023720058
+     },
+     {
+      "seed": 48,
+      "n_iter": 111,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.780133414059609e-05,
+      "perubahan_pusat_akhir": 1.3357063420871285e-06,
+      "J_FCM": 28291.110602114582
+     },
+     {
+      "seed": 49,
+      "n_iter": 121,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.089628475396358e-05,
+      "perubahan_pusat_akhir": 1.2415882947314216e-06,
+      "J_FCM": 28291.109999168657
+     },
+     {
+      "seed": 50,
+      "n_iter": 114,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.860256763862221e-05,
+      "perubahan_pusat_akhir": 1.3466891961577687e-06,
+      "J_FCM": 28291.110671977105
+     },
+     {
+      "seed": 51,
+      "n_iter": 111,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.314901838960588e-05,
+      "perubahan_pusat_akhir": 1.2722898604655697e-06,
+      "J_FCM": 28291.110195882808
+     }
+    ],
+    "status": "ok",
+    "klaster_terbesar_persen": 27.645216777665066,
+    "size_entropy": 1.3806792934597287,
+    "n_cluster": 4,
+    "silhouette": 0.1798375972174955,
+    "calinski_harabasz": 6791.044728267799,
+    "davies_bouldin": 1.4168943728421368,
+    "moran_i": 0.7710408644491865,
+    "proporsi_tetangga_sama": 0.8318043594919888,
+    "iidx": 1.471058771602054,
+    "dunn": 0.006992605291526237,
+    "desc": 0.3423919812025484,
+    "pesc": 0.0012004735005080125,
+    "desc_n": 0.047171325141431394,
+    "pesc_n": 0.0274253573094354,
+    "kontiguitas": 0.06781419104912587,
+    "homogenitas": 0.8087674358611869,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.7596130296197727
+   },
+   {
+    "algoritma": "FCM",
+    "n_init": 10,
+    "time_per_init_sec": 2.290674,
+    "seed_terbaik": 51,
+    "status": "ok",
+    "klaster_terbesar_persen": 31.138358399858863,
+    "size_entropy": 1.3699004464115334,
+    "n_cluster": 4,
+    "silhouette": 0.21057218464486144,
+    "calinski_harabasz": 7102.075832545732,
+    "davies_bouldin": 1.3024621746786482,
+    "moran_i": 0.8082423038994748,
+    "proporsi_tetangga_sama": 0.8079114813584443,
+    "iidx": 1.6698103307629064,
+    "dunn": 0.007921589686355883,
+    "desc": 0.31898369153718725,
+    "pesc": 0.0008787394403034877,
+    "desc_n": 0.04054356377914592,
+    "pesc_n": 0.030120571169027846,
+    "kontiguitas": 0.05453409389294979,
+    "homogenitas": 0.8169105749416643,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.835888500253789
+   },
+   {
+    "algoritma": "SFCM",
+    "n_init": 10,
+    "time_per_init_sec": 1.491722,
+    "seed_terbaik": 43,
+    "status": "ok",
+    "klaster_terbesar_persen": 27.892206589335334,
+    "size_entropy": 1.3804159004020389,
+    "n_cluster": 4,
+    "silhouette": 0.16533174534412462,
+    "calinski_harabasz": 6584.591822023261,
+    "davies_bouldin": 1.4526658125021656,
+    "moran_i": 0.8329953950341176,
+    "proporsi_tetangga_sama": 0.7652876089234151,
+    "iidx": 1.4882760470230783,
+    "dunn": 0.0071210487969746,
+    "desc": 0.2861823238661846,
+    "pesc": 0.0005631284374430763,
+    "desc_n": 0.033449732817232715,
+    "pesc_n": 0.027518816717018793,
+    "kontiguitas": 0.045601447287695634,
+    "homogenitas": 0.8258790004032603,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.6720758745092527
+   },
+   {
+    "algoritma": "REDCAP",
+    "n_init": 1,
+    "time_per_init_sec": 21.728795,
+    "seed_terbaik": null,
+    "status": "ok",
+    "klaster_terbesar_persen": 82.19027036563314,
+    "size_entropy": 0.6402608413289829,
+    "n_cluster": 4,
+    "silhouette": 0.058352090216725,
+    "calinski_harabasz": 229.53635904074977,
+    "davies_bouldin": 7.41041069253224,
+    "moran_i": 1.0,
+    "proporsi_tetangga_sama": 1.0,
+    "iidx": 0.08409552468244715,
+    "dunn": 0.0043921438601742,
+    "desc": 1.131292304926169,
+    "pesc": 0.00845976583982537,
+    "desc_n": 0.48582191321931395,
+    "pesc_n": 0.9168396518634956,
+    "kontiguitas": 0.9502174185643324,
+    "homogenitas": 0.5125022045009335,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.012200329126507781
+   },
+   {
+    "algoritma": "SKATER",
+    "n_init": 1,
+    "time_per_init_sec": 5.53408,
+    "seed_terbaik": null,
+    "status": "gagal",
+    "galat": "ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field."
+   }
+  ],
+  "2": [
+   {
+    "algoritma": "SDWFCM termodifikasi",
+    "n_init": 10,
+    "time_per_init_sec": 0.260413,
+    "seed_terbaik": 47,
+    "status": "ok",
+    "klaster_terbesar_persen": 57.92793190138049,
+    "size_entropy": 0.6805235509514678,
+    "n_cluster": 2,
+    "silhouette": 0.2992603032649777,
+    "calinski_harabasz": 10166.301678991886,
+    "davies_bouldin": 1.2558024456336092,
+    "moran_i": 0.833532562730102,
+    "proporsi_tetangga_sama": 0.9166432422763396,
+    "iidx": 1.7579096502642193,
+    "dunn": 0.0067630616276552705,
+    "desc": 0.15988331288392274,
+    "pesc": 0.00041992104535717686,
+    "desc_n": 0.06172749106414611,
+    "pesc_n": 0.04323188535113892,
+    "kontiguitas": 0.09269066586963337,
+    "homogenitas": 0.7208477343315135,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 1.0
+   },
+   {
+    "algoritma": "SDWFCM-Guo (λ = 0,5)",
+    "n_init": 10,
+    "time_per_init_sec": 0.20883748531341553,
+    "seed_terbaik": 46,
+    "J_FCM": 47517.698823702085,
+    "konvergensi": [
+     {
+      "seed": 42,
+      "n_iter": 32,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.94607073120673e-05,
+      "perubahan_pusat_akhir": 1.509923930276269e-06,
+      "J_FCM": 47517.69893044235
+     },
+     {
+      "seed": 43,
+      "n_iter": 27,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.414222412819702e-05,
+      "perubahan_pusat_akhir": 1.429677820241615e-06,
+      "J_FCM": 47517.69904478233
+     },
+     {
+      "seed": 44,
+      "n_iter": 28,
+      "konvergen": true,
+      "perubahan_U_akhir": 5.535736929849536e-05,
+      "perubahan_pusat_akhir": 9.235668257390195e-07,
+      "J_FCM": 47517.698920864634
+     },
+     {
+      "seed": 45,
+      "n_iter": 29,
+      "konvergen": true,
+      "perubahan_U_akhir": 6.948588830793691e-05,
+      "perubahan_pusat_akhir": 1.1577323316136479e-06,
+      "J_FCM": 47517.69885603744
+     },
+     {
+      "seed": 46,
+      "n_iter": 29,
+      "konvergen": true,
+      "perubahan_U_akhir": 7.176413627996346e-05,
+      "perubahan_pusat_akhir": 1.1922377005646467e-06,
+      "J_FCM": 47517.698823702085
+     },
+     {
+      "seed": 47,
+      "n_iter": 28,
+      "konvergen": true,
+      "perubahan_U_akhir": 5.8034925562159305e-05,
+      "perubahan_pusat_akhir": 9.682926113141477e-07,
+      "J_FCM": 47517.69891102305
+     },
+     {
+      "seed": 48,
+      "n_iter": 28,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.680312291529161e-05,
+      "perubahan_pusat_akhir": 1.4654644768241631e-06,
+      "J_FCM": 47517.69894034797
+     },
+     {
+      "seed": 49,
+      "n_iter": 30,
+      "konvergen": true,
+      "perubahan_U_akhir": 7.776541874900989e-05,
+      "perubahan_pusat_akhir": 1.2977562328098102e-06,
+      "J_FCM": 47517.69883773823
+     },
+     {
+      "seed": 50,
+      "n_iter": 28,
+      "konvergen": true,
+      "perubahan_U_akhir": 6.20893564319829e-05,
+      "perubahan_pusat_akhir": 1.0349038099821684e-06,
+      "J_FCM": 47517.69888824443
+     },
+     {
+      "seed": 51,
+      "n_iter": 29,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.168807706582974e-05,
+      "perubahan_pusat_akhir": 1.5481215359658407e-06,
+      "J_FCM": 47517.69893091171
+     }
+    ],
+    "status": "ok",
+    "klaster_terbesar_persen": 55.57711815816169,
+    "size_entropy": 0.6869133668835331,
+    "n_cluster": 2,
+    "silhouette": 0.29799683280768197,
+    "calinski_harabasz": 10270.428326528556,
+    "davies_bouldin": 1.2519679528226537,
+    "moran_i": 0.8200814228027212,
+    "proporsi_tetangga_sama": 0.9092326169728874,
+    "iidx": 1.7547763467245105,
+    "dunn": 0.006933698420779245,
+    "desc": 0.14886602834461388,
+    "pesc": 0.0004026701089988327,
+    "desc_n": 0.05636544720174644,
+    "pesc_n": 0.03916320813461412,
+    "kontiguitas": 0.08586469386583792,
+    "homogenitas": 0.7292312441526374,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.894740255384917
+   },
+   {
+    "algoritma": "FCM",
+    "n_init": 10,
+    "time_per_init_sec": 0.247441,
+    "seed_terbaik": 43,
+    "status": "ok",
+    "klaster_terbesar_persen": 56.54302474308649,
+    "size_entropy": 0.6845603397709534,
+    "n_cluster": 2,
+    "silhouette": 0.30522395597839197,
+    "calinski_harabasz": 10467.969395744516,
+    "davies_bouldin": 1.2417930627225837,
+    "moran_i": 0.7679585242376508,
+    "proporsi_tetangga_sama": 0.884930876753635,
+    "iidx": 1.7955072354949457,
+    "dunn": 0.01058561167069382,
+    "desc": 0.13130679005361018,
+    "pesc": 0.0002822489895378251,
+    "desc_n": 0.0473091381872983,
+    "pesc_n": 0.03892273444115061,
+    "kontiguitas": 0.07007147595350922,
+    "homogenitas": 0.7419867661345914,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.829671482861488
+   },
+   {
+    "algoritma": "SFCM",
+    "n_init": 10,
+    "time_per_init_sec": 0.154443,
+    "seed_terbaik": 43,
+    "status": "ok",
+    "klaster_terbesar_persen": 54.30688484100031,
+    "size_entropy": 0.6894327278153798,
+    "n_cluster": 2,
+    "silhouette": 0.2986142941776179,
+    "calinski_harabasz": 10298.093926551217,
+    "davies_bouldin": 1.251635328394988,
+    "moran_i": 0.7621772070535572,
+    "proporsi_tetangga_sama": 0.8816088723072598,
+    "iidx": 1.7514842475337307,
+    "dunn": 0.0074778824451197145,
+    "desc": 0.13377903766169616,
+    "pesc": 0.00027154134329274426,
+    "desc_n": 0.04802944471006172,
+    "pesc_n": 0.03827913770944269,
+    "kontiguitas": 0.07240281611154151,
+    "homogenitas": 0.7452101440504109,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.7779831255986622
+   },
+   {
+    "algoritma": "REDCAP",
+    "n_init": 1,
+    "time_per_init_sec": 23.840159,
+    "seed_terbaik": null,
+    "status": "degeneratif",
+    "klaster_terbesar_persen": 94.3986239139064,
+    "size_entropy": 0.21585535299546235,
+    "n_cluster": 2,
+    "silhouette": 0.17193678904246823,
+    "calinski_harabasz": 72.17291049041987,
+    "davies_bouldin": 8.075461045078729,
+    "moran_i": 1.0,
+    "proporsi_tetangga_sama": 1.0,
+    "iidx": 0.05618577944472235,
+    "dunn": 0.005738942540023403,
+    "desc": 0.5134625612341088,
+    "pesc": 0.0016645033963818823,
+    "desc_n": 0.39706765903205915,
+    "pesc_n": 0.2791799234515807,
+    "kontiguitas": 0.7772237863209982,
+    "homogenitas": 0.5125022045009335,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.0004845602398346668
+   },
+   {
+    "algoritma": "SKATER",
+    "n_init": 1,
+    "time_per_init_sec": 12.453131,
+    "seed_terbaik": null,
+    "status": "gagal",
+    "galat": "ValueError: Islands must be larger than the quorum. If not, drop the small islands and solve for clusters in the remaining field."
+   }
+  ]
+ },
+ "d_varian_guo": {
+  "4": [
+   {
+    "algoritma": "SDWFCM-Guo (d², λ = 0,5)",
+    "lambda": 0.5,
+    "kuadrat": true,
+    "seed_terbaik": 47,
+    "time_per_init_sec": 1.298321509361267,
+    "konvergensi": [
+     {
+      "seed": 42,
+      "n_iter": 60,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.92299462325528e-05,
+      "perubahan_pusat_akhir": 5.817512621630883e-07,
+      "J_FCM": 29177.221198089796
+     },
+     {
+      "seed": 43,
+      "n_iter": 81,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.138311063132736e-05,
+      "perubahan_pusat_akhir": 5.909928123548625e-07,
+      "J_FCM": 29177.225475872943
+     },
+     {
+      "seed": 44,
+      "n_iter": 84,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.980516071845758e-05,
+      "perubahan_pusat_akhir": 6.452588283689664e-07,
+      "J_FCM": 29177.225678703977
+     },
+     {
+      "seed": 45,
+      "n_iter": 100,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.040567337984048e-05,
+      "perubahan_pusat_akhir": 5.846241281082243e-07,
+      "J_FCM": 29177.22113088156
+     },
+     {
+      "seed": 46,
+      "n_iter": 99,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.039897182693281e-05,
+      "perubahan_pusat_akhir": 5.845886099642428e-07,
+      "J_FCM": 29177.221131101192
+     },
+     {
+      "seed": 47,
+      "n_iter": 77,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.466432309244245e-05,
+      "perubahan_pusat_akhir": 6.123010565795006e-07,
+      "J_FCM": 29177.221030149638
+     },
+     {
+      "seed": 48,
+      "n_iter": 71,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.009358917520131e-05,
+      "perubahan_pusat_akhir": 5.820697090430649e-07,
+      "J_FCM": 29177.22113430167
+     },
+     {
+      "seed": 49,
+      "n_iter": 99,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.10370772063713e-05,
+      "perubahan_pusat_akhir": 5.887112093927449e-07,
+      "J_FCM": 29177.2211158216
+     },
+     {
+      "seed": 50,
+      "n_iter": 89,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.206436946840015e-05,
+      "perubahan_pusat_akhir": 5.953286814630587e-07,
+      "J_FCM": 29177.22109107445
+     },
+     {
+      "seed": 51,
+      "n_iter": 96,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.754049938654955e-05,
+      "perubahan_pusat_akhir": 5.660985905597826e-07,
+      "J_FCM": 29177.221199378233
+     }
+    ],
+    "status": "ok",
+    "klaster_terbesar_persen": 36.21929166850439,
+    "size_entropy": 1.3509487107507352,
+    "n_cluster": 4,
+    "silhouette": 0.21504788580636472,
+    "calinski_harabasz": 7070.05439677696,
+    "davies_bouldin": 1.3115114402222874,
+    "moran_i": 0.8467568083079745,
+    "proporsi_tetangga_sama": 0.8418470344721846,
+    "iidx": 1.7964257071717133,
+    "dunn": 0.004728139574015258,
+    "desc": 0.34728311655020944,
+    "pesc": 0.0012287205812641906,
+    "desc_n": 0.0449968288242406,
+    "pesc_n": 0.034331784337199925,
+    "kontiguitas": 0.06095088347160728,
+    "homogenitas": 0.8079935442119134,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.7507395601510974,
+    "ari_vs_guo_harfiah": 0.6983579360407945
+   },
+   {
+    "algoritma": "SDWFCM-Guo (λ = 0,3)",
+    "lambda": 0.3,
+    "kuadrat": false,
+    "seed_terbaik": 50,
+    "time_per_init_sec": 1.4614924669265748,
+    "konvergensi": [
+     {
+      "seed": 42,
+      "n_iter": 91,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.32066048033106e-05,
+      "perubahan_pusat_akhir": 1.2832451178335091e-06,
+      "J_FCM": 27877.54682911819
+     },
+     {
+      "seed": 43,
+      "n_iter": 100,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.21402234625876e-05,
+      "perubahan_pusat_akhir": 1.2685671108014773e-06,
+      "J_FCM": 27877.5467879938
+     },
+     {
+      "seed": 44,
+      "n_iter": 97,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.499378550733559e-05,
+      "perubahan_pusat_akhir": 1.3078508632746733e-06,
+      "J_FCM": 27877.54689804302
+     },
+     {
+      "seed": 45,
+      "n_iter": 103,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.465773306673915e-05,
+      "perubahan_pusat_akhir": 1.3032249494004944e-06,
+      "J_FCM": 27877.54688508311
+     },
+     {
+      "seed": 46,
+      "n_iter": 97,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.934648268919025e-05,
+      "perubahan_pusat_akhir": 1.3677750739793382e-06,
+      "J_FCM": 27877.547065909057
+     },
+     {
+      "seed": 47,
+      "n_iter": 79,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.44476726532722e-05,
+      "perubahan_pusat_akhir": 1.2999902093691063e-06,
+      "J_FCM": 27877.546876806275
+     },
+     {
+      "seed": 48,
+      "n_iter": 93,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.034620198614534e-05,
+      "perubahan_pusat_akhir": 1.243866396216653e-06,
+      "J_FCM": 27877.5467188048
+     },
+     {
+      "seed": 49,
+      "n_iter": 102,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.219475842851085e-05,
+      "perubahan_pusat_akhir": 1.2693175585054561e-06,
+      "J_FCM": 27877.546790096814
+     },
+     {
+      "seed": 50,
+      "n_iter": 99,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.975958226863879e-05,
+      "perubahan_pusat_akhir": 1.2357913412586186e-06,
+      "J_FCM": 27877.54669618184
+     },
+     {
+      "seed": 51,
+      "n_iter": 95,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.006630556021655e-05,
+      "perubahan_pusat_akhir": 1.240014409931156e-06,
+      "J_FCM": 27877.546708011112
+     }
+    ],
+    "status": "ok",
+    "klaster_terbesar_persen": 29.581440479865922,
+    "size_entropy": 1.3773982901347994,
+    "n_cluster": 4,
+    "silhouette": 0.1931088613699865,
+    "calinski_harabasz": 6885.044225463208,
+    "davies_bouldin": 1.3766496559145476,
+    "moran_i": 0.7781306201741968,
+    "proporsi_tetangga_sama": 0.8447857307132088,
+    "iidx": 1.5572635378319104,
+    "dunn": 0.005746975225420889,
+    "desc": 0.3275449650242234,
+    "pesc": 0.0012708305921177673,
+    "desc_n": 0.04172164637227473,
+    "pesc_n": 0.03303257727341187,
+    "kontiguitas": 0.057163932770309525,
+    "homogenitas": 0.8095470473285635,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.8067015256030232,
+    "ari_vs_guo_harfiah": 0.8919094668698523
+   },
+   {
+    "algoritma": "SDWFCM-Guo (λ = 0,7)",
+    "lambda": 0.7,
+    "kuadrat": false,
+    "seed_terbaik": 47,
+    "time_per_init_sec": 2.1301730394363405,
+    "konvergensi": [
+     {
+      "seed": 42,
+      "n_iter": 130,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.34941100364109e-05,
+      "perubahan_pusat_akhir": 1.2485242782828143e-06,
+      "J_FCM": 29203.373709830135
+     },
+     {
+      "seed": 43,
+      "n_iter": 150,
+      "konvergen": false,
+      "perubahan_U_akhir": 0.0001253181291030951,
+      "perubahan_pusat_akhir": 1.746016666040462e-06,
+      "J_FCM": 29203.380541260827
+     },
+     {
+      "seed": 44,
+      "n_iter": 139,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.668290177411589e-05,
+      "perubahan_pusat_akhir": 1.2563682259686404e-06,
+      "J_FCM": 29203.375651377333
+     },
+     {
+      "seed": 45,
+      "n_iter": 147,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.966741799839839e-05,
+      "perubahan_pusat_akhir": 1.3430098255717837e-06,
+      "J_FCM": 29203.37656146879
+     },
+     {
+      "seed": 46,
+      "n_iter": 141,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.664465587876913e-05,
+      "perubahan_pusat_akhir": 1.290858270927564e-06,
+      "J_FCM": 29203.37604043974
+     },
+     {
+      "seed": 47,
+      "n_iter": 133,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.426644111755741e-05,
+      "perubahan_pusat_akhir": 2.098874331224465e-06,
+      "J_FCM": 29203.355384274164
+     },
+     {
+      "seed": 48,
+      "n_iter": 137,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.283866808307169e-05,
+      "perubahan_pusat_akhir": 1.1523212613967493e-06,
+      "J_FCM": 29203.37457238137
+     },
+     {
+      "seed": 49,
+      "n_iter": 150,
+      "konvergen": false,
+      "perubahan_U_akhir": 0.00012791995993397033,
+      "perubahan_pusat_akhir": 1.7861045278760868e-06,
+      "J_FCM": 29203.38093631254
+     },
+     {
+      "seed": 50,
+      "n_iter": 139,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.400056510957793e-05,
+      "perubahan_pusat_akhir": 1.189793985084675e-06,
+      "J_FCM": 29203.374964582967
+     },
+     {
+      "seed": 51,
+      "n_iter": 134,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.760118252215955e-05,
+      "perubahan_pusat_akhir": 1.3585079839395497e-06,
+      "J_FCM": 29203.376790014423
+     }
+    ],
+    "status": "ok",
+    "klaster_terbesar_persen": 30.961937105808673,
+    "size_entropy": 1.3729970140060093,
+    "n_cluster": 4,
+    "silhouette": 0.12310175670065093,
+    "calinski_harabasz": 6078.138872101693,
+    "davies_bouldin": 1.636529155968316,
+    "moran_i": 0.8830706201366443,
+    "proporsi_tetangga_sama": 0.7844274653106074,
+    "iidx": 1.2712312021125527,
+    "dunn": 0.006156501257349671,
+    "desc": 0.2817846530643248,
+    "pesc": 0.0007316885286608474,
+    "desc_n": 0.03988351042385321,
+    "pesc_n": 0.02234405148105744,
+    "kontiguitas": 0.059023116589528274,
+    "homogenitas": 0.8196623296256695,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.54013908284079,
+    "ari_vs_guo_harfiah": 0.7002068903660797
+   }
+  ],
+  "2": [
+   {
+    "algoritma": "SDWFCM-Guo (d², λ = 0,5)",
+    "lambda": 0.5,
+    "kuadrat": true,
+    "seed_terbaik": 49,
+    "time_per_init_sec": 0.22054786682128907,
+    "konvergensi": [
+     {
+      "seed": 42,
+      "n_iter": 32,
+      "konvergen": true,
+      "perubahan_U_akhir": 7.144336875131506e-05,
+      "perubahan_pusat_akhir": 6.948380950611011e-07,
+      "J_FCM": 48191.76582392652
+     },
+     {
+      "seed": 43,
+      "n_iter": 30,
+      "konvergen": true,
+      "perubahan_U_akhir": 7.000420145551846e-05,
+      "perubahan_pusat_akhir": 6.808424661830514e-07,
+      "J_FCM": 48191.765836538994
+     },
+     {
+      "seed": 44,
+      "n_iter": 30,
+      "konvergen": true,
+      "perubahan_U_akhir": 7.798044718431705e-05,
+      "perubahan_pusat_akhir": 7.583173511349628e-07,
+      "J_FCM": 48191.76576586513
+     },
+     {
+      "seed": 45,
+      "n_iter": 31,
+      "konvergen": true,
+      "perubahan_U_akhir": 6.888144073439956e-05,
+      "perubahan_pusat_akhir": 6.69776848871706e-07,
+      "J_FCM": 48191.76584515476
+     },
+     {
+      "seed": 46,
+      "n_iter": 31,
+      "konvergen": true,
+      "perubahan_U_akhir": 7.092305813425874e-05,
+      "perubahan_pusat_akhir": 6.895946886853466e-07,
+      "J_FCM": 48191.765826960516
+     },
+     {
+      "seed": 47,
+      "n_iter": 30,
+      "konvergen": true,
+      "perubahan_U_akhir": 7.984495361224374e-05,
+      "perubahan_pusat_akhir": 7.76439285088415e-07,
+      "J_FCM": 48191.76574944172
+     },
+     {
+      "seed": 48,
+      "n_iter": 30,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.800311079178236e-05,
+      "perubahan_pusat_akhir": 8.558187409857254e-07,
+      "J_FCM": 48191.765678303826
+     },
+     {
+      "seed": 49,
+      "n_iter": 31,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.804162460316455e-05,
+      "perubahan_pusat_akhir": 8.560248916378299e-07,
+      "J_FCM": 48191.765676569565
+     },
+     {
+      "seed": 50,
+      "n_iter": 30,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.26308169176438e-05,
+      "perubahan_pusat_akhir": 8.035039615883477e-07,
+      "J_FCM": 48191.76572480047
+     },
+     {
+      "seed": 51,
+      "n_iter": 31,
+      "konvergen": true,
+      "perubahan_U_akhir": 6.829407056021965e-05,
+      "perubahan_pusat_akhir": 6.641454250999601e-07,
+      "J_FCM": 48191.765850972166
+     }
+    ],
+    "status": "ok",
+    "klaster_terbesar_persen": 56.97966744586071,
+    "size_entropy": 0.6833721367780017,
+    "n_cluster": 2,
+    "silhouette": 0.30116667420059784,
+    "calinski_harabasz": 10298.33581754309,
+    "davies_bouldin": 1.2493678390485188,
+    "moran_i": 0.8149671232969913,
+    "proporsi_tetangga_sama": 0.906983875501495,
+    "iidx": 1.7717409608511785,
+    "dunn": 0.0068732571577916225,
+    "desc": 0.142868293489857,
+    "pesc": 0.0003923449060410562,
+    "desc_n": 0.053413647630334474,
+    "pesc_n": 0.03970525121053538,
+    "kontiguitas": 0.08007201028798952,
+    "homogenitas": 0.7307061415093277,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.9047678909413561,
+    "ari_vs_guo_harfiah": 0.9429546727641712
+   },
+   {
+    "algoritma": "SDWFCM-Guo (λ = 0,3)",
+    "lambda": 0.3,
+    "kuadrat": false,
+    "seed_terbaik": 46,
+    "time_per_init_sec": 0.19536254405975342,
+    "konvergensi": [
+     {
+      "seed": 42,
+      "n_iter": 30,
+      "konvergen": true,
+      "perubahan_U_akhir": 6.769531338801588e-05,
+      "perubahan_pusat_akhir": 1.0400553779321697e-06,
+      "J_FCM": 47205.48071160067
+     },
+     {
+      "seed": 43,
+      "n_iter": 26,
+      "konvergen": true,
+      "perubahan_U_akhir": 6.25418474284061e-05,
+      "perubahan_pusat_akhir": 9.329265440172207e-07,
+      "J_FCM": 47205.48083526798
+     },
+     {
+      "seed": 44,
+      "n_iter": 26,
+      "konvergen": true,
+      "perubahan_U_akhir": 7.813117727662418e-05,
+      "perubahan_pusat_akhir": 1.2083619347347252e-06,
+      "J_FCM": 47205.48058948817
+     },
+     {
+      "seed": 45,
+      "n_iter": 27,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.817459985081538e-05,
+      "perubahan_pusat_akhir": 1.3838186584957946e-06,
+      "J_FCM": 47205.48042054933
+     },
+     {
+      "seed": 46,
+      "n_iter": 27,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.35239020653702e-05,
+      "perubahan_pusat_akhir": 1.4766449806802306e-06,
+      "J_FCM": 47205.480325979544
+     },
+     {
+      "seed": 47,
+      "n_iter": 26,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.180212430688593e-05,
+      "perubahan_pusat_akhir": 1.267646502434161e-06,
+      "J_FCM": 47205.48054592364
+     },
+     {
+      "seed": 48,
+      "n_iter": 27,
+      "konvergen": true,
+      "perubahan_U_akhir": 5.9383514508045296e-05,
+      "perubahan_pusat_akhir": 9.158121904717653e-07,
+      "J_FCM": 47205.48077845562
+     },
+     {
+      "seed": 49,
+      "n_iter": 28,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.795150864292259e-05,
+      "perubahan_pusat_akhir": 1.3850446090035717e-06,
+      "J_FCM": 47205.48040294224
+     },
+     {
+      "seed": 50,
+      "n_iter": 26,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.803845212153131e-05,
+      "perubahan_pusat_akhir": 1.3715004971714961e-06,
+      "J_FCM": 47205.480460538485
+     },
+     {
+      "seed": 51,
+      "n_iter": 28,
+      "konvergen": true,
+      "perubahan_U_akhir": 5.5054302913620855e-05,
+      "perubahan_pusat_akhir": 8.523480133915129e-07,
+      "J_FCM": 47205.48080904539
+     }
+    ],
+    "status": "ok",
+    "klaster_terbesar_persen": 56.06227671679972,
+    "size_entropy": 0.6857788253485891,
+    "n_cluster": 2,
+    "silhouette": 0.29698692023785916,
+    "calinski_harabasz": 10195.525653720846,
+    "davies_bouldin": 1.255557678625137,
+    "moran_i": 0.8306151376436763,
+    "proporsi_tetangga_sama": 0.9143689469245905,
+    "iidx": 1.7464989930582948,
+    "dunn": 0.006988427539493376,
+    "desc": 0.14605092985962398,
+    "pesc": 0.00044014684364418043,
+    "desc_n": 0.055286589586224844,
+    "pesc_n": 0.04043983733114502,
+    "kontiguitas": 0.08308923064167084,
+    "homogenitas": 0.7245553812037252,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.9067950697383017,
+    "ari_vs_guo_harfiah": 0.9705741920301668
+   },
+   {
+    "algoritma": "SDWFCM-Guo (λ = 0,7)",
+    "lambda": 0.7,
+    "kuadrat": false,
+    "seed_terbaik": 47,
+    "time_per_init_sec": 0.246093487739563,
+    "konvergensi": [
+     {
+      "seed": 42,
+      "n_iter": 39,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.139873446406195e-05,
+      "perubahan_pusat_akhir": 1.7503245643979426e-06,
+      "J_FCM": 48283.2510343406
+     },
+     {
+      "seed": 43,
+      "n_iter": 32,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.670207539278321e-05,
+      "perubahan_pusat_akhir": 1.8823771614773221e-06,
+      "J_FCM": 48283.25160397969
+     },
+     {
+      "seed": 44,
+      "n_iter": 32,
+      "konvergen": true,
+      "perubahan_U_akhir": 9.659279393247789e-05,
+      "perubahan_pusat_akhir": 2.0965341196443887e-06,
+      "J_FCM": 48283.2525126205
+     },
+     {
+      "seed": 45,
+      "n_iter": 34,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.217129467487066e-05,
+      "perubahan_pusat_akhir": 1.7627654933516368e-06,
+      "J_FCM": 48283.25108481823
+     },
+     {
+      "seed": 46,
+      "n_iter": 34,
+      "konvergen": true,
+      "perubahan_U_akhir": 8.129157193218053e-05,
+      "perubahan_pusat_akhir": 1.7399227421055485e-06,
+      "J_FCM": 48283.25098587756
+     },
+     {
+      "seed": 47,
+      "n_iter": 33,
+      "konvergen": true,
+      "perubahan_U_akhir": 5.5188659420468175e-05,
+      "perubahan_pusat_akhir": 1.1608993417677738e-06,
+      "J_FCM": 48283.24852237996
+     },
+     {
+      "seed": 48,
+      "n_iter": 34,
+      "konvergen": true,
+      "perubahan_U_akhir": 5.5282894994463656e-05,
+      "perubahan_pusat_akhir": 1.1648775151140711e-06,
+      "J_FCM": 48283.248540253044
+     },
+     {
+      "seed": 49,
+      "n_iter": 36,
+      "konvergen": true,
+      "perubahan_U_akhir": 6.419578552667843e-05,
+      "perubahan_pusat_akhir": 1.358525549388645e-06,
+      "J_FCM": 48283.24936198616
+     },
+     {
+      "seed": 50,
+      "n_iter": 33,
+      "konvergen": true,
+      "perubahan_U_akhir": 5.8358452561468395e-05,
+      "perubahan_pusat_akhir": 1.2296624416485713e-06,
+      "J_FCM": 48283.24881410472
+     },
+     {
+      "seed": 51,
+      "n_iter": 35,
+      "konvergen": true,
+      "perubahan_U_akhir": 7.449129337546113e-05,
+      "perubahan_pusat_akhir": 1.594803336502082e-06,
+      "J_FCM": 48283.25037135096
+     }
+    ],
+    "status": "ok",
+    "klaster_terbesar_persen": 54.950822564283506,
+    "size_entropy": 0.6882370098763935,
+    "n_cluster": 2,
+    "silhouette": 0.2992644748225857,
+    "calinski_harabasz": 10368.938810323529,
+    "davies_bouldin": 1.247104517090843,
+    "moran_i": 0.8031809520266616,
+    "proporsi_tetangga_sama": 0.9009531597373062,
+    "iidx": 1.7659132033673908,
+    "dunn": 0.008399662359853347,
+    "desc": 0.14817282861403172,
+    "pesc": 0.00035292112073206277,
+    "desc_n": 0.05561903680491353,
+    "pesc_n": 0.03753336744404189,
+    "kontiguitas": 0.0845971142078753,
+    "homogenitas": 0.7324762168943725,
+    "pesc_n_aproksimasi": false,
+    "ari_vs_sdwfcm_termodifikasi": 0.8642956377246581,
+    "ari_vs_guo_harfiah": 0.9563737931214351
+   }
+  ]
+ },
+ "detik_total": 404.6902449131012
+}

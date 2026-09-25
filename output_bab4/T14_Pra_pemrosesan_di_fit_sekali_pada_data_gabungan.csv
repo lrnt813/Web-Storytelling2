@@ -5,5 +5,5 @@ Fitur terpilih,"Road_Density_mean, waktu_tes_pendidikan, waktu_tes_kesehatan, wa
 Fitur dibuang,–
 Capping 3 × IQR,"Road_Density_mean: [-0,290; 1,815]"
 Komponen PCA,5
-Varians kumulatif PCA,"85,58 %"
+Varians kumulatif PCA,"85,65 %"
 σ kernel Gaussian per level (m),"Baseline 141,42; Rendah 141,42; Sedang 141,42; Tinggi 141,42"

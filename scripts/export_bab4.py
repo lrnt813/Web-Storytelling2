@@ -186,7 +186,7 @@ def tables_common(R, F=None, S=None):
             if "DESC-N" in ok:
                 r["Kontiguitas"], r["Homogenitas"] = n["kontiguitas"], n["homogenitas"]
     df = pd.DataFrame(rows)
-    T.append(Table("T05", "Pemilihan K berbasis stabilitas (data gabungan)", df,
+    T.append(Table("T05", "Stabilitas K (uji ketahanan) dan metrik pendukung (data gabungan)", df,
                    {c: 3 for c in df.columns if c not in ("K", "Klaster terbesar (%)",
                                                          "Setara secara stabilitas dengan K terbaik")}
                    | {"K": 0, "Klaster terbesar (%)": 2, "Setara secara stabilitas dengan K terbaik": 0},
