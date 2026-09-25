@@ -76,6 +76,11 @@ def _nearest_block_dist(pairs: np.ndarray, cells: dict) -> np.ndarray:
     out = np.empty(len(pairs))
     if len(pairs) == 0:
         return out
+    size = np.array([len(cells[b]) for b in range(max(cells) + 1)]) if isinstance(next(iter(cells)), (int, np.integer))         else None
+    pairs = np.array(pairs, copy=True)
+    if size is not None:                           # KD-tree dibangun pada blok yang lebih besar
+        swap = size[pairs[:, 1]] > size[pairs[:, 0]]
+        pairs[swap] = pairs[swap][:, ::-1]
     order = np.argsort(pairs[:, 0], kind="stable")
     p = pairs[order]
     starts = np.r_[0, np.flatnonzero(np.diff(p[:, 0])) + 1, len(p)]

@@ -1,0 +1,25 @@
+{
+ "status": {
+  "DESC-N": {
+   "K_tertinggi": 2,
+   "monoton": false,
+   "kriteria_a": true,
+   "kriteria_b": true,
+   "lulus": true
+  },
+  "PESC-N": {
+   "K_tertinggi": 4,
+   "monoton": false,
+   "kriteria_a": true,
+   "kriteria_b": true,
+   "lulus": true
+  }
+ },
+ "ukuran_kelas": {
+  "merah": 1471,
+  "kuning": 3994,
+  "hijau": 3044,
+  "biru": 1491
+ },
+ "kriteria": "(a) tertinggi di K = 4 atau tidak monoton; (b) invarian × 10 (< 1e-9)"
+}

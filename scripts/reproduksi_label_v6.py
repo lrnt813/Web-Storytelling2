@@ -10,7 +10,8 @@ kode, seed, dan data yang sama, lalu DIVERIFIKASI terhadap metrik terkunci (kepu
     terkunci;
   * algoritma pembanding di Baseline (FCM, SFCM, SDWFCM Baseline, REDCAP, SKATER) untuk K = 4 dan K = 2: metrik
     harus sama dengan `model.<K>.algorithm_comparison`.
-Skor PCA dihitung ulang dengan parameter praproses terkunci dan dibandingkan dengan kolom pc* terkunci.
+Praproses di-fit ulang pada data gabungan (deterministik, sama dengan pipeline); parameternya harus sama dengan
+parameter terkunci dan skor PCA dibandingkan dengan kolom pc* terkunci.
 Bila ada verifikasi yang gagal, skrip berhenti (exit 1) dan label tidak ditulis.
 
 Keluaran (output_bab4/finalisasi_v6/): label_turunan.npz (label mentah) dan verifikasi_label.json.
@@ -51,18 +52,28 @@ def load_inputs():
     roads, tes = load_road_network(cfg)
     w = build_weights(gdf)
     A_rook = T.rook_adjacency(w)
-    t_pen, frames = float(R["t_pen"]), {}
+    t_pen, frames = None, {}                       # T_pen dihitung ulang seperti pipeline (nilai JSON dibulatkan)
     for lv in T.LEVELS:
-        frames[lv["key"]] = T.prepare_level(gdf, roads, tes, lv["intensity"], cfg, t_pen=t_pen)["df"]
+        prep = T.prepare_level(gdf, roads, tes, lv["intensity"], cfg, t_pen=t_pen)
+        t_pen = prep["t_pen"]
+        frames[lv["key"]] = prep["df"]
+    assert abs(t_pen - float(R["t_pen"])) < 1e-6, "T_pen hitung ulang tidak sama dengan T_pen terkunci"
     pool = T.build_pooled(frames, gdf)
-    X = T.Preprocessor.from_dict(R["preprocessing"]).transform(pool)
+    pre = T.Preprocessor.fit(pool, cfg)            # fit ulang (deterministik, sama dengan pipeline); parameter
+    X = pre.transform(pool)                        # terkunci dibulatkan 6 desimal sehingga from_dict tidak persis
+    from scripts.thesis_analysis import clean_json
+    par = json.loads(json.dumps(clean_json(pre.to_dict()), ensure_ascii=False))
+    par_beda = sorted(k for k in set(par) | set(R["preprocessing"]) if par.get(k) != R["preprocessing"].get(k))
+    par_sama = not par_beda
     locked = pd.read_csv(LOCKED / "thesis_pooled_results.csv.gz")
     pcs = [c for c in locked.columns if c.startswith("pc")]
     same_rows = (np.array_equal(locked["id_grid"].values, pool["id_grid"].values)
                  and np.array_equal(locked["level"].values, pool["level"].values))
     dx = float(np.abs(locked[pcs].values - X).max()) if same_rows else float("inf")
     W, _ = T.block_knn_weights(pool[["cx", "cy"]].values, pool["level"].values, cfg.sdwfcm_knn)
-    return R, cfg, gdf, w, A_rook, pool, X, W, locked, {"baris_identik": bool(same_rows), "maks_selisih_pc": dx}
+    return R, cfg, gdf, w, A_rook, pool, X, W, locked, {"baris_identik": bool(same_rows), "maks_selisih_pc": dx,
+                                                         "parameter_praproses_sama": bool(par_sama),
+                                                         "parameter_berbeda": par_beda}
 
 
 def main():
@@ -72,7 +83,8 @@ def main():
     t0 = time.time()
     R, cfg, gdf, w, A_rook, pool, X, W, locked, ver_x = load_inputs()
     ver = {"X": ver_x, "sdwfcm_gabungan": {}, "algoritma": {}}
-    ok = ver_x["baris_identik"] and ver_x["maks_selisih_pc"] < 5e-6
+    ok = ver_x["baris_identik"] and ver_x["maks_selisih_pc"] < 5e-6 and ver_x["parameter_praproses_sama"]
+    print("X:", ver_x, flush=True)
     labels = {}
     cand = {c["k"]: c for c in R["k_selection"]["candidates"]}
     for K in K_REPRO:
@@ -91,6 +103,7 @@ def main():
             v["cocok"] = v["cocok"] and v["ari_vs_label_terkunci"] == 1.0
         ver["sdwfcm_gabungan"][str(K)] = v
         ok &= v["cocok"]
+        print({kk: vv for kk, vv in v.items()}, flush=True)
         labels[f"gabungan_k{K}"] = lab.astype(np.int16)
         print(f"K={K}: cocok={v['cocok']} ({v['detik']:.0f} s)", flush=True)
 
