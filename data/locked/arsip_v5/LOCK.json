@@ -1,0 +1,185 @@
+{
+ "keterangan": "Hasil analisis terkunci. Jangan diedit manual. Semua angka skripsi berasal dari output_bab4/ yang dibangun dari folder ini (python -m scripts.export_bab4).",
+ "locked_at": "2026-09-25T03:00:41+07:00",
+ "git": {
+  "commit_analisis": "0bcb860004b90ed9bcf6ed4c09b27f7ff27d8432",
+  "branch_analisis": "revisi-v5",
+  "commit_saat_kunci": "281e79d161cc20d2bb82e4ccb187efccdb6a7445",
+  "branch_saat_kunci": "revisi-v5",
+  "berkas_pipeline_sama_dengan_commit_analisis": true
+ },
+ "python": {
+  "versi": "3.14.7",
+  "implementasi": "CPython",
+  "platform": "Windows-11-10.0.26200-SP0"
+ },
+ "pustaka": {
+  "numpy": "2.5.3",
+  "pandas": "3.0.5",
+  "scipy": "1.18.1",
+  "scikit-learn": "1.9.1",
+  "geopandas": "1.1.4",
+  "networkx": "3.6.1",
+  "libpysal": "4.15.0",
+  "esda": "2.10.0",
+  "shapely": "2.1.2",
+  "pyproj": "3.8.0",
+  "pyogrio": "0.13.0",
+  "spopt": "0.7.0",
+  "numba": "0.67.0",
+  "rasterio": "1.5.1"
+ },
+ "parameter_cfg": {
+  "base_dir": "./data",
+  "target_crs": "EPSG:32749",
+  "hazard_col_map": {
+   "banjir": "banjir",
+   "banjir_bandang": "banjir_bandang",
+   "tanah_longsor": "tanah_longsor"
+  },
+  "indeks_bahaya": {
+   "banjir": "banjir",
+   "banjir_bandang": "banjir_bandang",
+   "tanah_longsor": "tanah_longsor"
+  },
+  "kategori_fac": [
+   "pendidikan",
+   "kesehatan",
+   "pemerintahan",
+   "ibadah",
+   "gor"
+  ],
+  "hazard_normalize_map": {
+   "0": 0.0,
+   "1": 0.33,
+   "2": 0.67,
+   "3": 1.0
+  },
+  "impact_closure_threshold": 0.2,
+  "tes_hazard_threshold": 2,
+  "road_break_threshold": 3,
+  "walking_speed_m_per_min": 80.0,
+  "isolation_time_threshold": 30.0,
+  "isolation_penalty_weight": 10.0,
+  "unreachable_time": 9999.0,
+  "sdwfcm_m": 1.7,
+  "sdwfcm_alpha": 0.5,
+  "sdwfcm_knn": 8,
+  "sdwfcm_max_iter": 150,
+  "sdwfcm_tol": 0.0001,
+  "sdwfcm_impact_weight": 1.0,
+  "sfcm_alpha": 0.5,
+  "sfcm_max_iter": 150,
+  "sfcm_tol": 0.0001,
+  "redcap_linkage": "ward",
+  "size_alpha": 1.0,
+  "skater_min_region": 10,
+  "input_file": "./data/Kulonprogo_Ready4.gpkg",
+  "roads_file": "./data/Kulonprogo_Jalan.gpkg",
+  "tes_files": {
+   "pendidikan": "./data/Kulonprogo_Pendidikan.gpkg",
+   "kesehatan": "./data/Kulonprogo_Faskes.gpkg",
+   "pemerintahan": "./data/Kulonprogo_Kantor.gpkg",
+   "ibadah": "./data/Kulonprogo_Ibadah.gpkg",
+   "gor": "./data/Kulonprogo_GOR.gpkg"
+  }
+ },
+ "konstanta_thesis": {
+  "SKENARIO": "banjir",
+  "LEVELS": [
+   {
+    "key": "baseline",
+    "label": "Baseline",
+    "kelas_ditutup": [],
+    "label_lengkap": "Baseline (tidak ada kelas ditutup)",
+    "intensity": 0.0
+   },
+   {
+    "key": "rendah",
+    "label": "Rendah",
+    "kelas_ditutup": [
+     3
+    ],
+    "label_lengkap": "Level Rendah (kelas 3 ditutup)",
+    "intensity": 0.25
+   },
+   {
+    "key": "sedang",
+    "label": "Sedang",
+    "kelas_ditutup": [
+     2,
+     3
+    ],
+    "label_lengkap": "Level Sedang (kelas ≥ 2 ditutup)",
+    "intensity": 0.5
+   },
+   {
+    "key": "tinggi",
+    "label": "Tinggi",
+    "kelas_ditutup": [
+     1,
+     2,
+     3
+    ],
+    "label_lengkap": "Level Tinggi (kelas ≥ 1 ditutup)",
+    "intensity": 0.75
+   }
+  ],
+  "PCA_VARIANCE": 0.8,
+  "IQR_FACTOR": 3.0,
+  "CAPPED_COLUMNS": [
+   "Road_Density_mean"
+  ],
+  "VARIANCE_MIN": 0.001,
+  "IINDEX_P": 2,
+  "SDWFCM_N_INIT": 10,
+  "SDWFCM_SEED": 42,
+  "DUNN_SAMPLE": 2000,
+  "MORAN_PERMUTATION_SEED": 42,
+  "TAS_MIN_EUCLID_M": 50.0,
+  "TAS_DI_ABSOLUTE": 2.0,
+  "K_SCORE_METRICS": [
+   "iidx",
+   "dunn",
+   "desc",
+   "ketegasan_partisi"
+  ],
+  "K_RANGE": [
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10
+  ]
+ },
+ "seed": {
+  "sdwfcm_seed_awal": 42,
+  "sdwfcm_n_init": 10,
+  "sdwfcm_seed_terbaik_per_k": {
+   "2": 50,
+   "3": 49,
+   "4": 50
+  },
+  "moran_permutation_seed": 42,
+  "dunn_sample_seed": 42
+ },
+ "k_terpilih_aturan": 2,
+ "k_keluaran": [
+  2,
+  3,
+  4
+ ],
+ "files": {
+  "thesis_results.json": "7a77fb6dae449e97bb85a05a477ba1a8ab6891a00abe7243e3f0d31134eb5f05",
+  "thesis_grid_results.csv.gz": "02c2b0f657f4dd94ab7562925e02ae21b0d927b170b790ffb4d9e6a78b8b6729",
+  "thesis_pooled_results.csv.gz": "0dc3585b63689de546f142fc863bce650ee1f23ad9d92118da91b8c1d131dce0"
+ },
+ "fingerprint_hasil_tanpa_waktu": "8b0b47eee51e5974ca2567e5b42d57e7d104066d7d39a474e4913f7426c6e0dc",
+ "sha256_isi_grid_csv": "ca705355f0a47d78e8c4c6200b13562a3e08625bcfae5da0b866922c6067f80a",
+ "sha256_isi_pooled_csv": "398451698bd772f376025f974c63445d9e228b04c4f95349d4c34d41779426f4",
+ "catatan_fingerprint": "fingerprint = SHA-256 JSON kanonik thesis_results.json tanpa field waktu dan meta.git; sha256_isi_*_csv = SHA-256 isi CSV setelah dekompresi (header gzip memuat stempel waktu). Keduanya dipakai scripts/cek_reproduksi.py."
+}

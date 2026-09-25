@@ -1,0 +1,5 @@
+﻿Level,Grid Tergenang,Terisolasi (non-Tergenang),Terisolasi (Tergenang),Ruas ditutup,Kelas ditutup (aturan),Kelas grid Tergenang (data),Kelas ruas ditutup (data),Aturan = data,TAS: T_aktual < T_ideal
+Baseline,0,111,0,0,–,–,–,True,0
+Rendah,39,126,2,710,3,3,3,True,0
+Sedang,3375,502,1751,20963,"2, 3","2, 3","2, 3",True,0
+Tinggi,7175,651,4759,44096,"1, 2, 3","1, 2, 3","1, 2, 3",True,0

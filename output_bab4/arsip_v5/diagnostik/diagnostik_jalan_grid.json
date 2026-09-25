@@ -1,0 +1,161 @@
+{
+ "per_level": {
+  "baseline": {
+   "kelas_ditutup": [],
+   "ruas_ditutup": 0,
+   "km_ditutup_total": 0.0,
+   "km_ditutup_di_dalam_grid": 0.0,
+   "km_ditutup_di_luar_grid": 0.0,
+   "ruas_di_luar_grid": 0,
+   "km_di_grid_tergenang": 0.0,
+   "km_di_grid_non_tergenang": 0.0,
+   "ruas_di_grid_tergenang": 0,
+   "ruas_di_grid_non_tergenang": 0,
+   "km_per_kelas_grid": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0
+   },
+   "ruas_per_kelas_grid": {
+    "0": 0,
+    "1": 0,
+    "2": 0,
+    "3": 0
+   },
+   "grid_non_tergenang_dilalui_ruas_tertutup": 0,
+   "grid_tergenang_dilalui_ruas_tertutup": 0,
+   "grid_tergenang": 0
+  },
+  "rendah": {
+   "kelas_ditutup": [
+    3
+   ],
+   "ruas_ditutup": 702,
+   "km_ditutup_total": 56.058728228401584,
+   "km_ditutup_di_dalam_grid": 3.5569048081143895,
+   "km_ditutup_di_luar_grid": 52.501823420287195,
+   "ruas_di_luar_grid": 602,
+   "km_di_grid_tergenang": 2.585594901625267,
+   "km_di_grid_non_tergenang": 0.9713099064891234,
+   "ruas_di_grid_tergenang": 79,
+   "ruas_di_grid_non_tergenang": 22,
+   "km_per_kelas_grid": {
+    "0": 0.27749472566850486,
+    "1": 0.0,
+    "2": 0.6938151808206184,
+    "3": 2.585594901625267
+   },
+   "ruas_per_kelas_grid": {
+    "0": 3,
+    "1": 0,
+    "2": 21,
+    "3": 79
+   },
+   "grid_non_tergenang_dilalui_ruas_tertutup": 16,
+   "grid_tergenang_dilalui_ruas_tertutup": 39,
+   "grid_tergenang": 2531
+  },
+  "sedang": {
+   "kelas_ditutup": [
+    2,
+    3
+   ],
+   "ruas_ditutup": 20871,
+   "km_ditutup_total": 702.4760044827246,
+   "km_ditutup_di_dalam_grid": 411.431735382991,
+   "km_ditutup_di_luar_grid": 291.04426909973364,
+   "ruas_di_luar_grid": 5087,
+   "km_di_grid_tergenang": 340.17242407685455,
+   "km_di_grid_non_tergenang": 71.25931130613642,
+   "ruas_di_grid_tergenang": 13664,
+   "ruas_di_grid_non_tergenang": 2554,
+   "km_per_kelas_grid": {
+    "0": 57.91579663293743,
+    "1": 13.34351467319899,
+    "2": 198.4872054545315,
+    "3": 141.68521862232302
+   },
+   "ruas_per_kelas_grid": {
+    "0": 2005,
+    "1": 563,
+    "2": 8313,
+    "3": 5883
+   },
+   "grid_non_tergenang_dilalui_ruas_tertutup": 649,
+   "grid_tergenang_dilalui_ruas_tertutup": 2770,
+   "grid_tergenang": 7845
+  },
+  "tinggi": {
+   "kelas_ditutup": [
+    1,
+    2,
+    3
+   ],
+   "ruas_ditutup": 41619,
+   "km_ditutup_total": 1181.455187916681,
+   "km_ditutup_di_dalam_grid": 803.729179978584,
+   "km_ditutup_di_luar_grid": 377.72600793809704,
+   "ruas_di_luar_grid": 8207,
+   "km_di_grid_tergenang": 642.6025167718101,
+   "km_di_grid_non_tergenang": 161.12666320677403,
+   "ruas_di_grid_tergenang": 27377,
+   "ruas_di_grid_non_tergenang": 6908,
+   "km_per_kelas_grid": {
+    "0": 161.12666320677403,
+    "1": 18.978736023111267,
+    "2": 406.6322241424061,
+    "3": 216.99155660629273
+   },
+   "ruas_per_kelas_grid": {
+    "0": 6908,
+    "1": 766,
+    "2": 18010,
+    "3": 9625
+   },
+   "grid_non_tergenang_dilalui_ruas_tertutup": 1433,
+   "grid_tergenang_dilalui_ruas_tertutup": 4842,
+   "grid_tergenang": 8041
+  }
+ },
+ "km_kelas_ruas_x_kelas_grid": {
+  "0": {
+   "0": 1249.4142125548706,
+   "1": 5.70250354372484,
+   "2": 238.41903212783106,
+   "3": 72.85388301552724
+  },
+  "1": {
+   "0": 103.21086657383658,
+   "1": 5.635221349912277,
+   "2": 208.14501868787454,
+   "3": 75.30633798396971
+  },
+  "2": {
+   "0": 57.638301907268925,
+   "1": 13.34351467319899,
+   "2": 197.79339027371088,
+   "3": 139.09962372069776
+  },
+  "3": {
+   "0": 0.27749472566850486,
+   "1": 0.0,
+   "2": 0.6938151808206184,
+   "3": 2.585594901625267
+  }
+ },
+ "km_jalan_total": 3780.1224651436664,
+ "km_jalan_di_dalam_grid": 2370.1188112205377,
+ "km_per_kelas_ruas": {
+  "0": 2598.667277226986,
+  "1": 478.9791834339565,
+  "2": 646.4172762543232,
+  "3": 56.05872822840158
+ },
+ "grid_per_kelas": {
+  "0": 14632,
+  "1": 196,
+  "2": 5314,
+  "3": 2531
+ }
+}

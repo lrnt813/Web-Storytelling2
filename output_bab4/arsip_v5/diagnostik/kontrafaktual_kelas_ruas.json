@@ -1,0 +1,154 @@
+{
+ "asli": {
+  "baseline": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 0,
+   "terputus": 168,
+   "tas": 1842,
+   "terisolasi_non_tergenang": 111,
+   "mean_waktu_min_non_tergenang": 9.041001272141902,
+   "median_waktu_min_non_tergenang": 5.810452209441573
+  },
+  "rendah": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 702,
+   "terputus": 162,
+   "tas": 1652,
+   "terisolasi_non_tergenang": 109,
+   "mean_waktu_min_non_tergenang": 9.835203562310955,
+   "median_waktu_min_non_tergenang": 6.116949406933845
+  },
+  "sedang": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 20871,
+   "terputus": 819,
+   "tas": 1042,
+   "terisolasi_non_tergenang": 703,
+   "mean_waktu_min_non_tergenang": 27.095443218357435,
+   "median_waktu_min_non_tergenang": 6.88827451919123
+  },
+  "tinggi": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 41619,
+   "terputus": 1576,
+   "tas": 958,
+   "terisolasi_non_tergenang": 1320,
+   "mean_waktu_min_non_tergenang": 43.7698357011822,
+   "median_waktu_min_non_tergenang": 7.114898935635569
+  }
+ },
+ "A_maks_grid_luar_tetap": {
+  "baseline": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 0,
+   "terputus": 168,
+   "tas": 1842,
+   "terisolasi_non_tergenang": 111,
+   "mean_waktu_min_non_tergenang": 9.041001272141902,
+   "median_waktu_min_non_tergenang": 5.810452209441573
+  },
+  "rendah": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 13516,
+   "terputus": 769,
+   "tas": 1467,
+   "terisolasi_non_tergenang": 485,
+   "mean_waktu_min_non_tergenang": 17.432460246921508,
+   "median_waktu_min_non_tergenang": 6.173213047806326
+  },
+  "sedang": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 44948,
+   "terputus": 1668,
+   "tas": 948,
+   "terisolasi_non_tergenang": 1578,
+   "mean_waktu_min_non_tergenang": 49.75058188941909,
+   "median_waktu_min_non_tergenang": 6.9660371481488195
+  },
+  "tinggi": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 48906,
+   "terputus": 1618,
+   "tas": 942,
+   "terisolasi_non_tergenang": 1510,
+   "mean_waktu_min_non_tergenang": 48.47700914154918,
+   "median_waktu_min_non_tergenang": 6.966924197366684
+  }
+ },
+ "B_mayoritas_grid_luar_tetap": {
+  "baseline": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 0,
+   "terputus": 168,
+   "tas": 1842,
+   "terisolasi_non_tergenang": 111,
+   "mean_waktu_min_non_tergenang": 9.041001272141902,
+   "median_waktu_min_non_tergenang": 5.810452209441573
+  },
+  "rendah": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 12611,
+   "terputus": 733,
+   "tas": 1495,
+   "terisolasi_non_tergenang": 443,
+   "mean_waktu_min_non_tergenang": 16.553256860186263,
+   "median_waktu_min_non_tergenang": 6.169597163386839
+  },
+  "sedang": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 43772,
+   "terputus": 1597,
+   "tas": 953,
+   "terisolasi_non_tergenang": 1522,
+   "mean_waktu_min_non_tergenang": 48.26953950030279,
+   "median_waktu_min_non_tergenang": 6.959526146528923
+  },
+  "tinggi": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 47800,
+   "terputus": 1562,
+   "tas": 940,
+   "terisolasi_non_tergenang": 1470,
+   "mean_waktu_min_non_tergenang": 47.40462828446039,
+   "median_waktu_min_non_tergenang": 6.964834294217981
+  }
+ },
+ "C_maks_grid_luar_terbuka": {
+  "baseline": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 0,
+   "terputus": 168,
+   "tas": 1842,
+   "terisolasi_non_tergenang": 111,
+   "mean_waktu_min_non_tergenang": 9.041001272141902,
+   "median_waktu_min_non_tergenang": 5.810452209441573
+  },
+  "rendah": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 12914,
+   "terputus": 738,
+   "tas": 1509,
+   "terisolasi_non_tergenang": 454,
+   "mean_waktu_min_non_tergenang": 16.831181542559197,
+   "median_waktu_min_non_tergenang": 6.173213047806326
+  },
+  "sedang": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 39861,
+   "terputus": 1298,
+   "tas": 943,
+   "terisolasi_non_tergenang": 1162,
+   "mean_waktu_min_non_tergenang": 39.96260099295163,
+   "median_waktu_min_non_tergenang": 6.961681633157004
+  },
+  "tinggi": {
+   "t_pen": 403.8691696402639,
+   "ruas_ditutup": 40699,
+   "terputus": 1184,
+   "tas": 935,
+   "terisolasi_non_tergenang": 1071,
+   "mean_waktu_min_non_tergenang": 37.87468434307909,
+   "median_waktu_min_non_tergenang": 6.954345478902744
+  }
+ }
+}
