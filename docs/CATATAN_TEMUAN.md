@@ -432,3 +432,34 @@ Semua aturan putaran ini ditetapkan sebelum hasil v6 terlihat (instruksi penelit
   - Koreksi snapping ke ruas tetap relevan: kasus 8895, 9632, dan 17011 berubah karena snapping.
   - **Keputusan untuk peneliti/pembimbing:** baris berkode F otomatis berstatus "perlu divalidasi" di
     lembar v6 (aturan (a)), sehingga akan diperiksa ulang dengan peta yang benar. — *DICATAT*
+- **P6-6. Hasil terkunci v6 dan keputusan K yang tertunda.** Analisis dijalankan dua kali pada commit
+  `1fdcec2`. Fingerprint identik (`e58b6e7e…1a00`), dan isi CSV grid serta data gabungan juga identik.
+  Pemilihan K dihitung ulang pada data v6 (METODOLOGI §9 (f)). Rerata ARI subsampel: K = 2 0,9593;
+  K = 3 0,9422; K = 4 0,9481; K = 5 0,9430. Himpunan setara (selisih ≤ 0,01) = **{2}**. K = 4 berselisih
+  0,0111, sehingga menurut aturan yang ditetapkan sebelum hasil v6 **K = 4 tidak lagi setara**.
+  Sesuai instruksi, analisis berhenti sebelum ekspor. Peneliti memilih **menunda ekspor**: hasil dikunci
+  dan diberi tag `hasil-skripsi-v6` (keluaran K = 2, 3, 4 lengkap), tetapi keluaran berikut belum dibangun
+  ulang:
+  - `export_bab4` (tabel T*/S*/L*, Tabel_Bab4.docx, ringkasan, peta);
+  - `temuan_kunci.md` dan `perbandingan_v5_vs_v6.md`.
+
+  Isi `output_bab4/` di tingkat atas (selain `validasi/` dan `dampak_koreksi_snapping/`) masih berupa
+  keluaran v5 dan **tidak boleh dikutip** sampai ekspor v6 dijalankan. `pengaturan_hasil.json` tetap
+  `k_utama = 4`. **Keputusan untuk peneliti/pembimbing:** K utama v6 — ikuti aturan (K = 2), atau
+  tetapkan K = 4 sebagai keputusan peneliti yang dicatat eksplisit sebagai penyimpangan dari aturan
+  stabilitas. Toleransi 0,01 tidak diubah, karena mengubahnya setelah hasil terlihat berarti menyetel
+  aturan agar cocok dengan hasil. — *MENUNGGU KEPUTUSAN*
+- **P6-7. Snapping ke ruas juga dapat menambah jalan memutar (pengamatan).** Aturan "ruas terdekat" tidak
+  mempertimbangkan keterhubungan ruas. Contoh grid 21663 (Baseline): T_aktual v5 9,40 → v6 116,89 menit,
+  menjadi TAS. Ruas terdekatnya adalah jalan panjang di sekeliling kawasan bandara yang tidak tersambung
+  ke sisi TES di dekat grid, sehingga rute memutar. Contoh lain: grid 1198, 18133, dan 21538. Koreksi yang
+  sama menghapus TAS lama (17011, 20764, 9632, 8895). Rincian: `docs/DAMPAK_KOREKSI_SNAPPING.md` §6.
+  **Keputusan untuk peneliti/pembimbing:** apakah perlu aturan tambahan, misalnya mengecualikan kelas
+  jalan tertentu (motorway/trunk berpagar) sebagai sasaran snapping. Aturan seperti itu harus
+  ditetapkan sebelum melihat hasilnya. Lembar validasi v6 akan menandai kasus seperti ini (kode F/E). —
+  *DICATAT*
+- **P6-8. Lembar validasi v6** (`output_bab4/validasi/validasi_TAS_v6.xlsx`, 264 baris). Status isian:
+  otomatis 141, perlu konfirmasi peneliti 36, perlu divalidasi 87; 30 hotspot. Cek T_aktual: 264/264
+  "sama". Peta per TAS dibuat ulang di `output_bab4/validasi/peta/`; peta v5 ada di
+  `output_bab4/arsip_v5/validasi/peta/`. Rekap (`scripts/rekap_validasi_TAS.py`) belum dijalankan. —
+  *MENUNGGU PENGISIAN*
