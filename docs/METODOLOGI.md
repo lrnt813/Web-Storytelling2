@@ -65,9 +65,19 @@ yang berada dalam radius 50 m dari grid Tergenang dinaikkan kelasnya menjadi 3 (
 
 1. Graf jaringan jalan dibentuk dari ruas yang tidak ditutup. Simpul = ujung segmen (dibulatkan
    0,01 m); bobot sisi = panjang segmen (m).
-2. Centroid grid dan titik TES di-*snap* ke simpul jalan terdekat bila jaraknya \(\le 300\) m.
-   Misalkan \(g(i)\) simpul grid dengan jarak snapping \(a_i\), dan \(n(e)\) simpul TES \(e\)
-   dengan jarak snapping \(b_e\).
+2. **Snapping ke ruas (Putaran 6, koreksi metode hasil validasi).** Centroid grid dan titik TES
+   di-*snap* ke titik terdekat pada **ruas** jalan yang terbuka pada level tersebut (proyeksi tegak
+   lurus ke sisi graf, dicari dengan shapely STRtree) bila jaraknya \(\le 300\) m. Pada titik
+   proyeksi disisipkan simpul virtual, dan sisi itu dipecah menjadi sisi-sisi berurutan dengan bobot
+   proporsional terhadap panjangnya (titik-titik pada sisi yang sama diurutkan menurut posisinya;
+   total bobot pecahan = bobot sisi asli). Proyeksi yang jatuh ≤ 1 mm dari ujung sisi memakai simpul
+   ujung itu. Bila beberapa ruas sama dekat, dipilih sisi berindeks terkecil (deterministik).
+   Misalkan \(g(i)\) simpul (virtual) grid dengan jarak snapping tegak lurus \(a_i\), dan \(n(e)\)
+   simpul (virtual) TES \(e\) dengan jarak snapping \(b_e\). Grid/TES tanpa ruas terbuka dalam
+   300 m diperlakukan seperti sebelumnya (tidak terjangkau → penalti).
+   Sampai v5, titik di-*snap* ke **verteks** jalan terdekat. Validasi manual TAS v5 menunjukkan cara
+   itu dapat menyambungkan titik ke jalan di seberang penghalang walaupun ada ruas lain yang lebih
+   dekat (ruas panjang tanpa verteks tengah); lihat CATATAN Putaran 6 (P6-1).
 3. Untuk setiap kategori \(q\) dengan himpunan TES valid \(E_q\) (yang ter-snap):
 \[
 L_{iq} = a_i + \min_{e \in E_q} \big( D^{\text{net}}_{g(i),\,n(e)} + b_e \big),

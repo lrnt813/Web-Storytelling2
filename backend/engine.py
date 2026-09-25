@@ -463,6 +463,7 @@ def filter_tes(tes_raw: Dict[str, gpd.GeoDataFrame], skenario: str, cfg: Cfg):
         stats[kat] = {"total": n, "valid": len(gv)}
         if len(gv) > 0:
             gv["kategori"] = kat
+            gv["id_tes"] = [f"{kat}-{i}" for i in gv.index]   # ID stabil antarlevel (indeks baris layer TES)
             lst.append(gv)
     if not lst:
         logger.error(f"[filter_tes] Tidak ada TES valid untuk {skenario.upper()}")
@@ -487,9 +488,109 @@ def graph_csr(G: nx.Graph, nl: np.ndarray) -> csr_matrix:
 
 
 def snap_points(xy: np.ndarray, tn, max_snap: float = SNAP_MAX_M):
-    """Simpul jalan terdekat per titik. Returns (jarak_m, indeks_simpul, ok)."""
+    """Simpul jalan terdekat per titik (snapping ke VERTEKS; tidak dipakai lagi oleh pipeline
+    sejak Putaran 6, disimpan untuk perbandingan). Returns (jarak_m, indeks_simpul, ok)."""
     d, idx = tn.query(np.asarray(xy, float), k=1)
     return d, idx, d <= max_snap
+
+
+_SNAP_END_M = 1e-3   # titik proyeksi ≤ 1 mm dari ujung sisi dianggap jatuh di simpul ujung itu
+
+
+def graph_edge_arrays(G: nx.Graph, nl: np.ndarray):
+    """Sisi graf sebagai array: indeks simpul ujung (urutan nl) dan bobot (m)."""
+    index = {tuple(p): i for i, p in enumerate(map(tuple, np.asarray(nl)))}
+    ea, eb, w = [], [], []
+    for u, v, d in G.edges(data="weight"):
+        ea.append(index[u])
+        eb.append(index[v])
+        w.append(float(d))
+    return np.asarray(ea, int), np.asarray(eb, int), np.asarray(w, float)
+
+
+def snap_to_segments(xy: np.ndarray, nl: np.ndarray, ea: np.ndarray, eb: np.ndarray,
+                     max_snap: float = SNAP_MAX_M):
+    """Snapping ke RUAS terdekat: proyeksi tegak lurus titik ke sisi graf (garis lurus antarsimpul)
+    terdekat dalam jarak ≤ max_snap (shapely STRtree). Bila beberapa sisi sama dekat, dipilih sisi
+    dengan indeks terkecil (deterministik).
+    Returns (jarak_m, indeks_sisi, posisi_m_dari_ujung_a, ok); sisi = −1 bila tidak ada."""
+    import shapely
+    xy = np.asarray(xy, float).reshape(-1, 2)
+    n = len(xy)
+    dist = np.full(n, np.inf)
+    edge = np.full(n, -1, int)
+    pos = np.zeros(n)
+    if len(ea) == 0 or n == 0:
+        return dist, edge, pos, np.zeros(n, bool)
+    lines = shapely.linestrings(np.stack([nl[ea], nl[eb]], axis=1))
+    pts = shapely.points(xy)
+    tree = shapely.STRtree(lines)
+    (pi, ei), d = tree.query_nearest(pts, max_distance=max_snap, return_distance=True, all_matches=True)
+    if len(pi):
+        order = np.lexsort((ei, pi))                  # per titik: sisi berindeks terkecil lebih dulu
+        pi, ei, d = pi[order], ei[order], d[order]
+        first = np.r_[True, pi[1:] != pi[:-1]]
+        pi, ei, d = pi[first], ei[first], d[first]
+        dist[pi] = d
+        edge[pi] = ei
+        pos[pi] = shapely.line_locate_point(lines[ei], pts[pi])
+    return dist, edge, pos, edge >= 0
+
+
+def snapped_network(G: nx.Graph, nl: np.ndarray, point_sets: List[np.ndarray],
+                    max_snap: float = SNAP_MAX_M, edge_arrays=None) -> dict:
+    """Graf CSR dengan simpul virtual pada titik proyeksi setiap titik (snapping ke ruas).
+
+    Sisi yang menerima titik proyeksi dipecah menjadi beberapa sisi berurutan (titik diurutkan menurut
+    posisinya sepanjang sisi) dengan bobot proporsional terhadap panjang; total bobot pecahan = bobot
+    sisi asli. Titik yang jatuh ≤ 1 mm dari ujung sisi memakai simpul ujung itu; titik-titik yang
+    jatuh di posisi sama memakai satu simpul virtual. Indeks 0..len(nl)−1 = simpul asli.
+    Returns dict: csr, n_asli, dan per himpunan titik `sets[j]` = (jarak_snap_m, indeks_simpul, ok,
+    indeks_sisi, posisi_m)."""
+    ea, eb, w = edge_arrays if edge_arrays is not None else graph_edge_arrays(G, nl)
+    n0 = len(nl)
+    L = np.hypot(*(nl[eb] - nl[ea]).T) if len(ea) else np.zeros(0)
+    snaps = [snap_to_segments(p, nl, ea, eb, max_snap) for p in point_sets]
+    # titik proyeksi per sisi → simpul (asli atau virtual)
+    nodes_out = [np.full(len(s[0]), -1, int) for s in snaps]
+    per_edge: Dict[int, dict] = {}
+    for j, (d, e, pos, ok) in enumerate(snaps):
+        for i in np.where(ok)[0]:
+            k = int(e[i])
+            p = float(pos[i])
+            if p <= _SNAP_END_M:
+                nodes_out[j][i] = ea[k]
+            elif p >= L[k] - _SNAP_END_M:
+                nodes_out[j][i] = eb[k]
+            else:
+                per_edge.setdefault(k, {}).setdefault(round(p, 3), []).append((j, i))
+    split = np.zeros(len(ea), bool)
+    nu, nv, nw = [], [], []
+    nxt = n0
+    for k in sorted(per_edge):
+        split[k] = True
+        chain = [int(ea[k])]
+        ppos = [0.0]
+        for p in sorted(per_edge[k]):
+            for j, i in per_edge[k][p]:
+                nodes_out[j][i] = nxt
+            chain.append(nxt)
+            ppos.append(p)
+            nxt += 1
+        chain.append(int(eb[k]))
+        ppos.append(float(L[k]))
+        scale = w[k] / L[k]
+        for a, b, pa, pb in zip(chain[:-1], chain[1:], ppos[:-1], ppos[1:]):
+            nu.append(a)
+            nv.append(b)
+            nw.append((pb - pa) * scale)
+    keep = ~split
+    rows = np.concatenate([ea[keep], np.asarray(nu, int)])
+    cols = np.concatenate([eb[keep], np.asarray(nv, int)])
+    vals = np.concatenate([w[keep], np.asarray(nw, float)])
+    csr = csr_matrix((np.r_[vals, vals], (np.r_[rows, cols], np.r_[cols, rows])), shape=(nxt, nxt))
+    sets = [(s[0], nodes_out[j], s[3], s[1], s[2]) for j, s in enumerate(snaps)]
+    return {"csr": csr, "n_asli": n0, "sets": sets}
 
 
 def network_distance_from_sources(csr: csr_matrix, src_nodes: np.ndarray,
@@ -528,9 +629,9 @@ def compute_distances(
 ):
     """Waktu tempuh (menit) dari centroid setiap grid ke TES terdekat per kategori.
 
-    Jarak = (centroid grid → simpul jalan terdekat) + (jarak jaringan antarsimpul)
-          + (simpul jalan terdekat TES → titik TES), dibagi walking_speed_m_per_min.
-    Snapping centroid dan TES maksimum SNAP_MAX_M (300 m). Untuk tiap kategori dicari TES
+    Jarak = (centroid grid → titik proyeksi pada ruas terbuka terdekat) + (jarak jaringan)
+          + (titik proyeksi pada ruas terdekat TES → titik TES), dibagi walking_speed_m_per_min.
+    Snapping ke RUAS (Putaran 6; lihat snapped_network) maksimum SNAP_MAX_M (300 m). Untuk tiap kategori dicari TES
     dengan total jarak terkecil (Dijkstra dari sumber virtual yang terhubung ke simpul TES
     berbobot ruas snapping TES). Grid/TES yang gagal di-snap atau tidak terhubung diberi
     waktu penalti `t_pen`.
@@ -547,16 +648,19 @@ def compute_distances(
         tpk = {k: np.full(n, tp) for k in cfg.kategori_fac}
         return tpk, np.full(n, tp), [None] * n, {k: np.ones(n, int) for k in cfg.kategori_fac}, np.zeros(n, int)
 
-    csr = graph_csr(G, nl)
-    g_d, g_idx, g_ok = snap_points(np.column_stack((cx, cy)), tn)
+    all_t_xy = np.column_stack([tes_v.geometry.x.values, tes_v.geometry.y.values])
+    sn = snapped_network(G, nl, [np.column_stack((cx, cy)), all_t_xy])
+    csr = sn["csr"]
+    g_d, g_idx, g_ok = sn["sets"][0][:3]
+    tt_d, tt_idx, tt_ok = sn["sets"][1][:3]
+    kat_all = tes_v["kategori"].values
 
     tpk = {}
     for kat in cfg.kategori_fac:
-        sub = tes_v[tes_v["kategori"] == kat]
+        sel = kat_all == kat
         arr = np.full(n, np.inf)
-        if len(sub):
-            t_xy = np.column_stack([sub.geometry.x.values, sub.geometry.y.values])
-            t_d, t_idx, t_ok = snap_points(t_xy, tn)
+        if sel.any():
+            t_d, t_idx, t_ok = tt_d[sel], tt_idx[sel], tt_ok[sel]
             if t_ok.any():
                 d_node = network_distance_from_sources(csr, t_idx[t_ok], t_d[t_ok])
                 arr[g_ok] = g_d[g_ok] + d_node[g_idx[g_ok]]

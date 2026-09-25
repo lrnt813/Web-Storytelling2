@@ -363,3 +363,28 @@ Model, K, data, dan semua ambang tidak diubah; putaran ini hanya penyajian, vali
   `scripts/rekap_validasi_TAS.py` setelah lembar diisi peneliti (belum dijalankan). — *MENUNGGU PENGISIAN*
 - **P5-5. Referensi draft lama di kode**: tidak ada (diperiksa dengan grep di backend/, scripts/,
   frontend/, tests/). `docs/angka_draft_lama.json` tetap sebagai arsip dokumentasi. — *SELESAI*
+
+# Putaran 6 (branch `revisi-v6`)
+
+Semua aturan putaran ini ditetapkan sebelum hasil v6 terlihat (instruksi peneliti Putaran 6).
+
+- **P6-0. Lembar validasi v5 terisi.** Lembar yang diisi peneliti berada di
+  `output_bab4/validasi/validasi_TAS.xlsx` (perubahan belum di-commit), bukan
+  `validasi_TAS_v5_terisi.xlsx` seperti disebut instruksi. Isinya disalin ke nama yang diharapkan dan
+  di-commit; berkas kerja `validasi_TAS.xlsx` tidak diubah. Arsip `output_bab4/arsip_v5/validasi/`
+  memuat lembar v5 kosong seperti di tag `hasil-skripsi-v5`. — *SELESAI*
+- **P6-1. Koreksi metode hasil validasi: snapping ke ruas, bukan ke verteks.** Validasi manual TAS v5
+  menemukan kesalahan snapping pada sekitar 20 dari 62 TAS Baseline, ditambah dua kasus yang belum
+  terjelaskan (grid 8895: grid dan TES di sisi rel yang sama tetapi rute memutar; grid 9632: grid dan
+  TES di luar area bandara tetapi rute memutar). Penyebabnya: `snap_points`/`tn.query` memilih
+  VERTEKS jalan terdekat. Semua segmen jalan data berupa garis dua titik, sehingga ruas panjang tidak
+  punya verteks tengah; titik di dekat bagian tengah ruas panjang tersambung ke verteks jalan lain
+  (bisa di seberang sungai/rel) yang secara verteks lebih dekat. Diagnostik topologi (branch
+  `diagnostik-topologi`, `docs/DIAGNOSTIK_TOPOLOGI.md`) sudah menunjukkan jaringan bersih, jadi yang
+  diperbaiki hanya cara snapping. Sejak v6, grid dan TES di-*snap* ke titik proyeksi tegak lurus pada
+  ruas terbuka terdekat (≤ 300 m) dengan simpul virtual (`engine.snapped_network`, METODOLOGI §4).
+  Ruas snapping = jarak tegak lurus; T_ideal tidak berubah; T_pen dihitung ulang dengan aturan yang
+  sama. Uji: `tests/test_snapping_ruas.py`. — *SELESAI (kode)*
+- **P6-2. ID TES stabil.** `filter_tes` menambah kolom `id_tes` = `<kategori>-<indeks baris layer TES>`
+  (sama dengan `id_tes` di dashboard), dipakai untuk aturan "TES sama" pada atribusi banjir. Keluaran
+  grid mendapat kolom `id_tes_terdekat_<level>`. — *SELESAI*

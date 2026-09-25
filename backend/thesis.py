@@ -56,6 +56,7 @@ from .engine import (
     graph_csr,
     run_skater,
     simulate_hazard,
+    snapped_network,
 )
 
 logger = logging.getLogger(__name__)
@@ -1080,9 +1081,9 @@ def detect_tas_detour(
     """Deteksi Titik Aman Semu berbasis Detour Index waktu.
 
     T_ideal = max(d_Euclid(centroid, TES terdekat), TAS_MIN_EUCLID_M) / kecepatan
-    T_aktual = [ruas snapping centroid → simpul + jarak jaringan antarsimpul
-                + ruas snapping simpul → titik TES] / kecepatan, ke TES yang SAMA
-               (snapping ≤ max_snap), sehingga T_ideal dan T_aktual sama-sama mengukur
+    T_aktual = [ruas snapping centroid → titik proyeksi pada ruas terbuka terdekat + jarak jaringan
+                + ruas snapping titik proyeksi → titik TES] / kecepatan, ke TES yang SAMA
+               (snapping ke ruas ≤ max_snap; Putaran 6), sehingga T_ideal dan T_aktual sama-sama mengukur
                perjalanan centroid → titik TES. Batas minimum TAS_MIN_EUCLID_M (50 m) dipasang
                pada KEDUA jarak, sehingga T_aktual ≥ T_ideal untuk semua grid terjangkau
     DI_t = T_aktual / T_ideal
@@ -1104,7 +1105,7 @@ def detect_tas_detour(
         st = np.where(wet, 3, 2).astype(int)
         return {"t_ideal": np.full(n, np.nan), "t_aktual": np.full(n, t_pen),
                 "detour_index": np.full(n, np.nan), "is_tas": np.zeros(n, int),
-                "status": st, "status_persentil": st.copy(), "kategori_tes_terdekat": np.full(n, None),
+                "status": st, "status_persentil": st.copy(), "kategori_tes_terdekat": np.full(n, None), "id_tes_terdekat": np.full(n, None),
                 "summary": {"jumlah_tes_terdekat_tidak_terjangkau": int((~wet).sum()), "jumlah_tergenang": int(wet.sum())}}
 
     tes_xy = np.column_stack([tes_v.geometry.x.values, tes_v.geometry.y.values])
@@ -1112,11 +1113,10 @@ def detect_tas_detour(
     d_euc = np.maximum(d_euc_raw, TAS_MIN_EUCLID_M)
     t_ideal = d_euc / speed
 
-    csr = _graph_to_csr(G, nl)
-    g_snap_d, g_node = tn.query(grid_xy, k=1)
-    t_snap_d, t_node = tn.query(tes_xy, k=1)
-    grid_ok = g_snap_d <= max_snap
-    tes_ok = t_snap_d <= max_snap
+    sn = snapped_network(G, nl, [grid_xy, tes_xy], max_snap=max_snap)
+    csr = sn["csr"]
+    g_snap_d, g_node, grid_ok = sn["sets"][0][:3]
+    t_snap_d, t_node, tes_ok = sn["sets"][1][:3]
 
     net = np.full(n, np.inf)
     cand = np.where(grid_ok & tes_ok[tes_idx])[0]
@@ -1220,9 +1220,10 @@ def detect_tas_detour(
         "jumlah_t_aktual_lt_t_ideal": int((reach & (t_akt < t_ideal - 1e-9)).sum()),
         "jumlah_t_aktual_lt_euclid_tanpa_batas": int((reach & (t_akt < d_euc_raw / speed - 1e-9)).sum()),
     }
+    id_tes = tes_v["id_tes"].values[tes_idx] if "id_tes" in tes_v.columns else np.full(n, None)
     return {"t_ideal": t_ideal, "t_aktual": t_akt, "detour_index": di, "t_euclid_raw": d_euc_raw / speed,
             "is_tas": is_tas.astype(int), "status": status, "status_persentil": status_p,
-            "kategori_tes_terdekat": kat, "summary": summary}
+            "kategori_tes_terdekat": kat, "id_tes_terdekat": id_tes, "summary": summary}
 
 
 def _quantiles(v: np.ndarray) -> dict:
@@ -1289,6 +1290,7 @@ def level_grid_frame(key: str, df: pd.DataFrame, tas: dict, cfg: Cfg) -> pd.Data
     out[f"tas_status_{key}"] = tas["status"]
     out[f"tas_status_persentil_{key}"] = tas["status_persentil"]
     out[f"tes_terdekat_{key}"] = tas["kategori_tes_terdekat"]
+    out[f"id_tes_terdekat_{key}"] = tas.get("id_tes_terdekat")
     return out
 
 
