@@ -48,6 +48,13 @@ def load_finalisasi():
     return F, S
 
 
+def krit_note(R, F=None, S=None) -> str:
+    """Ringkasan satu kalimat tabel kriteria → K yang ditunjuk → catatan keandalan (KEPUTUSAN_K_v6.md (g))."""
+    from scripts.keputusan_k_v6 import kriteria_k_final
+    return " ".join(f"{r['Kriteria']} → K = {r['K yang ditunjuk']} ({r['Catatan keandalan'].rstrip('.')})."
+                    for r in kriteria_k_final(R, F, S))
+
+
 def lulus_b3(S) -> list:
     """Metrik ternormalisasi yang lulus validasi data buatan (boleh menjadi metrik pendukung pemilihan K)."""
     return [m for m in ("DESC-N", "PESC-N") if S and S["status"].get(m, {}).get("lulus")]
@@ -76,6 +83,8 @@ TERGENANG_COLOR = "#38bdf8"
 def id_num(v, dec=2):
     if v is None or (isinstance(v, float) and v != v):
         return "–"
+    if isinstance(v, str):
+        return v
     if isinstance(v, bool):
         return "Ya" if v else "Tidak"
     if isinstance(v, (int, np.integer)) and dec == 0:
@@ -185,6 +194,12 @@ def tables_common(R, F=None, S=None):
                 r[m] = n["desc_n" if m == "DESC-N" else "pesc_n"]
             if "DESC-N" in ok:
                 r["Kontiguitas"], r["Homogenitas"] = n["kontiguitas"], n["homogenitas"]
+    ditunjuk = {"K": "K yang ditunjuk"}
+    for col in ("ARI subsampel (rerata)", "Silhouette", "Ketegasan partisi", "DESC-N",
+                "PESC-N"):
+        if col in rows[0]:
+            ditunjuk[col] = f"K = {max(rows, key=lambda r: r[col])['K']}"
+    rows.append(ditunjuk)
     df = pd.DataFrame(rows)
     T.append(Table("T05", "Stabilitas K (uji ketahanan) dan metrik pendukung (data gabungan)", df,
                    {c: 3 for c in df.columns if c not in ("K", "Klaster terbesar (%)",
@@ -194,13 +209,13 @@ def tables_common(R, F=None, S=None):
                    f"inisialisasi per subsampel; ARI inisialisasi = rerata 45 pasangan run seed 42–51. \"Setara\" = selisih "
                    f"rerata ARI subsampel dari nilai tertinggi ({id_num(best, 3)}) ≤ {id_num(ks['toleransi'], 2)}. Aturan "
                    f"stabilitas dengan pemecah seri \"K terkecil\" memilih K = {ks['k_terpilih']}. K yang setara secara "
-                   f"stabilitas: {', '.join(str(r['K']) for r in rows if r['Setara secara stabilitas dengan K terbaik'])}; "
+                   f"stabilitas: {', '.join(str(r['K']) for r in rows if r.get('Setara secara stabilitas dengan K terbaik'))}; "
                    f"K yang tidak setara di antara K keluaran: "
-                   f"{', '.join(str(k) for k in R['k_keluaran'] if not next(r for r in rows if r['K'] == k)['Setara secara stabilitas dengan K terbaik']) or '–'}. "
-                   f"Dihitung ulang pada data v6 (snapping ke ruas). Kriteria akhir pemilihan K (Finalisasi v6, METODOLOGI "
-                   f"§9 (h)): I-Index, Dunn, dan ketegasan partisi (L01); K utama = 4. Stabilitas subsampel = uji "
-                   f"ketahanan. DESC-N/PESC-N ditampilkan hanya bila lulus validasi data buatan (L03): "
-                   f"{', '.join(ok) if ok else 'tidak ada yang lulus'}."))
+                   f"{', '.join(str(k) for k in R['k_keluaran'] if not next(r for r in rows if r['K'] == k).get('Setara secara stabilitas dengan K terbaik')) or '–'}. "
+                   f"Dihitung ulang pada data v6 (snapping ke ruas). Baris terakhir = K yang ditunjuk tiap kriteria. "
+                   f"K utama = 4 ditetapkan atas dasar substantif (memisahkan tipologi Terputus; METODOLOGI §9 (h)), bukan "
+                   f"pilihan mayoritas metrik: {krit_note(R, F, S)} DESC-N/PESC-N ditampilkan karena lulus validasi data "
+                   f"buatan (L03): {', '.join(ok) if ok else 'tidak ada yang lulus'}."))
     rows = [{"K": c["k"], "I-Index": c["iidx"], "Dunn (rerata)": c["dunn"], "Dunn (sd)": c["dunn_sd"],
              "Ketegasan partisi": c["ketegasan_partisi"],
              "DESC": c["desc"], "PESC": c["pesc"], "Komposit +DESC": c["komposit_dengan_desc"],
@@ -210,12 +225,18 @@ def tables_common(R, F=None, S=None):
             n = F["b4_desc_n_v6"][str(r["K"])]
             r.update({"DESC-N": n["desc_n"], "PESC-N": n["pesc_n"], "Kontiguitas": n["kontiguitas"],
                       "Homogenitas": n["homogenitas"], "PESC-N aproksimasi": n["aproksimasi"]})
+    ditunjuk = {"K": "K yang ditunjuk"}
+    for col in ("I-Index", "Dunn (rerata)", "Ketegasan partisi", "DESC", "PESC", "DESC-N", "PESC-N"):
+        if col in rows[0]:
+            ditunjuk[col] = f"K = {max(rows, key=lambda r: r[col])['K']}"
+    rows.append(ditunjuk)
     df = pd.DataFrame(rows)
-    T.append(Table("L01", "Lampiran: indeks validitas pemilihan K (kriteria akhir: I-Index, Dunn, ketegasan partisi)", df,
+    T.append(Table("L01", "Lampiran: indeks validitas per K dan K yang ditunjuk tiap indeks", df,
                    {"K": 0, "I-Index": 3, "Dunn (rerata)": 4, "Dunn (sd)": 4, "Ketegasan partisi": 3, "DESC": 3,
                     "PESC": 4, "Komposit +DESC": 3, "Komposit −DESC": 3, "DESC-N": 4, "PESC-N": 4, "Kontiguitas": 4,
                     "Homogenitas": 4, "PESC-N aproksimasi": 0},
-                   "Kriteria akhir pemilihan K (METODOLOGI §9 (h)): I-Index, Dunn, dan ketegasan partisi. DESC/PESC asli "
+                   "Baris terakhir = K yang ditunjuk tiap kriteria. K utama = 4 ditetapkan atas dasar substantif (METODOLOGI "
+                   "§9 (h)); catatan keandalan: " + krit_note(R, F, S) + " DESC/PESC asli "
                    "(Guo dkk., 2015; blok rook) tidak dipakai memilih karena tidak dinormalisasi terhadap K. DESC-N/PESC-N = "
                    "versi ternormalisasi (METODOLOGI §8b); label K = 5..10 direproduksi dan diverifikasi "
                    "(output_bab4/finalisasi_v6/verifikasi_label.json). Dunn: 5 sampel 2.000 baris (seed 42–46). "
@@ -439,8 +460,12 @@ def tables_algo_finalisasi(F, k, prefix):
                  "SFCM: m = 1,7, 10 inisialisasi (J terkecil). SDWFCM-Guo: bentuk harfiah (d tak dikuadratkan, pangkat "
                  f"1/(m−1)), λ = 0,5, NB = 8 tetangga, 10 inisialisasi, run dengan J_FCM terkecil; konvergen {kon}/10 seed. "
                  "I-Index dengan centroid tegas untuk semua algoritma; Dunn rerata 5 sampel 2.000 baris; Moran's I label "
-                 "999 permutasi; DESC/PESC asli dan DESC-N/PESC-N dengan blok rook Baseline. Label algoritma selain "
-                 "SDWFCM-Guo direproduksi dan diverifikasi terhadap metrik terkunci. Degeneratif = klaster terbesar > 90 %.")
+                 "999 permutasi; DESC/PESC asli dan DESC-N/PESC-N dengan blok rook Baseline. DESC dan PESC asli: "
+                 "implementasi mendekati Guo dkk. (2015); blok satu sampel diabaikan dan PESC memakai jarak antarpusat "
+                 "blok (lihat CATATAN F-3). DESC-N dan PESC-N memihak partisi kontigu secara konstruksi (REDCAP tertinggi "
+                 "meskipun Silhouette-nya 0,058 pada K = 4), sehingga keduanya tidak dibaca sebagai peringkat kualitas "
+                 "algoritma secara umum. Label algoritma selain SDWFCM-Guo direproduksi dan diverifikasi terhadap metrik "
+                 "terkunci. Degeneratif = klaster terbesar > 90 %.")
 
 
 def tables_guo_varian(F):
@@ -456,6 +481,72 @@ def tables_guo_varian(F):
     return Table("L02", "Lampiran: varian sensitivitas SDWFCM-Guo (d², λ = 0,3, λ = 0,7) pada Baseline", df, fmt,
                  "Varian d²: jarak atribut dikuadratkan pada f dan D (menjawab ambiguitas pangkat keanggotaan). λ = 0,3 dan "
                  "0,7: bentuk harfiah. Metrik sama dengan T06.")
+
+
+KETAHANAN_K = (4, 2)
+
+
+def ketahanan_rows(R, grid):
+    """Perbandingan berdampingan K = 4 vs K = 2 (baris per pasangan level atau per level)."""
+    sn = lambda st, k: "Tergenang" if st == k else f"Tipologi {st + 1}"
+    rows = []
+    tr = {k: {(t["from_level"], t["to_level"]): t for t in R["model"][str(k)]["transitions"]} for k in KETAHANAN_K}
+    for pair in tr[4]:
+        r = {"Bagian": "Transisi", "Level / pasangan": f"{LEVEL_LABEL[pair[0]]} → {LEVEL_LABEL[pair[1]]}"}
+        for k in KETAHANAN_K:
+            t = tr[k][pair]
+            d = t["dominant_transition"]
+            r[f"K = {k}: transisi dominan"] = f"{sn(d['from'], k)} → {sn(d['to'], k)} ({id_num(d['count'], 0)})"
+            r[f"K = {k}: SR (%)"] = t["stability_rate"]
+            r[f"K = {k}: masuk Tergenang"] = t["masuk_tergenang"]
+        rows.append(r)
+    for key in LEVEL_ORDER:
+        r = {"Bagian": "Tipologi terburuk dan TAS", "Level / pasangan": LEVEL_LABEL[key]}
+        tas = grid[f"tas_status_{key}"].values == 1
+        for k in KETAHANAN_K:
+            st = grid[f"state_{key}_k{k}"].values
+            worst = st == k - 1
+            r[f"K = {k}: % grid di tipologi terburuk"] = float(worst.mean() * 100)
+            r[f"K = {k}: TAS di tipologi terburuk"] = int((tas & worst).sum())
+            r[f"K = {k}: TAS di tipologi lain"] = int((tas & ~worst & (st < k)).sum())
+        rows.append(r)
+    return rows
+
+
+def tables_ketahanan(R, grid):
+    df = pd.DataFrame(ketahanan_rows(R, grid))
+    fmt = {c: (2 if ("SR" in c or "%" in c) else 0) for c in df.columns
+           if c not in ("Bagian", "Level / pasangan") and "transisi dominan" not in c}
+    return [Table("S20", "Ketahanan kesimpulan terhadap K: K = 4 (utama) vs K = 2 (sensitivitas)", df, fmt,
+                  "Transisi dominan = sel matriks transisi terbesar di luar diagonal; SR = stability rate pada grid "
+                  "non-Tergenang di kedua level; masuk Tergenang tidak bergantung K. % grid di tipologi terburuk terhadap "
+                  "semua grid level itu. TAS (aturan utama) tidak bergantung K; kolom TAS hanya membagi TAS menurut "
+                  "tipologi grid tersebut.")]
+
+
+def ringkasan_ketahanan(R, grid) -> list:
+    """Kesimpulan faktual: bagian yang sama dan yang berbeda antara K = 4 dan K = 2."""
+    rows = ketahanan_rows(R, grid)
+    tr = [r for r in rows if r["Bagian"] == "Transisi"]
+    lv = [r for r in rows if r["Bagian"] != "Transisi"]
+    same_tg = all(r["K = 4: masuk Tergenang"] == r["K = 2: masuk Tergenang"] for r in tr)
+    tuju = lambda s: s.split(" → ")[1].split(" (")[0]
+    sama_arah = [r["Level / pasangan"] for r in tr
+                 if (tuju(r["K = 4: transisi dominan"]) == "Tergenang") == (tuju(r["K = 2: transisi dominan"]) == "Tergenang")]
+    sr_lebih_rendah = all(r["K = 4: SR (%)"] <= r["K = 2: SR (%)"] for r in tr)
+    L = [f"- Sama: jumlah grid masuk Tergenang {'identik' if same_tg else 'berbeda'} pada kedua K (tidak bergantung "
+         "tipologi); jumlah TAS per level sama (TAS tidak bergantung K).",
+         f"- Sama: jenis transisi dominan (menuju Tergenang atau antartipologi) pada pasangan "
+         f"{', '.join(sama_arah) if sama_arah else '–'}.",
+         f"- Berbeda: SR K = 4 {'lebih rendah atau sama dengan' if sr_lebih_rendah else 'tidak selalu lebih rendah dari'} "
+         "K = 2 pada semua pasangan level.",
+         "- Berbeda: persentase grid di tipologi terburuk " + "; ".join(
+             f"{r['Level / pasangan']} {id_num(r['K = 4: % grid di tipologi terburuk'], 2)} % (K = 4) vs "
+             f"{id_num(r['K = 2: % grid di tipologi terburuk'], 2)} % (K = 2)" for r in lv) + ".",
+         "- Berbeda: TAS di tipologi terburuk " + "; ".join(
+             f"{r['Level / pasangan']} {id_num(r['K = 4: TAS di tipologi terburuk'], 0)} (K = 4) vs "
+             f"{id_num(r['K = 2: TAS di tipologi terburuk'], 0)} (K = 2)" for r in lv) + "."]
+    return L
 
 
 def tables_validasi_sintetis():
@@ -745,6 +836,8 @@ def write_maps(R, grid, out_dir):
         fig.savefig(d / f"atribusi_banjir_{key}.png")
         plt.close(fig)
 
+    write_membership_maps(R, g, d, plt)
+
     pal = {0: "#e5e7eb", 1: "#a855f7", 2: "#0f172a", 3: TERGENANG_COLOR}
     lab = {0: "Non-TAS", 1: "TAS", 2: TES_TT, 3: "Tergenang"}
     for key in LEVEL_ORDER:
@@ -758,6 +851,32 @@ def write_maps(R, grid, out_dir):
                   loc="lower left", fontsize=7)
         fig.tight_layout()
         fig.savefig(d / f"tas_{key}.png")
+        plt.close(fig)
+
+
+def write_membership_maps(R, g, d, plt, k=4, klaster=(2, 3)):
+    """Peta derajat keanggotaan fuzzy terkunci (u_c, K = 4) terhadap Tipologi 3 dan Tipologi 4, per level. Hanya
+    visualisasi dari thesis_pooled_results.csv.gz; grid Tergenang abu-abu."""
+    pool_f = LOCKED / "thesis_pooled_results.csv.gz"
+    if str(k) not in R["model"] or not pool_f.exists():
+        return
+    cols = [f"u{c}_k{k}" for c in klaster]
+    pool = pd.read_csv(pool_f, usecols=["id_grid", "level"] + cols)
+    for key in LEVEL_ORDER:
+        sub = pool[pool["level"] == key].set_index("id_grid")
+        fig, axes = plt.subplots(1, len(klaster), figsize=(6.5 * len(klaster), 8), dpi=110)
+        for ax, c, col in zip(axes, klaster, cols):
+            val = g["id_grid"].map(sub[col])
+            wet = val.isna()
+            if wet.any():
+                g[wet].plot(ax=ax, color="#d1d5db", linewidth=0)
+            g[~wet].assign(u=val[~wet]).plot(ax=ax, column="u", cmap="viridis", vmin=0, vmax=1, linewidth=0,
+                                            legend=True, legend_kwds={"shrink": 0.6, "label": "derajat keanggotaan"})
+            ax.set_axis_off()
+            ax.set_title(f"Keanggotaan terhadap Tipologi {c + 1} (K = {k})", fontsize=9)
+        fig.suptitle(f"{R['levels'][key]['label_lengkap']} — abu-abu = Tergenang", fontsize=9)
+        fig.tight_layout()
+        fig.savefig(d / f"keanggotaan_K{k}_{key}.png")
         plt.close(fig)
 
 
@@ -1032,6 +1151,26 @@ def write_temuan_kunci(R, grid, tables, k_utama, out_dir):
     L += ["", "Dipicu = bukan TAS di Baseline, TES terdekat sama, waktu Baseline ke TES itu < 30 menit; diperparah = TAS "
           "di Baseline, TES sama, T_aktual naik > 1 menit; tidak berubah = TAS di Baseline, TES sama, perubahan ≤ 1 menit; "
           "lainnya = selain itu. Persentase terhadap TAS level tersebut."]
+    if all(str(k) in R["model"] for k in KETAHANAN_K):
+        rows = ketahanan_rows(R, grid)
+        L += ["", "## (g) Ketahanan kesimpulan terhadap K: K = 4 (utama) vs K = 2 (sensitivitas)", "",
+              f"Sumber: {src('S20')}. K utama = 4 atas dasar substantif (METODOLOGI §9 (h)).", "",
+              "| Pasangan level | K = 4: transisi dominan | K = 4: SR | K = 2: transisi dominan | K = 2: SR | Masuk Tergenang (K = 4 / K = 2) |",
+              "|---|---|---:|---|---:|---:|"]
+        for r in rows:
+            if r["Bagian"] == "Transisi":
+                L.append(f"| {r['Level / pasangan']} | {r['K = 4: transisi dominan']} | {id_num(r['K = 4: SR (%)'], 2)} % | "
+                         f"{r['K = 2: transisi dominan']} | {id_num(r['K = 2: SR (%)'], 2)} % | "
+                         f"{id_num(r['K = 4: masuk Tergenang'], 0)} / {id_num(r['K = 2: masuk Tergenang'], 0)} |")
+        L += ["", "| Level | % grid di tipologi terburuk (K = 4 / K = 2) | TAS di tipologi terburuk (K = 4 / K = 2) | "
+              "TAS di tipologi lain (K = 4 / K = 2) |", "|---|---:|---:|---:|"]
+        for r in rows:
+            if r["Bagian"] != "Transisi":
+                L.append(f"| {r['Level / pasangan']} | {id_num(r['K = 4: % grid di tipologi terburuk'], 2)} % / "
+                         f"{id_num(r['K = 2: % grid di tipologi terburuk'], 2)} % | "
+                         f"{id_num(r['K = 4: TAS di tipologi terburuk'], 0)} / {id_num(r['K = 2: TAS di tipologi terburuk'], 0)} | "
+                         f"{id_num(r['K = 4: TAS di tipologi lain'], 0)} / {id_num(r['K = 2: TAS di tipologi lain'], 0)} |")
+        L += ["", "Kesimpulan:", *ringkasan_ketahanan(R, grid)]
     (out_dir / "temuan_kunci.md").write_text("\n".join(L) + "\n", encoding="utf-8")
 
 
@@ -1059,6 +1198,8 @@ def main(argv=None):
     if F:
         tables += [tables_guo_varian(F)] + tables_diag_desc(F)
     tables += tables_validasi_sintetis()
+    if all(str(k) in R["model"] for k in KETAHANAN_K):
+        tables += tables_ketahanan(R, grid)
     order = lambda t: ({"T": 0, "L": 1, "S": 2}[t.code[0]], int("".join(ch for ch in t.code[1:3] if ch.isdigit())), t.code)
     tables.sort(key=order)
     write_csv(tables, out_dir)

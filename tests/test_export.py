@@ -41,3 +41,43 @@ def test_finalisasi_tabel_algoritma_memuat_guo_dan_metrik_baru():
     for col in ("DESC-N", "PESC-N", "Kontiguitas", "Homogenitas", "I-Index", "Dunn", "ARI vs SDWFCM termodifikasi"):
         assert col in t.df.columns
     assert "konvergen 9/10" in t.note
+
+
+def test_id_num_membiarkan_teks():
+    assert E.id_num("K = 4", 3) == "K = 4"
+
+
+def _R_ketahanan():
+    tr = lambda a, b, fr, to, c, sr, tg: {"from_level": a, "to_level": b, "dominant_transition": {"from": fr, "to": to, "count": c},
+                                          "stability_rate": sr, "masuk_tergenang": tg}
+    pairs = [("baseline", "rendah"), ("rendah", "sedang"), ("sedang", "tinggi"), ("baseline", "tinggi")]
+    return {"model": {"4": {"transitions": [tr(a, b, 0, 4, 5, 90.0, 7) for a, b in pairs]},
+                      "2": {"transitions": [tr(a, b, 0, 2, 9, 95.0, 7) for a, b in pairs]}}}
+
+
+def test_ketahanan_k4_vs_k2():
+    grid = pd.DataFrame({**{f"tas_status_{l}": [1, 1, 0, 3] for l in E.LEVEL_ORDER},
+                         **{f"state_{l}_k4": [3, 1, 0, 4] for l in E.LEVEL_ORDER},
+                         **{f"state_{l}_k2": [1, 1, 0, 2] for l in E.LEVEL_ORDER}})
+    rows = E.ketahanan_rows(_R_ketahanan(), grid)
+    tr = [r for r in rows if r["Bagian"] == "Transisi"]
+    lv = [r for r in rows if r["Bagian"] != "Transisi"]
+    assert len(tr) == 4 and tr[0]["K = 4: transisi dominan"] == "Tipologi 1 → Tergenang (5)"
+    assert lv[0]["K = 4: % grid di tipologi terburuk"] == 25.0 and lv[0]["K = 2: % grid di tipologi terburuk"] == 50.0
+    assert lv[0]["K = 4: TAS di tipologi terburuk"] == 1 and lv[0]["K = 4: TAS di tipologi lain"] == 1
+    assert lv[0]["K = 2: TAS di tipologi terburuk"] == 2 and lv[0]["K = 2: TAS di tipologi lain"] == 0
+    teks = "\n".join(E.ringkasan_ketahanan(_R_ketahanan(), grid))
+    assert "identik" in teks and "lebih rendah atau sama" in teks
+
+
+def test_kriteria_k_final_menunjuk_argmax():
+    from scripts.keputusan_k_v6 import kriteria_k_final
+    c = lambda k, a, s, t, i, d: {"k": k, "ari_subsampel_mean": a, "silhouette": s, "ketegasan_partisi": t,
+                                  "iidx": i, "dunn": d}
+    R = {"k_selection": {"candidates": [c(2, .96, .24, .34, 1.2, .006), c(4, .95, .20, .46, 15.2, .0105),
+                                        c(5, .94, .17, .41, 11.8, .0107)]}}
+    F = {"b4_desc_n_v6": {"2": {"desc_n": .02, "pesc_n": .11}, "4": {"desc_n": .014, "pesc_n": .06},
+                          "5": {"desc_n": .012, "pesc_n": .058}}}
+    got = {r["Kriteria"]: r["K yang ditunjuk"] for r in kriteria_k_final(R, F)}
+    assert got == {"Stabilitas subsampel (ARI)": 2, "Silhouette": 2, "Ketegasan partisi": 4, "I-Index": 4, "Dunn": 5,
+                   "DESC-N": 2, "PESC-N": 2}
