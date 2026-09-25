@@ -185,17 +185,15 @@ function renderKTab(r) {
         cells: [c.k, `${fmtNum(c.ari_subsampel_mean, 3)} ± ${fmtNum(c.ari_subsampel_sd, 3)}`,
                 `${fmtNum(c.ari_inisialisasi_mean, 3)} ± ${fmtNum(c.ari_inisialisasi_sd, 3)}`,
                 fmtNum(c.silhouette, 3), fmtNum(c.ketegasan_partisi, 3), fmtNum(c.size_entropy, 3),
-                `${fmtNum(c.klaster_terbesar_persen, 1)}%`,
-                (best - c.ari_subsampel_mean) <= (ks.toleransi ?? 0.01) + 1e-12 ? 'Ya' : 'Tidak']
+                `${fmtNum(c.klaster_terbesar_persen, 1)}%`]
     }));
     const lamp = (ks.candidates || []).map(c => ({ cells: [c.k, fmtNum(c.iidx, 3), `${fmtNum(c.dunn, 4)} ± ${fmtNum(c.dunn_sd, 4)}`,
         fmtNum(c.desc, 3), fmtNum(c.pesc, 4), fmtNum(c.komposit_dengan_desc, 3), fmtNum(c.komposit_tanpa_desc, 3)] }));
     return section('Pemilihan Jumlah Klaster Berbasis Stabilitas (data gabungan)',
         `ARI subsampel: ${ks.B} subsampel ${fmtNum((ks.fraksi_subsampel || 0) * 100, 0)}% id_grid (${ks.n_init_subsampel} inisialisasi) terhadap solusi data penuh; ARI inisialisasi: rerata ARI berpasangan 10 run (seed 42–51).`,
-        table(['K', 'ARI subsampel', 'ARI inisialisasi', 'Silhouette', 'Ketegasan partisi', 'Size Entropy', 'Klaster terbesar', 'Setara dengan K terbaik'], rows,
+        table(['K', 'ARI subsampel', 'ARI inisialisasi', 'Silhouette', 'Ketegasan partisi', 'Size Entropy', 'Klaster terbesar'], rows,
               { highlight: row => row.k === currentK(r) }),
-        `Aturan stabilitas (Putaran 2): K dengan rerata ARI subsampel tertinggi; bila berselisih ≤ ${fmtNum(ks.toleransi, 2)}, K terkecil → K = <b>${ks.k_terpilih}</b>.
-         "Setara" = selisih rerata ARI subsampel dari nilai tertinggi (${fmtNum(best, 3)}) ≤ ${fmtNum(ks.toleransi, 2)}. Model utama ditetapkan peneliti (lihat METODOLOGI).`)
+        `Stabilitas subsampel dilaporkan sebagai uji ketahanan. K utama = 4 ditetapkan peneliti bersama pembimbing atas dasar substantif (memisahkan tipologi Terputus; METODOLOGI §9 (h)).`)
         + section('Lampiran: metrik pendukung lain', 'Hanya dilaporkan, tidak dipakai memilih K.',
             table(['K', 'I-Index', 'Dunn (5 sampel)', 'DESC', 'PESC', 'Komposit +DESC', 'Komposit −DESC'], lamp));
 }
@@ -223,29 +221,29 @@ function renderProfileTab(r) {
     const M = currentModel(r), k = currentK(r);
     const tcols = ['waktu_tes_pendidikan', 'waktu_tes_kesehatan', 'waktu_tes_pemerintahan', 'waktu_tes_ibadah', 'waktu_tes_gor', 'waktu_tes_min'];
     const rows = (M.cluster_profile || []).map(p => ({ cells: [
-        `${swatch(p.klaster)} Klaster ${p.klaster}`, `<b>${p.deskripsi || ''}</b>`, fmtInt(p.jumlah_baris), `${fmtNum(p.persen_baris, 1)}%`,
+        `${swatch(p.klaster)} ${getClusterName(p.klaster)}`, `<b>${getClusterDesc(p.klaster) || p.deskripsi || ''}</b>`, fmtInt(p.jumlah_baris), `${fmtNum(p.persen_baris, 1)}%`,
         fmtNum(p.waktu_tes_min_median), fmtNum(p.waktu_tes_min_p75), fmtNum(p.waktu_tes_min_p90), fmtNum(p.waktu_tes_min),
         `${fmtNum((p.proporsi_waktu_min_lebih_batas || 0) * 100, 1)}%`, `${fmtNum((p.proporsi_terputus || 0) * 100, 1)}%`,
         fmtNum(p.proporsi_terisolasi, 3), fmtNum(p.jumlah_opsi_rute), fmtNum(p.Road_Density_mean), fmtNum(p.banjir)] }));
-    const detail = (M.cluster_profile || []).map(p => ({ cells: [`${swatch(p.klaster)} K${p.klaster}`,
+    const detail = (M.cluster_profile || []).map(p => ({ cells: [`${swatch(p.klaster)} ${getClusterName(p.klaster)}`,
         ...tcols.map(c => `${fmtNum(p[`${c}_median`])} <span class="muted">(${fmtNum(p[c])}; ${fmtNum(p[`${c}_persen_penalti`], 1)}%)</span>`)] }));
     const distRows = LEVELS.map(l => {
         const d = M.distribusi?.[l.key] || [];
         return { cells: [l.label, ...d.map(x => `${fmtInt(x.jumlah_grid)} <span class="muted">(${fmtNum(x.persen_semua_grid, 1)}%)</span>`)] };
     });
     return section(`Profil Tipologi — ${kLabel(r)} (data gabungan keempat level)`,
-            'Label peringkat menurut rata-rata waktu tempuh minimum (Tipologi 1 = terbaik). Waktu dalam menit. "> 30 mnt" = proporsi baris dengan waktu minimum melebihi batas waktu evakuasi; "Terputus" (kategori akses) = waktu minimum = penalti, tidak mencapai TES mana pun. Indeks bahaya hanya deskriptif.',
-            table(['Klaster', 'Tipologi', 'Baris', '%', 'Median', 'P75', 'P90', 'Rerata', '> 30 mnt', 'Terputus', 'Prop. terisolasi', 'Opsi rute', 'Kerapatan jalan', 'Indeks bahaya'], rows))
+            'Nomor tipologi = peringkat menurut rata-rata waktu tempuh minimum (Tipologi 1 = terbaik); deskripsi ditulis dari profil klaster. Grid Tergenang tidak diklasterkan. Waktu dalam menit. "> 30 mnt" = proporsi baris dengan waktu minimum melebihi batas waktu evakuasi; "Terputus" (kategori akses) = waktu minimum = penalti, tidak mencapai TES mana pun. Indeks bahaya hanya deskriptif.',
+            table(['Tipologi', 'Deskripsi', 'Baris', '%', 'Median', 'P75', 'P90', 'Rerata', '> 30 mnt', 'Terputus', 'Prop. terisolasi', 'Opsi rute', 'Kerapatan jalan', 'Indeks bahaya'], rows))
         + section('Waktu per kategori TES', 'Median (rerata; % baris penalti), menit.',
-            table(['Klaster', 'Pendidikan', 'Kesehatan', 'Pemerintahan', 'Ibadah', 'GOR', 'Minimum'], detail))
-        + section('Distribusi Tipologi per Level', 'Jumlah grid per tipologi dan Tergenang (persentase dari seluruh grid).',
-            table(['Level', ...Array.from({ length: k }, (_, j) => `${swatch(j)} Klaster ${j}`), `<i class="legend-swatch" style="background:${TERGENANG_COLOR}"></i> Tergenang`], distRows));
+            table(['Tipologi', 'Pendidikan', 'Kesehatan', 'Pemerintahan', 'Ibadah', 'GOR', 'Minimum'], detail))
+        + section('Distribusi Tipologi per Level', 'Jumlah grid per tipologi (persentase dari seluruh grid). Tergenang = status di luar klasterisasi, bukan tipologi.',
+            table(['Level', ...Array.from({ length: k }, (_, j) => `${swatch(j)} ${getClusterName(j)}`), `<i class="legend-swatch" style="background:${LUAR_KLASTER_COLOR}"></i> Status: ${TERGENANG_LABEL}`], distRows));
 }
 
 // ── Tab: Transisi (K aktif) ─────────────────────────────────────────────────
 function switchMatrixPair(i) { activeMatrixPair = i; renderResultsBody(); }
-function stateColor(s, k) { return s === k ? TERGENANG_COLOR : clusterColors[s]; }
-function stateName(s, k) { return s === k ? 'Tergenang' : `Klaster ${s}`; }
+function stateColor(s, k) { return s === k ? LUAR_KLASTER_COLOR : clusterColors[s]; }
+function stateName(s, k) { return s === k ? TERGENANG_LABEL : getClusterName(s); }
 
 function buildSankey(r) {
     const M = currentModel(r), k = currentK(r), S = k + 1;
@@ -276,7 +274,7 @@ function buildSankey(r) {
         col.forEach(n => {
             if (!n.c) return;
             nodeSvg += `<rect class="sk-node" x="${n.x}" y="${n.y}" width="${nodeW}" height="${Math.max(1, n.h)}" rx="2" fill="${stateColor(n.k, k)}" data-tip="${levelLabel(levels[ci])} · ${stateName(n.k, k)}<br><b>${fmtInt(n.c)}</b> grid"></rect>`;
-            if (n.h >= 11) nodeSvg += `<text class="sk-label" x="${ci === 0 ? n.x - 6 : n.x + nodeW + 4}" y="${n.y + n.h / 2 + 4}" text-anchor="${ci === 0 ? 'end' : 'start'}">${n.k === k ? 'Tergenang' : 'K' + n.k}</text>`;
+            if (n.h >= 11) nodeSvg += `<text class="sk-label" x="${ci === 0 ? n.x - 6 : n.x + nodeW + 4}" y="${n.y + n.h / 2 + 4}" text-anchor="${ci === 0 ? 'end' : 'start'}">${n.k === k ? 'Tergenang' : 'T' + (n.k + 1)}</text>`;
         });
         nodeSvg += `<text class="sk-col" x="${colX[ci] + nodeW / 2}" y="16" text-anchor="middle">${levelLabel(levels[ci])}</text>`;
     });

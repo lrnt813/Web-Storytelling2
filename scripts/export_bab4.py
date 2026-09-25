@@ -128,8 +128,23 @@ def k_utama_default() -> int:
         return 3
 
 
+LUAR_KLASTER_COLOR = "#cbd5e1"   # grid Tergenang pada peta tipologi (status di luar klasterisasi)
+
+
+def tip(c, k) -> str:
+    """Label tampilan tipologi (pengaturan_hasil.json → deskripsi_tipologi)."""
+    from backend.config import label_tipologi
+    return label_tipologi(c, k)
+
+
 def state_name(s, k):
-    return "Tergenang" if s == k else f"K{s}"
+    """Nama singkat state pada matriks/transisi: Tipologi n, atau status Tergenang di luar klasterisasi."""
+    from backend.config import TERGENANG_LABEL
+    return TERGENANG_LABEL if s == k else f"Tipologi {s + 1}"
+
+
+def legenda_tipologi(k) -> str:
+    return "; ".join(tip(c, k) for c in range(k))
 
 
 # ── tabel tidak bergantung K ────────────────────────────────────────────────
@@ -183,8 +198,7 @@ def tables_common(R, F=None, S=None):
     rows = [{"K": c["k"], "ARI subsampel (rerata)": c["ari_subsampel_mean"], "ARI subsampel (sd)": c["ari_subsampel_sd"],
              "ARI inisialisasi (rerata)": c["ari_inisialisasi_mean"], "ARI inisialisasi (sd)": c["ari_inisialisasi_sd"],
              "Silhouette": c["silhouette"], "Ketegasan partisi": c["ketegasan_partisi"],
-             "Size entropy": c["size_entropy"], "Klaster terbesar (%)": c["klaster_terbesar_persen"],
-             "Setara secara stabilitas dengan K terbaik": bool(best - c["ari_subsampel_mean"] <= ks["toleransi"] + 1e-12)}
+             "Size entropy": c["size_entropy"], "Klaster terbesar (%)": c["klaster_terbesar_persen"]}
             for c in ks["candidates"]]
     ok = lulus_b3(S)
     if F:
@@ -202,16 +216,10 @@ def tables_common(R, F=None, S=None):
     rows.append(ditunjuk)
     df = pd.DataFrame(rows)
     T.append(Table("T05", "Stabilitas K (uji ketahanan) dan metrik pendukung (data gabungan)", df,
-                   {c: 3 for c in df.columns if c not in ("K", "Klaster terbesar (%)",
-                                                         "Setara secara stabilitas dengan K terbaik")}
-                   | {"K": 0, "Klaster terbesar (%)": 2, "Setara secara stabilitas dengan K terbaik": 0},
+                   {c: 3 for c in df.columns if c not in ("K", "Klaster terbesar (%)")}
+                   | {"K": 0, "Klaster terbesar (%)": 2},
                    f"{ks['B']} subsampel {id_num(ks['fraksi_subsampel'] * 100, 0)} % id_grid, {ks['n_init_subsampel']} "
-                   f"inisialisasi per subsampel; ARI inisialisasi = rerata 45 pasangan run seed 42–51. \"Setara\" = selisih "
-                   f"rerata ARI subsampel dari nilai tertinggi ({id_num(best, 3)}) ≤ {id_num(ks['toleransi'], 2)}. Aturan "
-                   f"stabilitas dengan pemecah seri \"K terkecil\" memilih K = {ks['k_terpilih']}. K yang setara secara "
-                   f"stabilitas: {', '.join(str(r['K']) for r in rows if r.get('Setara secara stabilitas dengan K terbaik'))}; "
-                   f"K yang tidak setara di antara K keluaran: "
-                   f"{', '.join(str(k) for k in R['k_keluaran'] if not next(r for r in rows if r['K'] == k).get('Setara secara stabilitas dengan K terbaik')) or '–'}. "
+                   f"inisialisasi per subsampel; ARI inisialisasi = rerata 45 pasangan run seed 42–51. "
                    f"Dihitung ulang pada data v6 (snapping ke ruas). Baris terakhir = K yang ditunjuk tiap kriteria. "
                    f"K utama = 4 ditetapkan atas dasar substantif (memisahkan tipologi Terputus; METODOLOGI §9 (h)), bukan "
                    f"pilihan mayoritas metrik: {krit_note(R, F, S)} DESC-N/PESC-N ditampilkan karena lulus validasi data "
@@ -488,7 +496,7 @@ KETAHANAN_K = (4, 2)
 
 def ketahanan_rows(R, grid):
     """Perbandingan berdampingan K = 4 vs K = 2 (baris per pasangan level atau per level)."""
-    sn = lambda st, k: "Tergenang" if st == k else f"Tipologi {st + 1}"
+    sn = state_name
     rows = []
     tr = {k: {(t["from_level"], t["to_level"]): t for t in R["model"][str(k)]["transitions"]} for k in KETAHANAN_K}
     for pair in tr[4]:
@@ -531,8 +539,8 @@ def ringkasan_ketahanan(R, grid) -> list:
     lv = [r for r in rows if r["Bagian"] != "Transisi"]
     same_tg = all(r["K = 4: masuk Tergenang"] == r["K = 2: masuk Tergenang"] for r in tr)
     tuju = lambda s: s.split(" → ")[1].split(" (")[0]
-    sama_arah = [r["Level / pasangan"] for r in tr
-                 if (tuju(r["K = 4: transisi dominan"]) == "Tergenang") == (tuju(r["K = 2: transisi dominan"]) == "Tergenang")]
+    ke_tg = lambda s: tuju(s).startswith("Tergenang")
+    sama_arah = [r["Level / pasangan"] for r in tr if ke_tg(r["K = 4: transisi dominan"]) == ke_tg(r["K = 2: transisi dominan"])]
     sr_lebih_rendah = all(r["K = 4: SR (%)"] <= r["K = 2: SR (%)"] for r in tr)
     L = [f"- Sama: jumlah grid masuk Tergenang {'identik' if same_tg else 'berbeda'} pada kedua K (tidak bergantung "
          "tipologi); jumlah TAS per level sama (TAS tidak bergantung K).",
@@ -659,9 +667,10 @@ def tables_for_k(R, k, prefix, F=None):
                      "Proporsi waktu minimum > 30 menit": p["proporsi_waktu_min_lebih_batas"],
                      "Proporsi waktu minimum > 20 menit": p["proporsi_waktu_min_lebih_20"],
                      "Proporsi waktu minimum > 40 menit": p["proporsi_waktu_min_lebih_40"],
-                     "Proporsi Terputus": p["proporsi_terputus"], "Tipologi": p["deskripsi"]})
+                     "Proporsi Terputus": p["proporsi_terputus"], "Tipologi": tip(p["klaster"], k)})
         for c in TIME_COLS:
-            rows_t.append({"Klaster": p["klaster"], "Variabel": VAR_LABEL[c], "Rerata": p[c],
+            rows_t.append({"Klaster": p["klaster"], "Tipologi": tip(p["klaster"], k), "Variabel": VAR_LABEL[c],
+                           "Rerata": p[c],
                            "Median": p[f"{c}_median"], "P25": p[f"{c}_p25"], "P75": p[f"{c}_p75"],
                            "P90": p[f"{c}_p90"],
                            "Baris penalti": p[f"{c}_n_penalti"], "% baris penalti": p[f"{c}_persen_penalti"]})
@@ -673,8 +682,9 @@ def tables_for_k(R, k, prefix, F=None):
                     "Kepadatan jalan (rerata)": 3, "Kelas bahaya (deskriptif)": 3, "P90 waktu minimum": 2,
                     "Proporsi waktu minimum > 30 menit": 3, "Proporsi waktu minimum > 20 menit": 3,
                     "Proporsi waktu minimum > 40 menit": 3, "Proporsi Terputus": 3},
-                   "Label peringkat menurut rerata waktu minimum: Tipologi 1 = terbaik, Tipologi K = terburuk (penyajian; "
-                   "model tidak berubah). Batas waktu evakuasi 30 menit (Li dkk., 2026). Terputus = waktu minimum = "
+                   "Nomor tipologi = peringkat menurut rerata waktu minimum (Tipologi 1 = terbaik, Tipologi K = terburuk); "
+                   "deskripsi ditulis dari profil ini (pengaturan_hasil.json; penyajian, model tidak berubah). Grid "
+                   "Tergenang tidak diklasterkan (status di luar klasterisasi). Batas waktu evakuasi 30 menit (Li dkk., 2026). Terputus = waktu minimum = "
                    "penalti. Kelas bahaya bukan fitur."))
     df = pd.DataFrame(rows_t)
     T.append(Table(f"{prefix}07b", f"Waktu tempuh per kategori TES per klaster {sfx} (menit)", df,
@@ -684,22 +694,29 @@ def tables_for_k(R, k, prefix, F=None):
     rows = []
     for key in LEVEL_ORDER:
         row = {"Level": LEVEL_LABEL[key]}
-        for d in M["distribusi"][key]:
-            nm = "Tergenang" if d["nama"] == "Tergenang" else f"K{d['state']}"
-            row[f"{nm} (grid)"] = d["jumlah_grid"]
-            row[f"{nm} (%)"] = d["persen_semua_grid"]
+        dist = sorted(M["distribusi"][key], key=lambda d: d["state"])
+        for d in dist:
+            if d["state"] < k:
+                row[f"{tip(d['state'], k)} (grid)"] = d["jumlah_grid"]
+                row[f"{tip(d['state'], k)} (%)"] = d["persen_semua_grid"]
+        for d in dist:
+            if d["state"] == k:
+                row[f"Status: {state_name(k, k)} (grid)"] = d["jumlah_grid"]
+                row[f"Status: {state_name(k, k)} (%)"] = d["persen_semua_grid"]
         rows.append(row)
     df = pd.DataFrame(rows)
-    T.append(Table(f"{prefix}08", f"Distribusi tipologi dan Tergenang per level {sfx}", df,
+    T.append(Table(f"{prefix}08", f"Distribusi tipologi per level {sfx} dan status Tergenang (di luar klasterisasi)", df,
                    {c: (0 if c.endswith("(grid)") else 2) for c in df.columns if c != "Level"},
-                   "Persentase terhadap seluruh grid."))
+                   "Persentase terhadap seluruh grid. Grid Tergenang tidak diklasterkan; ditampilkan sebagai status "
+                   "tersendiri, bukan tipologi."))
 
     for i, t in enumerate(M["transitions"]):
         S = k + 1
         mat = pd.DataFrame(t["matrix"], columns=[f"ke {state_name(j, k)}" for j in range(S)])
         mat.insert(0, "Dari", [state_name(j, k) for j in range(S)])
         T.append(Table(f"{prefix}09{chr(97 + i)}", f"Matriks transisi {LEVEL_LABEL[t['from_level']]} → "
-                       f"{LEVEL_LABEL[t['to_level']]} {sfx} (jumlah grid)", mat, {c: 0 for c in mat.columns if c != "Dari"}))
+                       f"{LEVEL_LABEL[t['to_level']]} {sfx} (jumlah grid)", mat, {c: 0 for c in mat.columns if c != "Dari"},
+                       f"{legenda_tipologi(k)}. Tergenang = status di luar klasterisasi (bukan tipologi)."))
     rows = []
     for t in M["transitions"]:
         d = t["dominant_transition"]
@@ -712,11 +729,12 @@ def tables_for_k(R, k, prefix, F=None):
                      "Jumlah (dominan)": d["count"] if d else None, "Dominan menuju": d["menuju"] if d else "–",
                      "Active edges": t["active_edges"], "Edge mungkin": (k + 1) * k, "CDVM": t["cdvm"]})
     df = pd.DataFrame(rows)
-    T.append(Table(f"{prefix}10", f"Ringkasan transisi antarlevel {sfx} (state tipologi + Tergenang)", df,
+    T.append(Table(f"{prefix}10", f"Ringkasan transisi antarlevel {sfx} (tipologi dan status Tergenang)", df,
                    {"Masuk Tergenang (grid)": 0, "Masuk Tergenang (% semua grid)": 2,
                     "Grid non-Tergenang di kedua level": 0, "Stability rate (%)": 2, "ARI": 3, "Jumlah (dominan)": 0,
                     "Active edges": 0, "Edge mungkin": 0, "CDVM": 3},
-                   "Stability rate dan ARI hanya pada grid non-Tergenang di kedua level. CDVM = ½ Σ |p_s(tujuan) − p_s(asal)|."))
+                   "Stability rate dan ARI hanya pada grid non-Tergenang di kedua level. CDVM = ½ Σ |p_s(tujuan) − p_s(asal)| "
+                   f"atas tipologi dan status Tergenang. {legenda_tipologi(k)}."))
 
     v = M["model_final"]["validity"]
     rows = [{"Metrik": "I-Index", "Nilai": v["iidx"]}, {"Metrik": "Ketegasan partisi", "Nilai": v["ketegasan_partisi"]},
@@ -774,7 +792,7 @@ def tables_k_compare(R, grid):
 
     rows = [{"Ukuran": "Grid yang turun ke tipologi terburuk (K−1) pada Sedang → Tinggi",
              **{f"K{k}": worst_drop(grid, k) for k in ks}},
-            {"Ukuran": "Tipologi terburuk (label)", **{f"K{k}": R["model"][str(k)]["cluster_names"][str(k - 1)] for k in ks}}]
+            {"Ukuran": "Tipologi terburuk (label)", **{f"K{k}": tip(k - 1, k) for k in ks}}]
     T.append(Table("T16c", f"Temuan utama {lab}: penurunan ke tipologi terburuk", pd.DataFrame(rows), {},
                    "Dihitung pada grid non-Tergenang di Sedang dan Tinggi yang di Sedang bukan tipologi terburuk."))
 
@@ -805,16 +823,19 @@ def write_maps(R, grid, out_dir):
     d = out_dir / "peta"
     d.mkdir(exist_ok=True)
     for k in [int(x) for x in R["k_keluaran"]]:
-        names = R["model"][str(k)]["cluster_names"]
         for key in LEVEL_ORDER:
             st = g[f"state_{key}_k{k}"].values
-            colors = np.where(st == k, TERGENANG_COLOR, np.array(CLUSTER_COLORS)[np.minimum(st, 9)])
+            colors = np.where(st == k, LUAR_KLASTER_COLOR, np.array(CLUSTER_COLORS)[np.minimum(st, 9)])
             fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
             g.plot(ax=ax, color=colors, linewidth=0)
             ax.set_axis_off()
-            ax.set_title(f"Tipologi K = {k} — {R['levels'][key]['label_lengkap']}", fontsize=9)
-            ax.legend(handles=[Patch(color=CLUSTER_COLORS[c], label=f"K{c}: {names[str(c)]}") for c in range(k)]
-                      + [Patch(color=TERGENANG_COLOR, label="Tergenang")], loc="lower left", fontsize=7)
+            ax.set_title(f"Tipologi SDWFCM K = {k} — {R['levels'][key]['label_lengkap']}", fontsize=9)
+            leg = ax.legend(handles=[Patch(color=CLUSTER_COLORS[c], label=tip(c, k)) for c in range(k)],
+                            title="Tipologi", loc="lower left", fontsize=7, title_fontsize=7)
+            ax.add_artist(leg)
+            if (st == k).any():
+                ax.legend(handles=[Patch(color=LUAR_KLASTER_COLOR, label=f"Tergenang ({id_num(int((st == k).sum()), 0)} grid)")],
+                          title="Di luar klasterisasi", loc="upper right", fontsize=7, title_fontsize=7)
             fig.tight_layout()
             fig.savefig(d / f"tipologi_K{k}_{key}.png")
             plt.close(fig)
@@ -975,7 +996,7 @@ def _summary_k(R, k, grid):
              f"{id_num(v['ketegasan_partisi'], 3)}, PC {id_num(v['pc'], 3)}, PE {id_num(v['pe'], 3)}, klaster terbesar "
              f"{id_num(v['klaster_terbesar_persen'], 2)} %")
     for p in M["cluster_profile"]:
-        L.append(f"- K{p['klaster']} — **{p['deskripsi']}**: {id_num(p['jumlah_baris'], 0)} baris ({id_num(p['persen_baris'], 2)} %); "
+        L.append(f"- **{tip(p['klaster'], k)}**: {id_num(p['jumlah_baris'], 0)} baris ({id_num(p['persen_baris'], 2)} %); "
                  f"waktu minimum median {id_num(p['waktu_tes_min_median'], 2)} [P75 {id_num(p['waktu_tes_min_p75'], 2)}; "
                  f"P90 {id_num(p['waktu_tes_min_p90'], 2)}] menit, rerata {id_num(p['waktu_tes_min'], 2)}; > 30 menit "
                  f"{id_num(p['proporsi_waktu_min_lebih_batas'] * 100, 2)} %; Terputus {id_num(p['proporsi_terputus'] * 100, 2)} %; "
@@ -1136,7 +1157,7 @@ def write_temuan_kunci(R, grid, tables, k_utama, out_dir):
           "| Tipologi | Baris (%) | Median / P75 / P90 waktu min. (menit) | > 30 menit | Terputus | Terisolasi | Kepadatan jalan | Kelas bahaya |",
           "|---|---:|---|---:|---:|---:|---:|---:|"]
     for p in M["cluster_profile"]:
-        L.append(f"| {p['deskripsi']} | {id_num(p['jumlah_baris'], 0)} ({id_num(p['persen_baris'], 1)} %) | "
+        L.append(f"| {tip(p['klaster'], k_utama)} | {id_num(p['jumlah_baris'], 0)} ({id_num(p['persen_baris'], 1)} %) | "
                  f"{id_num(p['waktu_tes_min_median'], 2)} / {id_num(p['waktu_tes_min_p75'], 2)} / {id_num(p['waktu_tes_min_p90'], 2)} | "
                  f"{id_num(p['proporsi_waktu_min_lebih_batas'] * 100, 2)} % | {id_num(p['proporsi_terputus'] * 100, 2)} % | "
                  f"{id_num(p['proporsi_terisolasi'], 3)} | {id_num(p['Road_Density_mean'], 3)} | {id_num(p['banjir'], 3)} |")

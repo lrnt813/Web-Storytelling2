@@ -233,7 +233,7 @@ function renderRoutes(routes, latlng, isGridClick, gridAttr = null, recommendati
 
 
 function renderGridAttrPopup(g) {
-    const clr = g.tergenang === 1 ? TERGENANG_COLOR : (clusterColors[g.cluster_sdwfcm] || NEUTRAL_FILL);
+    const clr = g.tergenang === 1 ? LUAR_KLASTER_COLOR : (clusterColors[g.cluster_sdwfcm] || NEUTRAL_FILL);
     const desc = getClusterDesc(g.cluster_sdwfcm);
     const waktuRows = Object.entries(tesCategories).map(([kat, meta]) => {
         const v = g[`waktu_tes_${kat}`];
@@ -246,7 +246,7 @@ function renderGridAttrPopup(g) {
     const lokasi = adm ? `<div class="popup-loc"><i class="fa fa-map-location-dot"></i> Kal. ${adm.desa.replace(/^Kelurahan\s+/i, '')}, Kap. ${adm.kecamatan}
         <a href="#" class="popup-link" onclick="event.preventDefault(); openRegionPanel('desa', ${JSON.stringify(adm.desa).replace(/"/g, '&quot;')})">Ringkasan kalurahan</a></div>` : '';
     return `${lokasi}<div class="popup-card">
-        <div class="popup-row"><span>TIPOLOGI (${levelLabel(activeLevel)})</span><b style="color:${clr}">${getClusterName(g.cluster_sdwfcm)}</b></div>
+        <div class="popup-row"><span>TIPOLOGI (${levelLabel(activeLevel)})</span><b style="color:${clr}">${g.tergenang === 1 ? '– (tidak diklasterkan)' : getClusterName(g.cluster_sdwfcm)}</b></div>
         ${desc ? `<div class="popup-desc">${desc}</div>` : ''}
         ${isTergenang ? '' : popupRow('Derajat keanggotaan', `${fmtNum((g.membership_max || 0) * 100, 1)}%`)}
         ${popupRow('Indeks bahaya banjir', g.indeks_bahaya ?? '–')}

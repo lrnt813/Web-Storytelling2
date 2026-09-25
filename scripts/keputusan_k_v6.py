@@ -20,6 +20,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from backend.config import TERGENANG_LABEL, label_tipologi
+
 LOCKED = PROJECT_ROOT / "data" / "locked"
 DOC = PROJECT_ROOT / "docs" / "KEPUTUSAN_K_v6.md"
 LEVEL = {"baseline": "Baseline", "rendah": "Rendah", "sedang": "Sedang", "tinggi": "Tinggi"}
@@ -178,19 +180,19 @@ def main():
     rows = []
     for K in ("2", "4"):
         for p in R["model"][K]["cluster_profile"]:
-            rows.append([f"K = {K}", p["deskripsi"], f(p["jumlah_baris"], 0), f(p["persen_baris"], 2),
+            rows.append([f"K = {K}", label_tipologi(p["klaster"], int(K)), f(p["jumlah_baris"], 0), f(p["persen_baris"], 2),
                          f(p["waktu_tes_min_median"], 2), f(p["waktu_tes_min_p90"], 2),
                          f(p["waktu_tes_min_persen_penalti"], 2), f(p["proporsi_terputus"] * 100, 2)])
     L += table(["Model", "Tipologi", "Baris", "% baris", "Median waktu min. (menit)", "P90 waktu min. (menit)",
                 "% baris penalti (waktu min.)", "% Terputus"], rows)
     ct = R["tabulasi_silang"]["k2_k4"]
     L += ["", f"**Tabel silang K = 2 × K = 4** (baris data gabungan; ARI antar-partisi {f(ct['ari'])}):", ""]
-    L += table(["K = 2 \\ K = 4"] + [f"Tipologi {j + 1}" for j in range(len(ct["kolom"]))],
-               [[f"Tipologi {i + 1}"] + [f(v, 0) for v in row] for i, row in enumerate(ct["matrix"])])
+    L += table(["K = 2 \\ K = 4"] + [label_tipologi(j, 4) for j in range(len(ct["kolom"]))],
+               [[label_tipologi(i, 2)] + [f(v, 0) for v in row] for i, row in enumerate(ct["matrix"])])
     p4 = R["model"]["4"]["cluster_profile"][-1]
     pisah = p4["proporsi_terputus"] > 0.5
     L += ["", f"**Titik berhenti A3:** K = 4 v6 {'MASIH' if pisah else 'TIDAK LAGI'} memisahkan tipologi Terputus. "
-          f"{p4['deskripsi']} berisi {f(p4['jumlah_baris'], 0)} baris ({f(p4['persen_baris'], 2)} %), dengan "
+          f"{label_tipologi(p4['klaster'], 4)} berisi {f(p4['jumlah_baris'], 0)} baris ({f(p4['persen_baris'], 2)} %), dengan "
           f"{f(p4['proporsi_terputus'] * 100, 1)} % baris Terputus (waktu minimum = T_pen). Pada K = 2, baris Terputus "
           f"tersebar dalam Tipologi 2 ({f(R['model']['2']['cluster_profile'][1]['proporsi_terputus'] * 100, 1)} % dari "
           "klaster itu).", ""]
@@ -199,7 +201,7 @@ def main():
     L += ["## (e) Temuan utama K = 2 dan K = 4: transisi antarlevel", ""]
     rows = []
     tr = {K: {(t["from_level"], t["to_level"]): t for t in R["model"][K]["transitions"]} for K in ("2", "4")}
-    sn = lambda s, K: "Tergenang" if s == int(K) else f"Tipologi {s + 1}"
+    sn = lambda s, K: TERGENANG_LABEL if s == int(K) else f"Tipologi {s + 1}"
     for pair in tr["4"]:
         cells = [f"{LEVEL[pair[0]]} → {LEVEL[pair[1]]}"]
         for K in ("2", "4"):
@@ -253,7 +255,7 @@ def main():
     n4 = sum(r["K yang ditunjuk"] == 4 for r in krit)
     L += ["", f"Dari {len(krit)} kriteria, {n2} menunjuk K = 2 dan {n4} menunjuk K = 4; K = 4 **bukan** pilihan "
           "mayoritas metrik.", "",
-          f"**Dasar substantif.** K = 4 dipilih karena memisahkan tipologi grid Terputus: {p4['deskripsi']} berisi "
+          f"**Dasar substantif.** K = 4 dipilih karena memisahkan tipologi grid Terputus: {label_tipologi(p4['klaster'], 4)} berisi "
           f"{f(p4['jumlah_baris'], 0)} baris ({f(p4['persen_baris'], 2)} % data gabungan) dengan "
           f"{f(p4['proporsi_terputus'] * 100, 1)} % baris Terputus (waktu minimum = T_pen). Kelompok ini relevan bagi "
           "perencanaan evakuasi karena menandai grid yang tidak mencapai TES mana pun lewat jaringan jalan; pada "

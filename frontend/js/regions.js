@@ -63,7 +63,7 @@ function sortRegionRows(rows) {
 }
 
 function clusterBar(clusters, n) {
-    return `<div class="cl-bar">${clusters.map((c, i) => c ? `<i style="width:${(c / n * 100).toFixed(2)}%;background:${clusterColors[i]}" title="Klaster ${i}: ${fmtInt(c)} grid"></i>` : '').join('')}</div>`;
+    return `<div class="cl-bar">${clusters.map((c, i) => c ? `<i style="width:${(c / n * 100).toFixed(2)}%;background:${clusterColors[i]}" title="${getClusterName(i)}: ${fmtInt(c)} grid"></i>` : '').join('')}</div>`;
 }
 
 async function openRegionPanel(kind = null, name = null) {
@@ -133,7 +133,7 @@ function regionDetailCard(r, kindLabel) {
     const K = r.clusters.length;
     const bars = r.clusters.map((c, i) => `
         <div class="rd-row">
-            <span>${swatch(i)} Klaster ${i}<small>${esc(getClusterDesc(i))}</small></span>
+            <span>${swatch(i)} ${getClusterName(i)}<small>${esc(getClusterDesc(i))}</small></span>
             <div class="rd-track"><i style="width:${(c / r.n * 100).toFixed(1)}%;background:${clusterColors[i]}"></i></div>
             <b>${fmtInt(c)}</b>
         </div>`).join('');
@@ -150,7 +150,7 @@ function regionDetailCard(r, kindLabel) {
                 <div class="summary-tile"><span>Grid terisolasi</span><b>${fmtInt(r.isolated)} <small>(${fmtNum(r.isolated_pct, 1)}%)</small></b></div>
                 <div class="summary-tile"><span>Titik Aman Semu</span><b>${fmtInt(r.tas)} <small>(${fmtNum(r.tas_pct, 1)}%)</small></b></div>
                 <div class="summary-tile"><span>Grid Tergenang</span><b>${fmtInt(r.terdampak)} <small>(${fmtNum(r.terdampak_pct, 1)}%)</small></b></div>
-                <div class="summary-tile"><span>Klaster dominan</span><b>${swatch(r.dominant)} Klaster ${r.dominant}</b></div>
+                <div class="summary-tile"><span>Tipologi dominan</span><b>${swatch(r.dominant)} ${getClusterName(r.dominant)}</b></div>
             </div>
             <div class="rd-bars">${bars}</div>
         </div>`;
@@ -190,7 +190,7 @@ function regionSummaryRowsForExport() {
     const K = lastK || 4;
     const head = ['Peringkat', kindLabel, ...(regionKind === 'desa' ? ['Kapanewon'] : []), 'Jumlah grid', 'Grid terisolasi', '% terisolasi',
         'Titik Aman Semu', '% TAS', 'Grid Tergenang', '% Tergenang', 'Rata-rata waktu min (menit)', 'Klaster dominan',
-        ...Array.from({ length: K }, (_, i) => `Grid Klaster ${i}`)];
+        ...Array.from({ length: K }, (_, i) => `Grid ${getClusterName(i)}`)];
     const body = lastRegionRows.map((r, i) => [i + 1, r.display, ...(regionKind === 'desa' ? [r.kecamatan] : []), r.n, r.isolated,
         +r.isolated_pct.toFixed(2), r.tas, +r.tas_pct.toFixed(2), r.terdampak, +r.terdampak_pct.toFixed(2),
         r.waktu === null ? null : +r.waktu.toFixed(2), r.dominant, ...r.clusters]);

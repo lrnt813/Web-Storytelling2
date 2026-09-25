@@ -1,4 +1,22 @@
 {
  "k_utama": 4,
- "keterangan": "K model utama untuk tabel Bab IV (scripts/export_bab4.py) dan tampilan bawaan dashboard. K lainnya dari keluaran analisis (k_keluaran) menjadi sensitivitas. Keputusan FINAL: K utama = 4 atas dasar substantif (memisahkan tipologi Terputus), peneliti bersama pembimbing (METODOLOGI §9 (h); docs/KEPUTUSAN_K_v6.md (g)). Tidak memengaruhi analisis maupun hasil terkunci."
+ "keterangan": "K model utama untuk tabel Bab IV (scripts/export_bab4.py) dan tampilan bawaan dashboard. K lainnya dari keluaran analisis (k_keluaran) menjadi sensitivitas. Keputusan FINAL: K utama = 4 atas dasar substantif (memisahkan tipologi Terputus), peneliti bersama pembimbing (METODOLOGI §9 (h); docs/KEPUTUSAN_K_v6.md (g)). Tidak memengaruhi analisis maupun hasil terkunci.",
+ "deskripsi_tipologi": {
+  "2": [
+   "Akses dekat, jaringan jalan padat",
+   "Akses lebih jauh, jaringan jalan lebih jarang"
+  ],
+  "3": [
+   "Akses sangat dekat, jaringan jalan padat",
+   "Akses dekat, jaringan jalan lebih jarang",
+   "Akses jauh, sebagian terputus"
+  ],
+  "4": [
+   "Akses sangat dekat, jaringan jalan padat",
+   "Akses dekat ke TES terdekat, jaringan jalan lebih jarang",
+   "Akses sedang, TES kesehatan/GOR jauh",
+   "Terputus dari TES"
+  ]
+ },
+ "keterangan_deskripsi": "Deskripsi tipologi (penyajian) ditulis dari profil klaster hasil terkunci v6 (median waktu minimum, kepadatan jalan, waktu ke TES kesehatan/GOR, % Terputus; tabel T07/S07). Nomor tipologi tetap = peringkat rerata waktu minimum (Tipologi 1 terbaik). Grid Tergenang tidak diklasterkan dan ditampilkan sebagai status terpisah."
 }

@@ -32,7 +32,7 @@ from scipy.spatial import cKDTree
 from shapely.geometry import Point
 
 from . import thesis as T
-from .config import (BASE_DIR, DATA_DIR, cfg, k_utama_default, utm_to_wgs84 as _utm_to_wgs84,
+from .config import (BASE_DIR, DATA_DIR, cfg, deskripsi_tipologi, k_utama_default, label_tipologi, utm_to_wgs84 as _utm_to_wgs84,
                      wgs84_to_utm as _wgs84_to_utm)
 from .engine import (apply_road_cuts_to_graph, build_road_graph, filter_tes, load_data, load_road_network,
                      road_closed_mask, simulate_hazard)
@@ -283,12 +283,25 @@ def _level_payload(level: dict, summary: dict, records: List[dict], k: int, dist
     }
 
 
+def _apply_display_labels(results: dict) -> None:
+    """Label tampilan tipologi (pengaturan_hasil.json → deskripsi_tipologi), hanya di memori: cluster_names berisi
+    deskripsi, cluster_profile.deskripsi berisi "Tipologi n: deskripsi". Berkas hasil terkunci tidak diubah."""
+    for k, model in results.get("model", {}).items():
+        desk = deskripsi_tipologi(int(k))
+        if not desk:
+            continue
+        model["cluster_names"] = desk
+        for p in model.get("cluster_profile", []):
+            p["deskripsi"] = label_tipologi(p["klaster"], int(k))
+
+
 def _load_thesis_results() -> bool:
     res_path = Path(DATA_DIR) / RESULTS_FILE
     grid_path = Path(DATA_DIR) / GRID_FILE
     if not (res_path.exists() and grid_path.exists()):
         return False
     state.thesis_results = json.loads(res_path.read_text(encoding="utf-8"))
+    _apply_display_labels(state.thesis_results)
     state.thesis_grid = pd.read_csv(grid_path)
     state.t_pen = state.thesis_results.get("t_pen")
     return True

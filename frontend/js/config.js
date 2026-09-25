@@ -9,6 +9,8 @@ const clusterColors = { 0: "#1f77b4", 1: "#2ca02c", 2: "#9467bd", 3: "#e377c2", 
                         6: "#8c564b", 7: "#d62728", 8: "#7f7f7f", 9: "#ff7f0e", "-1": "#475569" };
 const TERPUTUS_COLOR = "#0f172a";
 const TERGENANG_COLOR = "#38bdf8";
+const LUAR_KLASTER_COLOR = "#cbd5e1";   // grid Tergenang pada tampilan tipologi: status di luar klasterisasi
+const TERGENANG_LABEL = 'Tergenang (di luar klasterisasi)';
 // Kategori akses per grid (padanan Li dkk. 2026): 0 Terjangkau, 1 Jauh (> 30 menit), 2 Terputus, 3 Tergenang
 const AKSES_COLORS = { 0: '#22c55e', 1: '#f97316', 2: '#0f172a', 3: TERGENANG_COLOR };
 const AKSES_LABELS = { 0: 'Terjangkau (≤ 30 menit)', 1: 'Jauh (> 30 menit)', 2: 'Terputus', 3: 'Tergenang' };   // grid tergenang (terdampak simulasi) — dikeluarkan dari klasterisasi & TAS
@@ -248,7 +250,7 @@ function setClusterNames(names, skKey = null) {
 }
 
 function getClusterName(clusterId) {
-    return clusterId === -1 ? 'Tergenang' : `Klaster ${clusterId}`;
+    return clusterId === -1 ? TERGENANG_LABEL : `Tipologi ${Number(clusterId) + 1}`;
 }
 
 function getClusterDesc(clusterId) {

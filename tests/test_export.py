@@ -62,7 +62,7 @@ def test_ketahanan_k4_vs_k2():
     rows = E.ketahanan_rows(_R_ketahanan(), grid)
     tr = [r for r in rows if r["Bagian"] == "Transisi"]
     lv = [r for r in rows if r["Bagian"] != "Transisi"]
-    assert len(tr) == 4 and tr[0]["K = 4: transisi dominan"] == "Tipologi 1 → Tergenang (5)"
+    assert len(tr) == 4 and tr[0]["K = 4: transisi dominan"] == "Tipologi 1 → Tergenang (di luar klasterisasi) (5)"
     assert lv[0]["K = 4: % grid di tipologi terburuk"] == 25.0 and lv[0]["K = 2: % grid di tipologi terburuk"] == 50.0
     assert lv[0]["K = 4: TAS di tipologi terburuk"] == 1 and lv[0]["K = 4: TAS di tipologi lain"] == 1
     assert lv[0]["K = 2: TAS di tipologi terburuk"] == 2 and lv[0]["K = 2: TAS di tipologi lain"] == 0
@@ -96,3 +96,24 @@ def test_t11g_dari_lembar_validasi(tmp_path):
     assert r.at["Baseline", "TAS struktural (A/B/C/D) (grid)"] == 1 and r.at["Baseline", "Artefak data/metode (E/F/H) (%)"] == 50
     assert r.at["Sedang", "TAS akibat banjir (G) (grid)"] == 1 and r.at["Sedang", "Valid Y"] == 2
     assert E.tables_validasi_tas(tmp_path / "tidak_ada.xlsx") == []
+
+
+def test_label_tipologi_deskriptif_dan_tergenang_terpisah():
+    from backend.config import TERGENANG_LABEL, deskripsi_tipologi, label_tipologi
+    for k in (2, 3, 4):
+        d = deskripsi_tipologi(k)
+        assert len(d) == k and all(v.strip() for v in d.values())
+        assert label_tipologi(0, k).startswith("Tipologi 1: ") and label_tipologi(k, k) == TERGENANG_LABEL
+    assert E.state_name(4, 4) == TERGENANG_LABEL and E.state_name(2, 4) == "Tipologi 3"
+    assert E.tip(3, 4) == "Tipologi 4: " + deskripsi_tipologi(4)["3"]
+    assert label_tipologi(0, 7) == "Tipologi 1"                    # tanpa deskripsi → hanya peringkat
+
+
+def test_dashboard_memakai_label_deskriptif_tanpa_mengubah_hasil():
+    from backend.config import deskripsi_tipologi
+    from backend.main import _apply_display_labels
+    R = {"model": {"4": {"cluster_names": {"0": "Tipologi 1 (terbaik)"},
+                         "cluster_profile": [{"klaster": c, "deskripsi": "x"} for c in range(4)]}}}
+    _apply_display_labels(R)
+    assert R["model"]["4"]["cluster_names"] == deskripsi_tipologi(4)
+    assert R["model"]["4"]["cluster_profile"][3]["deskripsi"].startswith("Tipologi 4: ")
