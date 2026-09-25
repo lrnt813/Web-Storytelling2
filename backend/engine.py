@@ -545,8 +545,9 @@ def snapped_network(G: nx.Graph, nl: np.ndarray, point_sets: List[np.ndarray],
     posisinya sepanjang sisi) dengan bobot proporsional terhadap panjang; total bobot pecahan = bobot
     sisi asli. Titik yang jatuh ≤ 1 mm dari ujung sisi memakai simpul ujung itu; titik-titik yang
     jatuh di posisi sama memakai satu simpul virtual. Indeks 0..len(nl)−1 = simpul asli.
-    Returns dict: csr, n_asli, dan per himpunan titik `sets[j]` = (jarak_snap_m, indeks_simpul, ok,
-    indeks_sisi, posisi_m)."""
+    Returns dict: csr, n_asli, per himpunan titik `sets[j]` = (jarak_snap_m, indeks_simpul, ok,
+    indeks_sisi, posisi_m), `edges` = (ea, eb, w), serta koordinat (`xy_virtual`) dan sisi induk
+    (`induk_virtual`) setiap simpul virtual (indeks n_asli + urutan)."""
     ea, eb, w = edge_arrays if edge_arrays is not None else graph_edge_arrays(G, nl)
     n0 = len(nl)
     L = np.hypot(*(nl[eb] - nl[ea]).T) if len(ea) else np.zeros(0)
@@ -566,6 +567,7 @@ def snapped_network(G: nx.Graph, nl: np.ndarray, point_sets: List[np.ndarray],
                 per_edge.setdefault(k, {}).setdefault(round(p, 3), []).append((j, i))
     split = np.zeros(len(ea), bool)
     nu, nv, nw = [], [], []
+    v_xy, v_parent = [], []
     nxt = n0
     for k in sorted(per_edge):
         split[k] = True
@@ -574,6 +576,8 @@ def snapped_network(G: nx.Graph, nl: np.ndarray, point_sets: List[np.ndarray],
         for p in sorted(per_edge[k]):
             for j, i in per_edge[k][p]:
                 nodes_out[j][i] = nxt
+            v_xy.append(nl[ea[k]] + (nl[eb[k]] - nl[ea[k]]) * (p / L[k]))
+            v_parent.append(k)
             chain.append(nxt)
             ppos.append(p)
             nxt += 1
@@ -590,7 +594,8 @@ def snapped_network(G: nx.Graph, nl: np.ndarray, point_sets: List[np.ndarray],
     vals = np.concatenate([w[keep], np.asarray(nw, float)])
     csr = csr_matrix((np.r_[vals, vals], (np.r_[rows, cols], np.r_[cols, rows])), shape=(nxt, nxt))
     sets = [(s[0], nodes_out[j], s[3], s[1], s[2]) for j, s in enumerate(snaps)]
-    return {"csr": csr, "n_asli": n0, "sets": sets}
+    return {"csr": csr, "n_asli": n0, "sets": sets, "edges": (ea, eb, w),
+            "xy_virtual": np.asarray(v_xy, float).reshape(-1, 2), "induk_virtual": np.asarray(v_parent, int)}
 
 
 def network_distance_from_sources(csr: csr_matrix, src_nodes: np.ndarray,

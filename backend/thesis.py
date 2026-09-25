@@ -12,6 +12,7 @@ Ringkasan alur (rincian dan persamaan: docs/METODOLOGI.md):
      di Baseline, dan deteksi Titik Aman Semu (TAS, Non-TAS, TES terdekat tidak terjangkau, Tergenang).
 """
 import logging
+import math
 import time
 from itertools import combinations
 from typing import Dict, List, Optional, Tuple
@@ -1226,6 +1227,179 @@ def detect_tas_detour(
             "kategori_tes_terdekat": kat, "id_tes_terdekat": id_tes, "summary": summary}
 
 
+def tas_routes(graph_pack: tuple, grid_xy: np.ndarray, tes_xy: np.ndarray,
+               max_snap: float = 300.0) -> List[Optional[dict]]:
+    """Rute jaringan grid → TES untuk pasangan (grid_xy[j], tes_xy[j]) dengan snapping ke ruas yang
+    sama persis dengan detect_tas_detour. Per pasangan: dict berisi `xy` (centroid, titik proyeksi
+    grid, simpul jalur, titik proyeksi TES, titik TES), `sisi` (pasangan koordinat ujung sisi graf ASLI
+    yang dilalui; sisi pecahan dipetakan ke sisi induknya), `jarak_m` (ruas snapping + jaringan), dan
+    `snap_grid_m`/`snap_tes_m`; None bila gagal snapping atau tidak terhubung."""
+    G, nl, _ = graph_pack
+    grid_xy = np.asarray(grid_xy, float).reshape(-1, 2)
+    tes_xy = np.asarray(tes_xy, float).reshape(-1, 2)
+    if len(grid_xy) == 0:
+        return []
+    sn = snapped_network(G, nl, [grid_xy, tes_xy], max_snap=max_snap)
+    (gd, gn, gok), (td, tnode, tok) = sn["sets"][0][:3], sn["sets"][1][:3]
+    ea, eb, _ = sn["edges"]
+    n0 = sn["n_asli"]
+    xy_all = np.vstack([nl, sn["xy_virtual"]]) if len(sn["xy_virtual"]) else np.asarray(nl, float)
+    parent = sn["induk_virtual"]
+    out: List[Optional[dict]] = [None] * len(grid_xy)
+    todo = np.where(gok & tok)[0]
+    for src in np.unique(tnode[todo]):
+        dist, pred = dijkstra(sn["csr"], directed=False, indices=int(src), return_predecessors=True)
+        for j in todo[tnode[todo] == src]:
+            g = int(gn[j])
+            if not np.isfinite(dist[g]):
+                continue
+            path = [g]
+            while path[-1] != src:
+                path.append(int(pred[path[-1]]))
+            sisi = []
+            for a, b in zip(path[:-1], path[1:]):
+                if a < n0 and b < n0:
+                    sisi.append((tuple(nl[a]), tuple(nl[b])))
+                else:
+                    k = int(parent[(a if a >= n0 else b) - n0])
+                    key = (tuple(nl[ea[k]]), tuple(nl[eb[k]]))
+                    if not sisi or sisi[-1] != key:
+                        sisi.append(key)
+            out[j] = {"xy": [tuple(grid_xy[j])] + [tuple(xy_all[i]) for i in path] + [tuple(tes_xy[j])],
+                      "sisi": sisi, "jarak_m": float(gd[j] + dist[g] + td[j]),
+                      "snap_grid_m": float(gd[j]), "snap_tes_m": float(td[j])}
+    return out
+
+
+def segment_lookup(roads) -> Dict[tuple, Tuple[int, float]]:
+    """Sisi graf (pasangan ujung dibulatkan 0,01 m, terurut) → (indeks segmen jalan, panjang m).
+    Sama dengan build_road_graph: bila ada segmen ganda, dipakai yang terpendek."""
+    out: Dict[tuple, Tuple[int, float]] = {}
+    for idx, geom in enumerate(roads.geometry.to_numpy()):
+        if geom is None or geom.is_empty:
+            continue
+        for line in ([geom] if geom.geom_type == "LineString" else list(geom.geoms)):
+            c = list(line.coords)
+            for (x1, y1), (x2, y2) in zip(c[:-1], c[1:]):
+                u, v = (round(x1, 2), round(y1, 2)), (round(x2, 2), round(y2, 2))
+                key = (u, v) if u <= v else (v, u)
+                sl = math.hypot(x2 - x1, y2 - y1)
+                if key not in out or sl < out[key][1]:
+                    out[key] = (idx, sl)
+    return out
+
+
+ATRIBUSI_TOL_MENIT = 1.0   # "diperparah" bila T_aktual naik > 1 menit; "tidak berubah" bila ≤ 1 menit
+ATRIBUSI = ("dipicu banjir", "diperparah banjir", "tidak berubah", "lainnya")
+
+
+def flood_attribution(grid_xy: np.ndarray, tas_base: dict, tas_level: dict, tes_xy_base: dict,
+                      closed_level: np.ndarray, graph_base: tuple, seg_lookup: dict,
+                      tol: float = ATRIBUSI_TOL_MENIT, evac: float = EVAC_TIME_MIN) -> pd.DataFrame:
+    """Atribusi pengaruh banjir untuk setiap TAS pada satu level (aturan ditetapkan sebelum hasil v6).
+
+    TES sama ⇔ ID TES terdekat (Euclidean) identik dengan Baseline.
+      dipicu banjir     : bukan TAS di Baseline, TES sama, T_aktual Baseline ke TES itu < `evac` (30 menit);
+      diperparah banjir : TAS di Baseline, TES sama, T_aktual naik > `tol` menit;
+      tidak berubah     : TAS di Baseline, TES sama, |perubahan T_aktual| ≤ `tol` menit;
+      lainnya           : selain itu (alasan dicatat).
+    Untuk "dipicu" dan "diperparah": waktu Baseline, waktu level, selisih, serta jumlah dan total panjang
+    segmen jalan yang ditutup pada level ini dan dilalui rute Baseline grid tersebut (termasuk segmen
+    tempat ruas snapping mendarat).
+    `tes_xy_base`: id_tes → (x, y) TES valid Baseline. Returns DataFrame satu baris per TAS level ini."""
+    st_b, st_l = tas_base["status"], tas_level["status"]
+    ta_b, ta_l = tas_base["t_aktual"], tas_level["t_aktual"]
+    id_b, id_l = tas_base["id_tes_terdekat"], tas_level["id_tes_terdekat"]
+    rows = []
+    for i in np.where(st_l == 1)[0]:
+        same = id_b[i] is not None and id_b[i] == id_l[i]
+        was = st_b[i] == 1
+        d = float(ta_l[i] - ta_b[i])
+        alasan, kat = "", ""
+        if not same:
+            grp, kat = "lainnya", "TES terdekat berubah"
+            alasan = f"TES terdekat berubah (Baseline {id_b[i]} → {id_l[i]})"
+        elif not was and ta_b[i] < evac:
+            grp = "dipicu banjir"
+        elif was and d > tol:
+            grp = "diperparah banjir"
+        elif was and abs(d) <= tol:
+            grp = "tidak berubah"
+        elif was:
+            grp, kat = "lainnya", "T_aktual turun"
+            alasan = f"TES sama, T_aktual turun {-d:.2f} menit dibanding Baseline"
+        elif st_b[i] == 2:
+            grp, kat = "lainnya", "TES tidak terjangkau di Baseline"
+            alasan = "TES sama, tetapi tidak terjangkau lewat jaringan di Baseline"
+        else:
+            grp, kat = "lainnya", "waktu Baseline ≥ batas"
+            alasan = f"TES sama, tetapi waktu Baseline {ta_b[i]:.2f} ≥ {evac:g} menit"
+        rows.append({"id_grid": int(i), "atribusi": grp, "alasan_kategori": kat, "alasan": alasan,
+                     "id_tes": id_l[i], "waktu_baseline_tes_sama": float(ta_b[i]) if same else np.nan,
+                     "waktu_level": float(ta_l[i]), "tambahan_waktu": d if same else np.nan})
+    df = pd.DataFrame(rows, columns=["id_grid", "atribusi", "alasan_kategori", "alasan", "id_tes",
+                                     "waktu_baseline_tes_sama", "waktu_level", "tambahan_waktu"])
+    df["ruas_tertutup_n"] = np.nan
+    df["ruas_tertutup_m"] = np.nan
+    need = df["atribusi"].isin(["dipicu banjir", "diperparah banjir"]).values
+    if need.any():
+        sub = df[need]
+        routes = tas_routes(graph_base, grid_xy[sub["id_grid"].values],
+                            np.array([tes_xy_base[t] for t in sub["id_tes"].values]))
+        n_c, m_c = [], []
+        for r in routes:
+            segs = set()
+            for a, b in (r["sisi"] if r else []):
+                key = (a, b) if a <= b else (b, a)
+                if key in seg_lookup:
+                    segs.add(seg_lookup[key])
+            closed = [(k, ln) for k, ln in segs if closed_level[k]]
+            n_c.append(len(closed) if r else np.nan)
+            m_c.append(float(sum(ln for _, ln in closed)) if r else np.nan)
+        df.loc[need, "ruas_tertutup_n"] = n_c
+        df.loc[need, "ruas_tertutup_m"] = m_c
+    return df
+
+
+def attribution_grid_frame(key: str, df: pd.DataFrame, n: int) -> pd.DataFrame:
+    """Kolom atribusi per grid untuk satu level (kosong untuk grid yang bukan TAS di level itu)."""
+    cols = {"atribusi": "atribusi_banjir", "alasan": "atribusi_alasan",
+            "waktu_baseline_tes_sama": "waktu_baseline_tes_sama", "tambahan_waktu": "tambahan_waktu",
+            "ruas_tertutup_n": "ruas_tertutup_rute_baseline_n", "ruas_tertutup_m": "ruas_tertutup_rute_baseline_m"}
+    out = pd.DataFrame(index=range(n))
+    ids = df["id_grid"].values.astype(int)
+    for src, dst in cols.items():
+        if pd.api.types.is_numeric_dtype(df[src]):
+            v = np.full(n, np.nan)
+            v[ids] = np.round(df[src].values.astype(float), 3)
+        else:
+            v = np.full(n, None, dtype=object)
+            v[ids] = df[src].astype(object).values
+        out[f"{dst}_{key}"] = v
+    return out
+
+
+def attribution_summary(df: pd.DataFrame) -> dict:
+    """Ringkasan atribusi per level: jumlah dan persentase tiap kelompok (terhadap TAS level itu),
+    median waktu Baseline kelompok "dipicu", dan median tambahan waktu "dipicu"/"diperparah"."""
+    n = len(df)
+    out = {"jumlah_tas": int(n), "kelompok": {}}
+    for g in ATRIBUSI:
+        c = int((df["atribusi"] == g).sum())
+        out["kelompok"][g] = {"jumlah": c, "persen": float(c / n * 100) if n else None}
+    dip = df[df["atribusi"] == "dipicu banjir"]
+    dpr = df[df["atribusi"] == "diperparah banjir"]
+    med = lambda v: float(np.median(v)) if len(v) else None
+    out["median_waktu_baseline_dipicu"] = med(dip["waktu_baseline_tes_sama"].values)
+    out["median_tambahan_waktu_dipicu"] = med(dip["tambahan_waktu"].values)
+    out["median_tambahan_waktu_diperparah"] = med(dpr["tambahan_waktu"].values)
+    out["median_ruas_tertutup_n_dipicu"] = med(dip["ruas_tertutup_n"].dropna().values)
+    out["median_ruas_tertutup_n_diperparah"] = med(dpr["ruas_tertutup_n"].dropna().values)
+    out["alasan_lainnya"] = {str(a): int(v) for a, v in
+                             df.loc[df["atribusi"] == "lainnya", "alasan_kategori"].value_counts().sort_index().items()}
+    return out
+
+
 def _quantiles(v: np.ndarray) -> dict:
     """Median, P25, P75, P90, dan n dari sebaran nilai (tanpa NaN)."""
     v = np.asarray(v, float)
@@ -1325,6 +1499,9 @@ def records_from_grid(grid: pd.DataFrame, key: str, cfg: Cfg, k: int) -> List[di
     for kk in cfg.kategori_fac:
         cols[f"waktu_{kk}_{key}"] = f"waktu_tes_{kk}"
     sub = grid[list(cols)].rename(columns=cols).copy()
+    # atribusi banjir pada TAS (hanya level Rendah/Sedang/Tinggi hasil terkunci; kosong bila tidak ada)
+    for src, dst in ((f"atribusi_banjir_{key}", "atribusi_banjir"), (f"tambahan_waktu_{key}", "tambahan_waktu_tas")):
+        sub[dst] = grid[src].values if src in grid.columns else None
     sub["is_isolated"] = (sub["jumlah_opsi_rute"] == 0).astype(int)
     for c in ["id_grid", "cluster_sdwfcm", "tergenang", "jumlah_opsi_rute",
               "titik_aman_semu", "status_tas", "status_tas_persentil", "kategori_akses", "is_isolated"]:
