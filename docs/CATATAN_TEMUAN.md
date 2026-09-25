@@ -388,3 +388,47 @@ Semua aturan putaran ini ditetapkan sebelum hasil v6 terlihat (instruksi penelit
 - **P6-2. ID TES stabil.** `filter_tes` menambah kolom `id_tes` = `<kategori>-<indeks baris layer TES>`
   (sama dengan `id_tes` di dashboard), dipakai untuk aturan "TES sama" pada atribusi banjir. Keluaran
   grid mendapat kolom `id_tes_terdekat_<level>`. — *SELESAI*
+- **P6-3. Atribusi pengaruh banjir pada TAS** (`thesis.flood_attribution`; aturan dari instruksi peneliti,
+  ditetapkan sebelum hasil v6). Keputusan implementasi yang perlu diketahui:
+  - "Waktu tempuh Baseline ke TES itu" = T_aktual Baseline (grid → TES terdekat yang sama, dengan ruas
+    snapping dan batas minimum 50 m). Karena TES sama, nilai ini identik dengan T_aktual Baseline grid.
+  - "Tidak berubah" memakai |ΔT_aktual| ≤ 1 menit. TAS di Baseline dengan T_aktual TURUN > 1 menit masuk
+    "lainnya" (alasan "T_aktual turun"). Penurunan ini mungkin karena ruas tempat grid ter-snap di Baseline
+    ditutup, sehingga grid ter-snap ke ruas lain.
+  - Grid bukan TAS di Baseline dengan TES sama tetapi waktu Baseline ≥ 30 menit masuk "lainnya", dipisah
+    menurut alasan: "TES tidak terjangkau di Baseline" atau "waktu Baseline ≥ batas".
+  - "Ruas tertutup yang memotong rute Baseline" ditafsirkan sebagai **segmen jalan yang ditutup pada level
+    itu dan dilalui rute Baseline** grid ke TES yang sama. Termasuk segmen tempat ruas snapping grid/TES
+    mendarat; sisi pecahan dipetakan ke segmen induknya. Panjang = panjang penuh segmen. Tafsiran lain
+    (perpotongan geometris dengan ruas tertutup) tidak dipakai. — *SELESAI*
+- **P6-4. Lembar validasi v6** (`scripts/lembar_validasi_TAS.py`). Keputusan yang tidak dirinci instruksi:
+  - Teks v5 dicocokkan per (id_grid, level). "TES sama" dibandingkan lewat koordinat TES di lembar v5,
+    karena lembar v5 tidak memuat ID TES.
+  - Teks untuk kode Baseline (aturan (a)) = gabungan Penyebab + Catatan v5. Sebanyak 17 baris Baseline
+    v5 hanya berisi Catatan.
+  - Pengecualian F berlaku bila F muncul sebagai kode utama **atau** tambahan hasil kata kunci. Teks v5
+    tetap dibawa ke "Penyebab (teks)/Catatan" dengan penanda "[v6] Kode F … tidak dibawa".
+  - Baris yang teks v5-nya tidak memenuhi syarat (TES berbeda, atau T_aktual berubah > 1 menit) mendapat
+    arsip teks v5 di Catatan ("Arsip v5 (…; tidak dipakai untuk kode)").
+  - Rendah: teks v5 yang spesifik dibawa ke "Penyebab (teks)" bila TES sama dan |ΔT_aktual| ≤ 1 menit,
+    tetapi tidak dipakai untuk pengodean otomatis (kode Rendah hanya dari aturan (b)–(e)).
+  - Kolom Valid berisi rumus Excel dari Kode utama; `rekap_validasi_TAS` menghitung ulang Valid dari
+    Kode utama.
+  - Hotspot: DBSCAN eps 350 m dengan **min_samples = 1**, sehingga setiap grid yang perlu
+    divalidasi/dikonfirmasi masuk satu hotspot, termasuk grid tunggal. Kolom "Hotspot" juga ditambahkan
+    di lembar utama agar rekap per hotspot dapat dihitung. — *SELESAI*
+- **P6-5. Peta lembar validasi v5 menggambar ruas snapping secara keliru (temuan penting).** Di
+  `scripts/lembar_validasi_TAS.py` versi v5, jalur disusun sebagai `[TES] + [simpul grid … simpul TES] +
+  [grid]` lalu dibalik. Akibatnya kedua "ruas snapping" (oranye putus) tergambar dari centroid ke simpul
+  dekat TES dan dari simpul dekat grid ke TES, sehingga tampak menyeberang langsung antara grid dan TES.
+  - Nilai T_aktual di lembar dan hasil terkunci v5 **tidak** terdampak: kolom "Cek T_aktual" = "sama"
+    untuk semua baris. Yang salah hanya gambarnya.
+  - Kemungkinan besar sebagian besar catatan "Snapping malah tidak memilih ruas jaringan jalan terdekat"
+    pada lembar v5 dipicu oleh gambar yang keliru ini, bukan oleh pemilihan simpul snapping. Contoh: grid
+    17227 memakai rute memutar yang sama di v5 dan v6, dengan ruas snapping pendek ke jalan di samping grid.
+  - Peta v6 disusun ulang dengan `thesis.tas_routes` (urutan centroid → proyeksi grid → jaringan →
+    proyeksi TES → TES). Peta v5 di `output_bab4/arsip_v5/validasi/peta/` tetap apa adanya sebagai arsip.
+  - Dampak angkanya dilaporkan di `docs/DAMPAK_KOREKSI_SNAPPING.md` §1.
+  - Koreksi snapping ke ruas tetap relevan: kasus 8895, 9632, dan 17011 berubah karena snapping.
+  - **Keputusan untuk peneliti/pembimbing:** baris berkode F otomatis berstatus "perlu divalidasi" di
+    lembar v6 (aturan (a)), sehingga akan diperiksa ulang dengan peta yang benar. — *DICATAT*
