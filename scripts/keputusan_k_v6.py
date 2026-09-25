@@ -20,7 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from backend.config import TERGENANG_LABEL, label_tipologi
+from backend.config import label_tipologi
 
 LOCKED = PROJECT_ROOT / "data" / "locked"
 DOC = PROJECT_ROOT / "docs" / "KEPUTUSAN_K_v6.md"
@@ -198,22 +198,20 @@ def main():
           "klaster itu).", ""]
 
     # (e)
-    L += ["## (e) Temuan utama K = 2 dan K = 4: transisi antarlevel", ""]
+    from scripts.export_bab4 import dominan_txt, transisi_tipologi
+    L += ["## (e) Temuan utama K = 2 dan K = 4: transisi tipologi antarlevel", ""]
     rows = []
     tr = {K: {(t["from_level"], t["to_level"]): t for t in R["model"][K]["transitions"]} for K in ("2", "4")}
-    sn = lambda s, K: TERGENANG_LABEL if s == int(K) else f"Tipologi {s + 1}"
     for pair in tr["4"]:
         cells = [f"{LEVEL[pair[0]]} → {LEVEL[pair[1]]}"]
         for K in ("2", "4"):
-            t = tr[K][pair]
-            d = t["dominant_transition"]
-            cells += [f"{sn(d['from'], K)} → {sn(d['to'], K)} ({f(d['count'], 0)})", f(t["stability_rate"], 2),
-                      f(t["masuk_tergenang"], 0)]
+            tt = transisi_tipologi(tr[K][pair], int(K))
+            cells += [dominan_txt(tt, int(K)), f(tt["stability_rate"], 2)]
         rows.append(cells)
-    L += table(["Pasangan level", "K = 2: transisi dominan", "K = 2: SR (%)", "K = 2: masuk Tergenang",
-                "K = 4: transisi dominan", "K = 4: SR (%)", "K = 4: masuk Tergenang"], rows)
-    L += ["", "Transisi dominan = sel matriks transisi terbesar di luar diagonal (perpindahan state). SR = stability "
-          "rate pada grid non-Tergenang di kedua level.", ""]
+    L += table(["Pasangan level", "K = 2: transisi dominan", "K = 2: SR (%)", "K = 4: transisi dominan",
+                "K = 4: SR (%)"], rows)
+    L += ["", "Hanya grid yang tidak Tergenang di kedua level (grid Tergenang tidak diklasterkan). Transisi dominan = "
+          "sel matriks transisi tipologi terbesar di luar diagonal. SR = stability rate.", ""]
 
     # (f)
     L += ["## (f) Riwayat keputusan K (kronologis)", "",

@@ -48,11 +48,22 @@ def test_id_num_membiarkan_teks():
 
 
 def _R_ketahanan():
-    tr = lambda a, b, fr, to, c, sr, tg: {"from_level": a, "to_level": b, "dominant_transition": {"from": fr, "to": to, "count": c},
-                                          "stability_rate": sr, "masuk_tergenang": tg}
+    # matriks (K + 1) × (K + 1): baris/kolom terakhir = Tergenang (diabaikan pada transisi tipologi)
+    m4 = [[10, 5, 0, 0, 7], [0, 20, 3, 0, 1], [0, 0, 30, 0, 0], [0, 0, 0, 2, 0], [0, 0, 0, 0, 9]]
+    m2 = [[40, 9, 7], [0, 60, 1], [0, 0, 9]]
+    tr = lambda a, b, m: {"from_level": a, "to_level": b, "matrix": m, "ari": 0.9}
     pairs = [("baseline", "rendah"), ("rendah", "sedang"), ("sedang", "tinggi"), ("baseline", "tinggi")]
-    return {"model": {"4": {"transitions": [tr(a, b, 0, 4, 5, 90.0, 7) for a, b in pairs]},
-                      "2": {"transitions": [tr(a, b, 0, 2, 9, 95.0, 7) for a, b in pairs]}}}
+    return {"model": {"4": {"transitions": [tr(a, b, m4) for a, b in pairs]},
+                      "2": {"transitions": [tr(a, b, m2) for a, b in pairs]}}}
+
+
+def test_transisi_tipologi_tanpa_tergenang():
+    t = _R_ketahanan()["model"]["4"]["transitions"][0]
+    tt = E.transisi_tipologi(t, 4)
+    assert tt["matrix"].shape == (4, 4) and tt["n"] == 70
+    assert abs(tt["stability_rate"] - 62 / 70 * 100) < 1e-9
+    assert tt["dominan"] == {"from": 0, "to": 1, "count": 5, "arah": "ke tipologi lebih buruk"}
+    assert tt["edge_aktif"] == 2 and E.dominan_txt(tt, 4) == "Tipologi 1 → Tipologi 2 (5)"
 
 
 def test_ketahanan_k4_vs_k2():
@@ -62,12 +73,14 @@ def test_ketahanan_k4_vs_k2():
     rows = E.ketahanan_rows(_R_ketahanan(), grid)
     tr = [r for r in rows if r["Bagian"] == "Transisi"]
     lv = [r for r in rows if r["Bagian"] != "Transisi"]
-    assert len(tr) == 4 and tr[0]["K = 4: transisi dominan"] == "Tipologi 1 → Tergenang (di luar klasterisasi) (5)"
+    assert len(tr) == 4 and tr[0]["K = 4: transisi dominan"] == "Tipologi 1 → Tipologi 2 (5)"
+    assert tr[0]["K = 2: transisi dominan"] == "Tipologi 1 → Tipologi 2 (9)"
+    assert not any("Tergenang" in str(v) for r in tr for v in r.values())
     assert lv[0]["K = 4: % grid di tipologi terburuk"] == 25.0 and lv[0]["K = 2: % grid di tipologi terburuk"] == 50.0
     assert lv[0]["K = 4: TAS di tipologi terburuk"] == 1 and lv[0]["K = 4: TAS di tipologi lain"] == 1
     assert lv[0]["K = 2: TAS di tipologi terburuk"] == 2 and lv[0]["K = 2: TAS di tipologi lain"] == 0
     teks = "\n".join(E.ringkasan_ketahanan(_R_ketahanan(), grid))
-    assert "identik" in teks and "lebih rendah atau sama" in teks
+    assert "arah transisi tipologi dominan" in teks and "lebih rendah atau sama" in teks
 
 
 def test_kriteria_k_final_menunjuk_argmax():

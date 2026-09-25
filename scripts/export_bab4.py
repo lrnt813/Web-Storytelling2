@@ -143,6 +143,32 @@ def state_name(s, k):
     return TERGENANG_LABEL if s == k else f"Tipologi {s + 1}"
 
 
+def transisi_tipologi(t, k) -> dict:
+    """Transisi antartipologi saja: submatriks tipologi × tipologi dari matriks transisi terkunci (grid yang
+    Tergenang di salah satu level dikeluarkan). SR = diagonal / total; dominan = sel terbesar di luar diagonal;
+    CDVM = ½ Σ |p(tujuan) − p(asal)| atas tipologi; edge aktif = sel di luar diagonal > 0."""
+    M = np.asarray(t["matrix"], dtype=float)[:k, :k]
+    n = M.sum()
+    off = M.copy()
+    np.fill_diagonal(off, 0)
+    dom = None
+    if off.sum() > 0:
+        i, j = np.unravel_index(int(off.argmax()), off.shape)
+        dom = {"from": int(i), "to": int(j), "count": int(off[i, j]),
+               "arah": "ke tipologi lebih buruk" if j > i else "ke tipologi lebih baik"}
+    p0, p1 = (M.sum(axis=1) / n, M.sum(axis=0) / n) if n else (np.zeros(k), np.zeros(k))
+    return {"matrix": M.astype(int), "n": int(n), "stability_rate": float(np.trace(M) / n * 100) if n else None,
+            "dominan": dom, "cdvm": float(0.5 * np.abs(p1 - p0).sum()), "edge_aktif": int((off > 0).sum()),
+            "ari": t.get("ari")}
+
+
+def dominan_txt(tt, k, jumlah=True) -> str:
+    d = tt["dominan"]
+    if not d:
+        return "–"
+    return f"{state_name(d['from'], k)} → {state_name(d['to'], k)}" + (f" ({id_num(d['count'], 0)})" if jumlah else "")
+
+
 def legenda_tipologi(k) -> str:
     return "; ".join(tip(c, k) for c in range(k))
 
@@ -496,17 +522,15 @@ KETAHANAN_K = (4, 2)
 
 def ketahanan_rows(R, grid):
     """Perbandingan berdampingan K = 4 vs K = 2 (baris per pasangan level atau per level)."""
-    sn = state_name
     rows = []
     tr = {k: {(t["from_level"], t["to_level"]): t for t in R["model"][str(k)]["transitions"]} for k in KETAHANAN_K}
     for pair in tr[4]:
         r = {"Bagian": "Transisi", "Level / pasangan": f"{LEVEL_LABEL[pair[0]]} → {LEVEL_LABEL[pair[1]]}"}
         for k in KETAHANAN_K:
-            t = tr[k][pair]
-            d = t["dominant_transition"]
-            r[f"K = {k}: transisi dominan"] = f"{sn(d['from'], k)} → {sn(d['to'], k)} ({id_num(d['count'], 0)})"
-            r[f"K = {k}: SR (%)"] = t["stability_rate"]
-            r[f"K = {k}: masuk Tergenang"] = t["masuk_tergenang"]
+            tt = transisi_tipologi(tr[k][pair], k)
+            r[f"K = {k}: transisi dominan"] = dominan_txt(tt, k)
+            r[f"K = {k}: arah dominan"] = tt["dominan"]["arah"] if tt["dominan"] else "–"
+            r[f"K = {k}: SR (%)"] = tt["stability_rate"]
         rows.append(r)
     for key in LEVEL_ORDER:
         r = {"Bagian": "Tipologi terburuk dan TAS", "Level / pasangan": LEVEL_LABEL[key]}
@@ -526,8 +550,8 @@ def tables_ketahanan(R, grid):
     fmt = {c: (2 if ("SR" in c or "%" in c) else 0) for c in df.columns
            if c not in ("Bagian", "Level / pasangan") and "transisi dominan" not in c}
     return [Table("S20", "Ketahanan kesimpulan terhadap K: K = 4 (utama) vs K = 2 (sensitivitas)", df, fmt,
-                  "Transisi dominan = sel matriks transisi terbesar di luar diagonal; SR = stability rate pada grid "
-                  "non-Tergenang di kedua level; masuk Tergenang tidak bergantung K. % grid di tipologi terburuk terhadap "
+                  "Transisi tipologi hanya pada grid yang tidak Tergenang di kedua level: transisi dominan = sel terbesar di "
+                  "luar diagonal (antartipologi); SR = stability rate. % grid di tipologi terburuk terhadap "
                   "semua grid level itu. TAS (aturan utama) tidak bergantung K; kolom TAS hanya membagi TAS menurut "
                   "tipologi grid tersebut.")]
 
@@ -537,15 +561,13 @@ def ringkasan_ketahanan(R, grid) -> list:
     rows = ketahanan_rows(R, grid)
     tr = [r for r in rows if r["Bagian"] == "Transisi"]
     lv = [r for r in rows if r["Bagian"] != "Transisi"]
-    same_tg = all(r["K = 4: masuk Tergenang"] == r["K = 2: masuk Tergenang"] for r in tr)
-    tuju = lambda s: s.split(" → ")[1].split(" (")[0]
-    ke_tg = lambda s: tuju(s).startswith("Tergenang")
-    sama_arah = [r["Level / pasangan"] for r in tr if ke_tg(r["K = 4: transisi dominan"]) == ke_tg(r["K = 2: transisi dominan"])]
+    sama_arah = [r["Level / pasangan"] for r in tr if r["K = 4: arah dominan"] == r["K = 2: arah dominan"]]
+    beda_arah = [r["Level / pasangan"] for r in tr if r["K = 4: arah dominan"] != r["K = 2: arah dominan"]]
     sr_lebih_rendah = all(r["K = 4: SR (%)"] <= r["K = 2: SR (%)"] for r in tr)
-    L = [f"- Sama: jumlah grid masuk Tergenang {'identik' if same_tg else 'berbeda'} pada kedua K (tidak bergantung "
-         "tipologi); jumlah TAS per level sama (TAS tidak bergantung K).",
-         f"- Sama: jenis transisi dominan (menuju Tergenang atau antartipologi) pada pasangan "
-         f"{', '.join(sama_arah) if sama_arah else '–'}.",
+    L = ["- Sama: jumlah TAS per level (TAS tidak bergantung K).",
+         f"- Sama: arah transisi tipologi dominan (ke tipologi lebih buruk atau lebih baik) pada pasangan "
+         f"{', '.join(sama_arah) if sama_arah else '–'}"
+         + (f"; berbeda pada {', '.join(beda_arah)}." if beda_arah else "."),
          f"- Berbeda: SR K = 4 {'lebih rendah atau sama dengan' if sr_lebih_rendah else 'tidak selalu lebih rendah dari'} "
          "K = 2 pada semua pasangan level.",
          "- Berbeda: persentase grid di tipologi terburuk " + "; ".join(
@@ -711,30 +733,30 @@ def tables_for_k(R, k, prefix, F=None):
                    "tersendiri, bukan tipologi."))
 
     for i, t in enumerate(M["transitions"]):
-        S = k + 1
-        mat = pd.DataFrame(t["matrix"], columns=[f"ke {state_name(j, k)}" for j in range(S)])
-        mat.insert(0, "Dari", [state_name(j, k) for j in range(S)])
-        T.append(Table(f"{prefix}09{chr(97 + i)}", f"Matriks transisi {LEVEL_LABEL[t['from_level']]} → "
+        tt = transisi_tipologi(t, k)
+        mat = pd.DataFrame(tt["matrix"], columns=[f"ke {state_name(j, k)}" for j in range(k)])
+        mat.insert(0, "Dari", [state_name(j, k) for j in range(k)])
+        T.append(Table(f"{prefix}09{chr(97 + i)}", f"Matriks transisi tipologi {LEVEL_LABEL[t['from_level']]} → "
                        f"{LEVEL_LABEL[t['to_level']]} {sfx} (jumlah grid)", mat, {c: 0 for c in mat.columns if c != "Dari"},
-                       f"{legenda_tipologi(k)}. Tergenang = status di luar klasterisasi (bukan tipologi)."))
+                       f"{legenda_tipologi(k)}. Hanya grid yang tidak Tergenang di kedua level; grid Tergenang tidak "
+                       "diklasterkan sehingga tidak termasuk transisi tipologi."))
     rows = []
     for t in M["transitions"]:
-        d = t["dominant_transition"]
+        tt = transisi_tipologi(t, k)
+        d = tt["dominan"]
         rows.append({"Transisi": f"{LEVEL_LABEL[t['from_level']]} → {LEVEL_LABEL[t['to_level']]}",
-                     "Masuk Tergenang (grid)": t["masuk_tergenang"],
-                     "Masuk Tergenang (% semua grid)": t["persen_masuk_tergenang_semua_grid"],
-                     "Grid non-Tergenang di kedua level": t["n_non_tergenang_kedua_level"],
-                     "Stability rate (%)": t["stability_rate"], "ARI": t["ari"],
-                     "Transisi dominan": f"{state_name(d['from'], k)} → {state_name(d['to'], k)}" if d else "–",
-                     "Jumlah (dominan)": d["count"] if d else None, "Dominan menuju": d["menuju"] if d else "–",
-                     "Active edges": t["active_edges"], "Edge mungkin": (k + 1) * k, "CDVM": t["cdvm"]})
+                     "Grid non-Tergenang di kedua level": tt["n"],
+                     "Stability rate (%)": tt["stability_rate"], "ARI": tt["ari"],
+                     "Transisi dominan": dominan_txt(tt, k, jumlah=False),
+                     "Jumlah (dominan)": d["count"] if d else None, "Arah dominan": d["arah"] if d else "–",
+                     "Edge aktif": tt["edge_aktif"], "Edge mungkin": k * (k - 1), "CDVM": tt["cdvm"]})
     df = pd.DataFrame(rows)
-    T.append(Table(f"{prefix}10", f"Ringkasan transisi antarlevel {sfx} (tipologi dan status Tergenang)", df,
-                   {"Masuk Tergenang (grid)": 0, "Masuk Tergenang (% semua grid)": 2,
-                    "Grid non-Tergenang di kedua level": 0, "Stability rate (%)": 2, "ARI": 3, "Jumlah (dominan)": 0,
-                    "Active edges": 0, "Edge mungkin": 0, "CDVM": 3},
-                   "Stability rate dan ARI hanya pada grid non-Tergenang di kedua level. CDVM = ½ Σ |p_s(tujuan) − p_s(asal)| "
-                   f"atas tipologi dan status Tergenang. {legenda_tipologi(k)}."))
+    T.append(Table(f"{prefix}10", f"Ringkasan transisi tipologi antarlevel {sfx}", df,
+                   {"Grid non-Tergenang di kedua level": 0, "Stability rate (%)": 2, "ARI": 3, "Jumlah (dominan)": 0,
+                    "Edge aktif": 0, "Edge mungkin": 0, "CDVM": 3},
+                   "Hanya grid yang tidak Tergenang di kedua level (transisi antartipologi). Transisi dominan = sel terbesar "
+                   "di luar diagonal; CDVM = ½ Σ |p(tujuan) − p(asal)| atas tipologi. Jumlah grid Tergenang per level ada di "
+                   f"T03/T08. {legenda_tipologi(k)}."))
 
     v = M["model_final"]["validity"]
     rows = [{"Metrik": "I-Index", "Nilai": v["iidx"]}, {"Metrik": "Ketegasan partisi", "Nilai": v["ketegasan_partisi"]},
@@ -767,16 +789,15 @@ def tables_k_compare(R, grid):
     for i, pair in enumerate(R["model"][str(ks[0])]["transitions"]):
         row = {"Transisi": f"{LEVEL_LABEL[pair['from_level']]} → {LEVEL_LABEL[pair['to_level']]}"}
         for k in ks:
-            t = R["model"][str(k)]["transitions"][i]
-            d = t["dominant_transition"]
-            row[f"Dominan K{k}"] = (f"{state_name(d['from'], k)} → {state_name(d['to'], k)} ({id_num(d['count'], 0)})"
-                                    if d else "–")
-            row[f"SR K{k} (%)"] = t["stability_rate"]
-            row[f"ARI K{k}"] = t["ari"]
+            tt = transisi_tipologi(R["model"][str(k)]["transitions"][i], k)
+            row[f"Dominan K{k}"] = dominan_txt(tt, k)
+            row[f"SR K{k} (%)"] = tt["stability_rate"]
+            row[f"ARI K{k}"] = tt["ari"]
         rows.append(row)
     df = pd.DataFrame(rows)
-    T.append(Table("T16", f"Temuan utama {lab}: transisi", df,
-                   {c: (2 if c.startswith("SR") else 3) for c in df.columns if c.startswith(("SR", "ARI"))}))
+    T.append(Table("T16", f"Temuan utama {lab}: transisi tipologi", df,
+                   {c: (2 if c.startswith("SR") else 3) for c in df.columns if c.startswith(("SR", "ARI"))},
+                   "Hanya grid yang tidak Tergenang di kedua level; transisi dominan = antartipologi."))
 
     rows = []
     for key in LEVEL_ORDER[1:]:
@@ -825,17 +846,13 @@ def write_maps(R, grid, out_dir):
     for k in [int(x) for x in R["k_keluaran"]]:
         for key in LEVEL_ORDER:
             st = g[f"state_{key}_k{k}"].values
-            colors = np.where(st == k, LUAR_KLASTER_COLOR, np.array(CLUSTER_COLORS)[np.minimum(st, 9)])
+            ada = st < k                                  # grid Tergenang tidak diklasterkan → tidak digambar
             fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
-            g.plot(ax=ax, color=colors, linewidth=0)
+            g[ada].plot(ax=ax, color=np.array(CLUSTER_COLORS)[st[ada]], linewidth=0)
             ax.set_axis_off()
             ax.set_title(f"Tipologi SDWFCM K = {k} — {R['levels'][key]['label_lengkap']}", fontsize=9)
-            leg = ax.legend(handles=[Patch(color=CLUSTER_COLORS[c], label=tip(c, k)) for c in range(k)],
-                            title="Tipologi", loc="lower left", fontsize=7, title_fontsize=7)
-            ax.add_artist(leg)
-            if (st == k).any():
-                ax.legend(handles=[Patch(color=LUAR_KLASTER_COLOR, label=f"Tergenang ({id_num(int((st == k).sum()), 0)} grid)")],
-                          title="Di luar klasterisasi", loc="upper right", fontsize=7, title_fontsize=7)
+            ax.legend(handles=[Patch(color=CLUSTER_COLORS[c], label=tip(c, k)) for c in range(k)],
+                      title="Tipologi", loc="lower left", fontsize=7, title_fontsize=7)
             fig.tight_layout()
             fig.savefig(d / f"tipologi_K{k}_{key}.png")
             plt.close(fig)
@@ -920,14 +937,12 @@ def write_membership_maps(R, g, d, plt, k=4, klaster=(2, 3)):
         fig, axes = plt.subplots(1, len(klaster), figsize=(6.5 * len(klaster), 8), dpi=110)
         for ax, c, col in zip(axes, klaster, cols):
             val = g["id_grid"].map(sub[col])
-            wet = val.isna()
-            if wet.any():
-                g[wet].plot(ax=ax, color="#d1d5db", linewidth=0)
+            wet = val.isna()                              # Tergenang: tidak diklasterkan → tidak digambar
             g[~wet].assign(u=val[~wet]).plot(ax=ax, column="u", cmap="viridis", vmin=0, vmax=1, linewidth=0,
                                             legend=True, legend_kwds={"shrink": 0.6, "label": "derajat keanggotaan"})
             ax.set_axis_off()
             ax.set_title(f"Keanggotaan terhadap Tipologi {c + 1} (K = {k})", fontsize=9)
-        fig.suptitle(f"{R['levels'][key]['label_lengkap']} — abu-abu = Tergenang", fontsize=9)
+        fig.suptitle(f"{R['levels'][key]['label_lengkap']} (grid Tergenang tidak ditampilkan)", fontsize=9)
         fig.tight_layout()
         fig.savefig(d / f"keanggotaan_K{k}_{key}.png")
         plt.close(fig)
@@ -1006,10 +1021,10 @@ def _summary_k(R, k, grid):
                          for x in M["distribusi"][key])
         L.append(f"- {LEVEL_LABEL[key]}: {dist}")
     for t in M["transitions"]:
-        d = t["dominant_transition"]
-        L.append(f"- {LEVEL_LABEL[t['from_level']]} → {LEVEL_LABEL[t['to_level']]}: masuk Tergenang "
-                 f"{id_num(t['masuk_tergenang'], 0)}; SR {id_num(t['stability_rate'], 2)} %; ARI {id_num(t['ari'], 3)}; "
-                 f"dominan {state_name(d['from'], k)} → {state_name(d['to'], k)} ({id_num(d['count'], 0)}); CDVM {id_num(t['cdvm'], 3)}")
+        tt = transisi_tipologi(t, k)
+        L.append(f"- {LEVEL_LABEL[t['from_level']]} → {LEVEL_LABEL[t['to_level']]} (transisi tipologi): SR "
+                 f"{id_num(tt['stability_rate'], 2)} %; ARI {id_num(tt['ari'], 3)}; dominan {dominan_txt(tt, k)}; "
+                 f"CDVM {id_num(tt['cdvm'], 3)}")
     L.append(f"- Grid turun ke tipologi terburuk Sedang → Tinggi: {id_num(worst_drop(grid, k), 0)}")
     for a in M.get("algorithm_comparison", []):
         if a["status"] == "gagal":
@@ -1208,13 +1223,13 @@ def write_temuan_kunci(R, grid, tables, k_utama, out_dir):
         rows = ketahanan_rows(R, grid)
         L += ["", "## (g) Ketahanan kesimpulan terhadap K: K = 4 (utama) vs K = 2 (sensitivitas)", "",
               f"Sumber: {src('S20')}. K utama = 4 atas dasar substantif (METODOLOGI §9 (h)).", "",
-              "| Pasangan level | K = 4: transisi dominan | K = 4: SR | K = 2: transisi dominan | K = 2: SR | Masuk Tergenang (K = 4 / K = 2) |",
-              "|---|---|---:|---|---:|---:|"]
+              "Transisi tipologi (grid yang tidak Tergenang di kedua level):", "",
+              "| Pasangan level | K = 4: transisi dominan | K = 4: SR | K = 2: transisi dominan | K = 2: SR |",
+              "|---|---|---:|---|---:|"]
         for r in rows:
             if r["Bagian"] == "Transisi":
                 L.append(f"| {r['Level / pasangan']} | {r['K = 4: transisi dominan']} | {id_num(r['K = 4: SR (%)'], 2)} % | "
-                         f"{r['K = 2: transisi dominan']} | {id_num(r['K = 2: SR (%)'], 2)} % | "
-                         f"{id_num(r['K = 4: masuk Tergenang'], 0)} / {id_num(r['K = 2: masuk Tergenang'], 0)} |")
+                         f"{r['K = 2: transisi dominan']} | {id_num(r['K = 2: SR (%)'], 2)} % |")
         L += ["", "| Level | % grid di tipologi terburuk (K = 4 / K = 2) | TAS di tipologi terburuk (K = 4 / K = 2) | "
               "TAS di tipologi lain (K = 4 / K = 2) |", "|---|---:|---:|---:|"]
         for r in rows:

@@ -4,19 +4,19 @@
  "deskripsi_tipologi": {
   "2": [
    "Akses dekat, jaringan jalan padat",
-   "Akses lebih jauh, jaringan jalan lebih jarang"
+   "Akses lebih jauh, jaringan jalan jarang"
   ],
   "3": [
    "Akses sangat dekat, jaringan jalan padat",
-   "Akses dekat, jaringan jalan lebih jarang",
-   "Akses jauh, sebagian terputus"
+   "Akses dekat, jaringan jalan jarang",
+   "Akses jauh, jaringan jalan paling jarang"
   ],
   "4": [
    "Akses sangat dekat, jaringan jalan padat",
-   "Akses dekat ke TES terdekat, jaringan jalan lebih jarang",
-   "Akses sedang, TES kesehatan/GOR jauh",
-   "Terputus dari TES"
+   "Akses dekat, jaringan jalan jarang",
+   "Akses sedang, jaringan jalan jarang",
+   "Akses terputus, jaringan jalan paling jarang"
   ]
  },
- "keterangan_deskripsi": "Deskripsi tipologi (penyajian) ditulis dari profil klaster hasil terkunci v6 (median waktu minimum, kepadatan jalan, waktu ke TES kesehatan/GOR, % Terputus; tabel T07/S07). Nomor tipologi tetap = peringkat rerata waktu minimum (Tipologi 1 terbaik). Grid Tergenang tidak diklasterkan dan ditampilkan sebagai status terpisah."
+ "keterangan_deskripsi": "Deskripsi tipologi (penyajian) = kombinasi akses (median waktu minimum ke TES) dan jaringan jalan (rerata kepadatan jalan) dari profil klaster hasil terkunci v6 (tabel T07/S07). Nomor tipologi tetap = peringkat rerata waktu minimum (Tipologi 1 terbaik). Grid Tergenang tidak diklasterkan dan tidak ditampilkan pada peta maupun transisi tipologi."
 }

@@ -38,9 +38,7 @@ function buildLegendHtml(k) {
                         <div><div>${getClusterName(i)}</div>${desc ? `<div class="legend-desc">${desc}</div>` : ''}</div>
                      </div>`;
         }
-        html += `<div class="legend-foot"><b>Di luar klasterisasi</b></div>`;
-        html += `<div class="legend-static-item">${legendSwatch(LUAR_KLASTER_COLOR)} Tergenang <span class="legend-note">${fmtInt(countBy(d => d.tergenang === 1))}</span></div>`;
-        html += `<div class="legend-foot">Klik tipologi untuk menyorot. Transparansi = derajat keanggotaan. Grid Tergenang tidak diklasterkan dan bukan tipologi.</div>`;
+        html += `<div class="legend-foot">Klik tipologi untuk menyorot. Transparansi = derajat keanggotaan. Grid Tergenang tidak diklasterkan sehingga tidak ditampilkan (lihat tampilan Grid Tergenang).</div>`;
     } else if (activeView === 'tas') {
         html += `<div class="legend-static-item">${legendSwatch(TAS_COLOR, '#f5f3ff')} Titik Aman Semu <span class="legend-note">${fmtInt(countBy(d => d.titik_aman_semu === 1))}</span></div>
                  <div class="legend-static-item">${legendSwatch(NEUTRAL_FILL)} Non-TAS <span class="legend-note">${fmtInt(countBy(d => d.status_tas === 0))}</span></div>

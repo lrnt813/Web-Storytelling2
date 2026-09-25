@@ -245,10 +245,26 @@ function switchMatrixPair(i) { activeMatrixPair = i; renderResultsBody(); }
 function stateColor(s, k) { return s === k ? LUAR_KLASTER_COLOR : clusterColors[s]; }
 function stateName(s, k) { return s === k ? TERGENANG_LABEL : getClusterName(s); }
 
+// Transisi antartipologi saja: submatriks tipologi × tipologi (grid Tergenang di salah satu level dikeluarkan).
+function transTipologi(t, k) {
+    const m = t.matrix.slice(0, k).map(row => row.slice(0, k));
+    const n = m.flat().reduce((a, b) => a + b, 0);
+    let diag = 0, best = null, edges = 0;
+    const p0 = Array(k).fill(0), p1 = Array(k).fill(0);
+    m.forEach((row, i) => row.forEach((v, j) => {
+        p0[i] += v; p1[j] += v;
+        if (i === j) { diag += v; return; }
+        if (v > 0) edges++;
+        if (!best || v > best.count) best = { from: i, to: j, count: v };
+    }));
+    const cdvm = n ? 0.5 * p0.reduce((a, _, i) => a + Math.abs(p1[i] - p0[i]) / n, 0) : null;
+    return { matrix: m, n, sr: n ? diag / n * 100 : null, dominan: best && best.count > 0 ? best : null, edges, cdvm };
+}
+
 function buildSankey(r) {
-    const M = currentModel(r), k = currentK(r), S = k + 1;
+    const M = currentModel(r), k = currentK(r), S = k;
     const levels = LEVELS.map(l => l.key);
-    const counts = levels.map(key => (M.distribusi?.[key] || []).map(p => p.jumlah_grid));
+    const counts = levels.map(key => (M.distribusi?.[key] || []).filter(p => p.state < k).sort((a, b) => a.state - b.state).map(p => p.jumlah_grid));
     const total = counts[0].reduce((a, b) => a + b, 0);
     const W = 880, H = 460, padT = 28, padB = 10, nodeW = 14, gap = 8, padL = 90, padR = 90;
     const colX = levels.map((_, i) => padL + i * (W - padL - padR - nodeW) / (levels.length - 1));
@@ -260,13 +276,13 @@ function buildSankey(r) {
         const src = nodes[ti], dst = nodes[ti + 1];
         const outOff = src.map(n => n.y), inOff = dst.map(n => n.y);
         for (let i = 0; i < S; i++) for (let j = 0; j < S; j++) {
-            const v = t.matrix[i][j]; if (!v) continue;
+            const v = t.matrix[i][j]; if (!v) continue;   // hanya i, j < k: transisi antartipologi
             const h = v * scale, x0 = src[i].x + nodeW, x1 = dst[j].x, y0 = outOff[i], y1 = inOff[j];
             outOff[i] += h; inOff[j] += h;
             const xm = (x0 + x1) / 2;
             const d = `M${x0},${y0} C${xm},${y0} ${xm},${y1} ${x1},${y1} L${x1},${y1 + h} C${xm},${y1 + h} ${xm},${y0 + h} ${x0},${y0 + h} Z`;
             const tip = `${levelLabel(t.from_level)} ${stateName(i, k)} → ${levelLabel(t.to_level)} ${stateName(j, k)}<br><b>${fmtInt(v)}</b> grid (${fmtNum(v / src[i].c * 100, 1)}% dari asal)`;
-            links += `<path class="sk-link" d="${d}" fill="${stateColor(j === k ? k : i, k)}" data-tip="${tip.replace(/"/g, '&quot;')}"></path>`;
+            links += `<path class="sk-link" d="${d}" fill="${stateColor(i, k)}" data-tip="${tip.replace(/"/g, '&quot;')}"></path>`;
         }
     });
     let nodeSvg = '';
@@ -274,11 +290,11 @@ function buildSankey(r) {
         col.forEach(n => {
             if (!n.c) return;
             nodeSvg += `<rect class="sk-node" x="${n.x}" y="${n.y}" width="${nodeW}" height="${Math.max(1, n.h)}" rx="2" fill="${stateColor(n.k, k)}" data-tip="${levelLabel(levels[ci])} · ${stateName(n.k, k)}<br><b>${fmtInt(n.c)}</b> grid"></rect>`;
-            if (n.h >= 11) nodeSvg += `<text class="sk-label" x="${ci === 0 ? n.x - 6 : n.x + nodeW + 4}" y="${n.y + n.h / 2 + 4}" text-anchor="${ci === 0 ? 'end' : 'start'}">${n.k === k ? 'Tergenang' : 'T' + (n.k + 1)}</text>`;
+            if (n.h >= 11) nodeSvg += `<text class="sk-label" x="${ci === 0 ? n.x - 6 : n.x + nodeW + 4}" y="${n.y + n.h / 2 + 4}" text-anchor="${ci === 0 ? 'end' : 'start'}">${'T' + (n.k + 1)}</text>`;
         });
         nodeSvg += `<text class="sk-col" x="${colX[ci] + nodeW / 2}" y="16" text-anchor="middle">${levelLabel(levels[ci])}</text>`;
     });
-    return `<div class="chart-wrap"><svg viewBox="0 0 ${W} ${H}" class="sankey" role="img" aria-label="Diagram Sankey transisi tipologi dan Tergenang">${links}${nodeSvg}</svg></div>`;
+    return `<div class="chart-wrap"><svg viewBox="0 0 ${W} ${H}" class="sankey" role="img" aria-label="Diagram Sankey transisi tipologi">${links}${nodeSvg}</svg></div>`;
 }
 
 function bindSankeyHover() {
@@ -289,26 +305,26 @@ function bindSankeyHover() {
 }
 
 function renderTransitionTab(r) {
-    const M = currentModel(r), k = currentK(r), S = k + 1;
+    const M = currentModel(r), k = currentK(r), S = k;
     if (!M.transitions?.length) return '<p class="muted">Data transisi tidak tersedia.</p>';
     const rows = M.transitions.map(t => {
-        const d = t.dominant_transition;
-        return { cells: [`${levelLabel(t.from_level)} → ${levelLabel(t.to_level)}`,
-            `${fmtInt(t.masuk_tergenang)} (${fmtNum(t.persen_masuk_tergenang_semua_grid, 1)}%)`,
-            t.stability_rate != null ? `${fmtNum(t.stability_rate, 1)}%` : '–', fmtNum(t.ari, 3),
-            d ? `${stateName(d.from, k)} → ${stateName(d.to, k)} (${fmtInt(d.count)}; ${d.menuju})` : '–',
-            `${t.active_edges} / ${S * (S - 1)}`, fmtNum(t.cdvm, 3)] };
+        const tt = transTipologi(t, k), d = tt.dominan;
+        return { cells: [`${levelLabel(t.from_level)} → ${levelLabel(t.to_level)}`, fmtInt(tt.n),
+            tt.sr != null ? `${fmtNum(tt.sr, 1)}%` : '–', fmtNum(t.ari, 3),
+            d ? `${stateName(d.from, k)} → ${stateName(d.to, k)} (${fmtInt(d.count)})` : '–',
+            `${tt.edges} / ${S * (S - 1)}`, fmtNum(tt.cdvm, 3)] };
     });
-    const t = M.transitions[Math.min(activeMatrixPair, M.transitions.length - 1)];
+    const t = { ...M.transitions[Math.min(activeMatrixPair, M.transitions.length - 1)] };
+    t.matrix = transTipologi(t, k).matrix;
     const pairTabs = `<div class="sub-tabs">${M.transitions.map((p, i) =>
         `<button class="sub-tab ${i === activeMatrixPair ? 'active' : ''}" onclick="switchMatrixPair(${i})">${levelLabel(p.from_level)} → ${levelLabel(p.to_level)}</button>`).join('')}</div>`;
     const maxV = Math.max(...t.matrix.flat());
     const sw = s => `<i class="legend-swatch" style="background:${stateColor(s, k)}"></i>`;
     const mRows = t.matrix.map((row, i) => ({ cells: [`${sw(i)} ${stateName(i, k)}`,
         ...row.map((v, j) => `<span class="cell-val${i === j ? ' diag' : ''}" style="background:rgba(59,130,246,${(v ? 0.12 + 0.6 * v / maxV : 0).toFixed(2)})">${fmtInt(v)}</span>`)] }));
-    return section(`Alur Perpindahan Grid Antar Level — ${kLabel(r)}`, 'Pita = jumlah grid yang berpindah tipologi atau menjadi Tergenang ketika level naik.', buildSankey(r))
-        + section('Ringkasan Transisi', 'Stability rate dan ARI hanya pada grid non-Tergenang di kedua level. CDVM = ½ Σ |p<sub>s</sub>(tujuan) − p<sub>s</sub>(asal)| atas tipologi + Tergenang.',
-                  table(['Transisi', 'Masuk Tergenang', 'Stability Rate', 'ARI', 'Transisi dominan', 'Edge aktif', 'CDVM'], rows))
+    return section(`Alur Perpindahan Tipologi Antar Level — ${kLabel(r)}`, 'Pita = jumlah grid yang tetap atau berpindah tipologi ketika level naik. Grid Tergenang tidak diklasterkan sehingga tidak termasuk transisi tipologi.', buildSankey(r))
+        + section('Ringkasan Transisi Tipologi', 'Hanya grid yang tidak Tergenang di kedua level. CDVM = ½ Σ |p<sub>s</sub>(tujuan) − p<sub>s</sub>(asal)| atas tipologi.',
+                  table(['Transisi', 'Grid (non-Tergenang di kedua level)', 'Stability Rate', 'ARI', 'Transisi dominan', 'Edge aktif', 'CDVM'], rows))
         + section('Matriks Transisi', 'Baris = state asal, kolom = state tujuan.',
                   pairTabs + table(['Asal \\ Tujuan', ...Array.from({ length: S }, (_, j) => stateName(j, k))], mRows));
 }

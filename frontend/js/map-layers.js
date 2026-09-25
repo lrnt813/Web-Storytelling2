@@ -651,7 +651,7 @@ function gridStyleFor(d) {
         return { fillColor: AKSES_COLORS[d.kategori_akses] ?? NEUTRAL_FILL, fillOpacity: d.kategori_akses === 0 ? 0.45 : 0.8, stroke: false };
     }
     if (activeView === 'klaster' && d.cluster_sdwfcm === -1) {
-        return { fillColor: LUAR_KLASTER_COLOR, fillOpacity: activeCluster !== null ? 0.05 : 0.55, stroke: false };
+        return { fillOpacity: 0, opacity: 0, stroke: false };      // Tergenang tidak diklasterkan: tidak ditampilkan
     }
     if (activeView === 'waktu') return { fillColor: waktuColor(d.waktu_tes_min), fillOpacity: 0.8, stroke: false };
     if (activeView === 'bahaya') return { fillColor: bahayaColors[d.indeks_bahaya] || NEUTRAL_FILL, fillOpacity: 0.8, stroke: false };
