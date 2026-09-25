@@ -809,6 +809,14 @@ def compare_algorithms(X: np.ndarray, W: csr_matrix, w_rook, A_rook: csr_matrix,
     REDCAP, SKATER. Semua memakai praproses, K, dan aturan penomoran yang sama (urut rata-rata
     waktu_tes_min). Untuk algoritma fuzzy dilaporkan koefisien partisi (PC) dan entropi partisi (PE)
     dari keanggotaan akhir. Partisi dengan klaster terbesar > 90% grid ditandai degeneratif."""
+    runs = comparison_runs(X, W, w_rook, A_rook, k, waktu_min, cfg)
+    return comparison_rows(runs, X, w_rook, A_rook, waktu_min)
+
+
+def comparison_runs(X: np.ndarray, W: csr_matrix, w_rook, A_rook: csr_matrix, k: int,
+                    waktu_min: np.ndarray, cfg: Cfg) -> Dict[str, dict]:
+    """Jalankan kelima algoritma pembanding (lihat compare_algorithms); per algoritma: label mentah,
+    waktu per inisialisasi, dan (untuk algoritma fuzzy) U, seed terbaik, J; atau `error` bila gagal."""
     import copy
     runs = {}
 
@@ -851,7 +859,13 @@ def compare_algorithms(X: np.ndarray, W: csr_matrix, w_rook, A_rook: csr_matrix,
     except Exception as e:
         logger.warning(f"[SKATER] gagal: {type(e).__name__}: {e}")
         runs["SKATER"] = {"error": f"{type(e).__name__}: {e}", "time_per_init": time.time() - t0, "n_init": 1}
+    return runs
 
+
+def comparison_rows(runs: Dict[str, dict], X: np.ndarray, w_rook, A_rook: csr_matrix,
+                    waktu_min: np.ndarray) -> List[dict]:
+    """Baris metrik tabel perbandingan algoritma dari hasil comparison_runs (label dinomori ulang menurut
+    rata-rata waktu_tes_min)."""
     rows = []
     for algo, r in runs.items():
         base = {"algoritma": algo, "n_init": r["n_init"], "time_per_init_sec": float(r["time_per_init"])}
