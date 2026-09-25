@@ -29,7 +29,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from backend.engine import Cfg, build_weights, load_data, load_road_network
+from backend.engine import SNAP_MAX_M, Cfg, build_weights, load_data, load_road_network, road_closed_mask
 from backend import thesis as T
 
 logger = logging.getLogger("ThesisAnalysis")
@@ -38,8 +38,6 @@ RESULTS_FILE = "thesis_results.json"
 GRID_FILE = "thesis_grid_results.csv.gz"
 POOLED_FILE = "thesis_pooled_results.csv.gz"     # data gabungan (grid × level non-Tergenang)
 RESULT_FILES = (RESULTS_FILE, GRID_FILE, POOLED_FILE)
-# Pemilihan K tidak dijalankan ulang pada putaran 4: tabel stabilitas diambil dari hasil v3 terkunci.
-K_SELECTION_V3 = PROJECT_ROOT / "data" / "locked" / "arsip_v3" / RESULTS_FILE
 LOCK_DIR = "locked"
 LOCK_FILE = "LOCK.json"
 
@@ -155,8 +153,12 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     results = {
         "meta": {
             "git": git_info(),
-            "versi_desain": ("v4 (kelas bahaya dari raster InaRisk; pemilihan K dari v3; keluaran K = 2, 3, 4; "
-                             "TAS dengan syarat T_aktual ≥ batas waktu evakuasi; kategori akses)"),
+            "versi_desain": ("v6 (snapping ke ruas terdekat; kelas bahaya dari raster InaRisk; pemilihan K "
+                             "dihitung ulang; keluaran K = 2, 3, 4; TAS dengan syarat T_aktual ≥ batas waktu "
+                             "evakuasi; kategori akses; atribusi banjir pada TAS)"),
+            "snapping": {"metode": "ruas terdekat (proyeksi tegak lurus, simpul virtual)",
+                         "batas_m": SNAP_MAX_M},
+            "atribusi_banjir": {"toleransi_menit": T.ATRIBUSI_TOL_MENIT, "batas_waktu_dipicu_menit": T.EVAC_TIME_MIN},
             "sumber_kelas_bahaya": "data/Kulonprogo_Banjir.tif (grid mayoritas, ruas maksimum, TES titik)",
             "skenario": T.SKENARIO,
             "levels": T.LEVELS,
@@ -193,11 +195,26 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
         logger.info(f"===== AKSESIBILITAS {lv['label_lengkap'].upper()} =====")
         prep = T.prepare_level(gdf, roads, tes, lv["intensity"], cfg, t_pen=t_pen)
         t_pen = prep["t_pen"]
-        prep.pop("graph")                  # graf tidak diperlukan lagi (hemat memori)
+        graph = prep.pop("graph")          # graf level lain tidak diperlukan lagi (hemat memori)
+        if lv["key"] == "baseline":
+            graph_base = graph             # dipakai atribusi banjir (rute Baseline)
         preps[lv["key"]] = prep
     results["t_pen"] = t_pen
     results["baseline_time_stats"] = T.describe_times(preps["baseline"]["df"], cfg)
     t = _tick("aksesibilitas_dan_tas", t)
+
+    # ── 1b. Atribusi pengaruh banjir pada TAS (Rendah/Sedang/Tinggi) ─────────
+    grid_xy = np.column_stack([gdf["cx"].values, gdf["cy"].values])
+    tes_b = preps["baseline"]["tes_v"]
+    tes_xy_base = dict(zip(tes_b["id_tes"].values, zip(tes_b.geometry.x.values, tes_b.geometry.y.values)))
+    seg_lookup = T.segment_lookup(roads)
+    atribusi = {}
+    for lv in T.LEVELS[1:]:
+        closed = road_closed_mask(roads, T.SKENARIO, lv["intensity"], cfg)
+        atribusi[lv["key"]] = T.flood_attribution(grid_xy, preps["baseline"]["tas"], preps[lv["key"]]["tas"],
+                                                  tes_xy_base, closed, graph_base, seg_lookup)
+    del graph_base
+    t = _tick("atribusi_banjir", t)
 
     # ── 2. Data gabungan, praproses, W blok-diagonal ─────────────────────────
     pool = T.build_pooled({k: p["df"] for k, p in preps.items()}, gdf)
@@ -217,24 +234,12 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     }
     t = _tick("data_gabungan_praproses_W", t)
 
-    # ── 3. Pemilihan K: TIDAK dijalankan ulang (hasil stabilitas v3) ─────────
-    #    Data gabungan diverifikasi identik dengan v3 sebelum tabel stabilitas v3 dipakai.
-    v3 = json.loads(K_SELECTION_V3.read_text(encoding="utf-8"))
-    v3_pool = pd.read_csv(K_SELECTION_V3.parent / POOLED_FILE)
-    pc_cols = [c for c in v3_pool.columns if c.startswith("pc")]
-    same_rows = (len(v3_pool) == len(pool)
-                 and np.array_equal(v3_pool["id_grid"].values, pool["id_grid"].values)
-                 and np.array_equal(v3_pool["level"].values, pool["level"].values))
-    same_x = same_rows and len(pc_cols) == X.shape[1] and np.allclose(v3_pool[pc_cols].values, X, atol=2e-6)
-    if not same_x:
-        raise SystemExit("Data gabungan tidak identik dengan v3; tabel pemilihan K v3 tidak boleh dipakai.")
-    results["k_selection"] = {**v3["k_selection"], "sumber": "hasil v3 (tidak dijalankan ulang)",
-                              "fingerprint_sumber": v3.get("meta", {}).get("git", {}).get("commit")}
-    results["k_terpilih_aturan"] = v3["k_selection"]["k_terpilih"]
+    # ── 3. Pemilihan K (stabilitas, dihitung ulang pada data v6) ─────────────
+    k_rows, k_summary, solutions = T.evaluate_k_stability(X, W, pool, A_pool, cfg, B=subsample_b)
+    results["k_selection"] = {"candidates": k_rows, **k_summary}
+    results["k_terpilih_aturan"] = k_summary["k_terpilih"]
     results["k_keluaran"] = list(T.K_OUTPUT)
-    solutions = {K: T.run_sdwfcm(X, W, K, cfg, seeds=T.STABILITY_SEEDS) for K in T.K_OUTPUT}
-    results["verifikasi_v3"] = {"data_gabungan_identik": bool(same_x)}
-    t = _tick("model_k_keluaran", t)
+    t = _tick("pemilihan_k", t)
 
     # ── 4. Keluaran tingkat grid yang tidak bergantung K ─────────────────────
     grid_parts = [pd.DataFrame({
@@ -256,8 +261,11 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
                                                            t_pen, thr))
             for thr in (T.EVAC_TIME_MIN,) + tuple(T.EVAC_TIME_SENS)}
         summary["tas_perubahan_vs_baseline"] = T.tas_change(base_status, preps[key]["tas"]["status"])
-        results["levels"][key] = summary
         frame = T.level_grid_frame(key, df, preps[key]["tas"], cfg)
+        if key in atribusi:
+            summary["atribusi_banjir"] = T.attribution_summary(atribusi[key])
+            frame = pd.concat([frame, T.attribution_grid_frame(key, atribusi[key], len(df))], axis=1)
+        results["levels"][key] = summary
         akses[key] = T.access_category(df["waktu_tes_min"].values, df["tergenang"].values, t_pen)
         frame[f"akses_{key}"] = akses[key]
         grid_parts.append(frame)
@@ -333,10 +341,6 @@ def run_thesis_analysis(data_dir=None, skip_comparison: bool = False, force: boo
     for i, ka in enumerate(ks):
         for kb in ks[i + 1:]:
             results["tabulasi_silang"][f"k{ka}_k{kb}"] = T.crosstab_labels(pool_labels[ka], pool_labels[kb], ka, kb)
-    if 2 in pool_labels and 3 in pool_labels:
-        results["verifikasi_v3"]["label_k2_k3_identik_v3"] = bool(
-            np.array_equal(v3_pool["klaster_k2"].values, pool_labels[2])
-            and np.array_equal(v3_pool["klaster_k3"].values, pool_labels[3]))
     t = _tick("model_final_dan_transisi", t)
 
     # ── 6. Perbandingan algoritma di Baseline untuk setiap K keluaran ─────────

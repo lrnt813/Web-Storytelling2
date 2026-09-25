@@ -52,8 +52,11 @@ def _thesis_constants() -> dict:
     from backend import thesis as T
     names = ["SKENARIO", "LEVELS", "PCA_VARIANCE", "IQR_FACTOR", "CAPPED_COLUMNS", "VARIANCE_MIN",
              "IINDEX_P", "SDWFCM_N_INIT", "SDWFCM_SEED", "DUNN_SAMPLE", "MORAN_PERMUTATION_SEED",
-             "TAS_MIN_EUCLID_M", "TAS_DI_ABSOLUTE", "K_SCORE_METRICS"]
+             "TAS_MIN_EUCLID_M", "TAS_DI_ABSOLUTE", "K_SCORE_METRICS", "ATRIBUSI_TOL_MENIT"]
     out = {n: getattr(T, n) for n in names}
+    from backend.engine import SNAP_MAX_M
+    out["SNAP_MAX_M"] = SNAP_MAX_M
+    out["SNAPPING"] = "ruas terdekat (proyeksi tegak lurus, simpul virtual)"
     out["K_RANGE"] = list(T.K_RANGE)
     return out
 
