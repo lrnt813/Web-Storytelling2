@@ -81,3 +81,18 @@ def test_kriteria_k_final_menunjuk_argmax():
     got = {r["Kriteria"]: r["K yang ditunjuk"] for r in kriteria_k_final(R, F)}
     assert got == {"Stabilitas subsampel (ARI)": 2, "Silhouette": 2, "Ketegasan partisi": 4, "I-Index": 4, "Dunn": 5,
                    "DESC-N": 2, "PESC-N": 2}
+
+
+def test_t11g_dari_lembar_validasi(tmp_path):
+    f = tmp_path / "lembar.xlsx"
+    d = pd.DataFrame({"id_grid": [1, 2, 3, 4], "level": ["Baseline", "Baseline", "Sedang", "Sedang"],
+                      "Atribusi banjir": [None, None, "dipicu banjir", "tidak berubah"],
+                      "Kode utama": ["A Sungai/waduk", "E", "G Penutupan ruas akibat banjir", "B"]})
+    with pd.ExcelWriter(f) as xw:
+        d.to_excel(xw, sheet_name="Validasi TAS", index=False)
+    t = E.tables_validasi_tas(f)[0]
+    r = t.df.set_index("Level")
+    assert t.code == "T11g" and r.at["Baseline", "TAS"] == 2
+    assert r.at["Baseline", "TAS struktural (A/B/C/D) (grid)"] == 1 and r.at["Baseline", "Artefak data/metode (E/F/H) (%)"] == 50
+    assert r.at["Sedang", "TAS akibat banjir (G) (grid)"] == 1 and r.at["Sedang", "Valid Y"] == 2
+    assert E.tables_validasi_tas(tmp_path / "tidak_ada.xlsx") == []

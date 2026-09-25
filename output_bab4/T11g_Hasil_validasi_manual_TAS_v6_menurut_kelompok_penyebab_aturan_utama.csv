@@ -1,0 +1,5 @@
+﻿Level,TAS,TAS struktural (A/B/C/D) (grid),TAS struktural (A/B/C/D) (%),TAS akibat banjir (G) (grid),TAS akibat banjir (G) (%),Artefak data/metode (E/F/H) (grid),Artefak data/metode (E/F/H) (%),Belum terjelaskan (I) (grid),Belum terjelaskan (I) (%),Belum diisi,Valid Y,Valid T,Valid cek
+Baseline,68,55,80.88235294117648,0,0.0,13,19.11764705882353,0,0.0,0,55,13,0
+Rendah,76,57,75.0,8,10.526315789473683,11,14.473684210526317,0,0.0,0,65,11,0
+Sedang,76,27,35.526315789473685,37,48.68421052631579,12,15.789473684210526,0,0.0,0,64,12,0
+Tinggi,44,7,15.909090909090908,27,61.36363636363637,10,22.727272727272727,0,0.0,0,34,10,0

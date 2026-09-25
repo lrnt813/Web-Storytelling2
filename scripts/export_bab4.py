@@ -549,6 +549,38 @@ def ringkasan_ketahanan(R, grid) -> list:
     return L
 
 
+def tables_validasi_tas(lembar=None):
+    """T11g: hasil validasi manual TAS v6 (lembar terisi peneliti), dari scripts.rekap_validasi_TAS.rekap."""
+    from scripts.rekap_validasi_TAS import KELOMPOK_BAB4, LEMBAR, SHEET, rekap
+    lembar = lembar or LEMBAR
+    if not Path(lembar).exists():
+        return []
+    d = pd.read_excel(lembar, sheet_name=SHEET)
+    if d["Kode utama"].isna().all():
+        return []
+    r = rekap(d)
+    b, v = r["bab4"], r["valid"]
+    rows = []
+    for lv in b.index:
+        tot = int(b.at[lv, "Total TAS"])
+        row = {"Level": lv, "TAS": tot}
+        for name in KELOMPOK_BAB4:
+            row[f"{name} (grid)"] = int(b.at[lv, name])
+            row[f"{name} (%)"] = b.at[lv, name] / tot * 100 if tot else None
+        row["Belum diisi"] = int(b.at[lv, "(belum diisi)"])
+        row["Valid Y"], row["Valid T"], row["Valid cek"] = (int(v.at[lv, c]) for c in ("Y", "T", "cek"))
+        rows.append(row)
+    df = pd.DataFrame(rows)
+    return [Table("T11g", "Hasil validasi manual TAS v6 menurut kelompok penyebab (aturan utama)", df,
+                  {c: (2 if c.endswith("(%)") else 0) for c in df.columns if c != "Level"},
+                  "Sumber: output_bab4/validasi/validasi_TAS_v6.xlsx (diisi peneliti; satu baris per grid TAS per level), "
+                  "direkap dengan scripts/rekap_validasi_TAS.py. Kode utama: A sungai/waduk, B kawasan tertutup/bandara, "
+                  "C topografi perbukitan, D jaringan jalan memang jarang (struktural); G penutupan ruas akibat banjir; "
+                  "E jaringan OSM tidak lengkap, F kesalahan snapping, H TES lebih dekat tidak tercatat (artefak data/"
+                  "metode); I belum terjelaskan. Valid: A/B/C/D/G → Y, E/F/H → T, I → cek. Persentase terhadap TAS "
+                  "level tersebut.")]
+
+
 def tables_validasi_sintetis():
     f = FIN_DIR / "validasi_sintetis.csv"
     if not f.exists():
@@ -1197,7 +1229,7 @@ def main(argv=None):
             tables += tables_for_k(R, k, "S", F)
     if F:
         tables += [tables_guo_varian(F)] + tables_diag_desc(F)
-    tables += tables_validasi_sintetis()
+    tables += tables_validasi_sintetis() + tables_validasi_tas()
     if all(str(k) in R["model"] for k in KETAHANAN_K):
         tables += tables_ketahanan(R, grid)
     order = lambda t: ({"T": 0, "L": 1, "S": 2}[t.code[0]], int("".join(ch for ch in t.code[1:3] if ch.isdigit())), t.code)
