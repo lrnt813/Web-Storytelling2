@@ -81,30 +81,30 @@ Lonjakan I-Index dari K = 3 ke K = 4 bertepatan dengan terbentuknya klaster bari
 
 | Model | Tipologi | Baris | % baris | Median waktu min. (menit) | P90 waktu min. (menit) | % baris penalti (waktu min.) | % Terputus |
 |---|---|---|---|---|---|---|---|
-| K = 2 | Tipologi 1 (terbaik) | 38.728 | 48,35 | 3,58 | 6,81 | 0,10 | 0,10 |
-| K = 2 | Tipologi 2 (terburuk) | 41.375 | 51,65 | 8,70 | 18,91 | 3,20 | 3,20 |
-| K = 4 | Tipologi 1 (terbaik) | 20.432 | 25,51 | 3,29 | 6,45 | 0,00 | 0,00 |
-| K = 4 | Tipologi 2 | 27.019 | 33,73 | 4,16 | 6,83 | 0,00 | 0,00 |
-| K = 4 | Tipologi 3 | 31.263 | 39,03 | 9,76 | 18,09 | 0,06 | 0,06 |
-| K = 4 | Tipologi 4 (terburuk) | 1.389 | 1,73 | 403,29 | 403,29 | 96,54 | 96,54 |
+| K = 2 | Tipologi 1: Akses dekat, jaringan jalan padat | 38.728 | 48,35 | 3,58 | 6,81 | 0,10 | 0,10 |
+| K = 2 | Tipologi 2: Akses lebih jauh, jaringan jalan lebih jarang | 41.375 | 51,65 | 8,70 | 18,91 | 3,20 | 3,20 |
+| K = 4 | Tipologi 1: Akses sangat dekat, jaringan jalan padat | 20.432 | 25,51 | 3,29 | 6,45 | 0,00 | 0,00 |
+| K = 4 | Tipologi 2: Akses dekat ke TES terdekat, jaringan jalan lebih jarang | 27.019 | 33,73 | 4,16 | 6,83 | 0,00 | 0,00 |
+| K = 4 | Tipologi 3: Akses sedang, TES kesehatan/GOR jauh | 31.263 | 39,03 | 9,76 | 18,09 | 0,06 | 0,06 |
+| K = 4 | Tipologi 4: Terputus dari TES | 1.389 | 1,73 | 403,29 | 403,29 | 96,54 | 96,54 |
 
 **Tabel silang K = 2 × K = 4** (baris data gabungan; ARI antar-partisi 0,435):
 
-| K = 2 \ K = 4 | Tipologi 1 | Tipologi 2 | Tipologi 3 | Tipologi 4 |
+| K = 2 \ K = 4 | Tipologi 1: Akses sangat dekat, jaringan jalan padat | Tipologi 2: Akses dekat ke TES terdekat, jaringan jalan lebih jarang | Tipologi 3: Akses sedang, TES kesehatan/GOR jauh | Tipologi 4: Terputus dari TES |
 |---|---|---|---|---|
-| Tipologi 1 | 20.432 | 17.706 | 552 | 38 |
-| Tipologi 2 | 0 | 9.313 | 30.711 | 1.351 |
+| Tipologi 1: Akses dekat, jaringan jalan padat | 20.432 | 17.706 | 552 | 38 |
+| Tipologi 2: Akses lebih jauh, jaringan jalan lebih jarang | 0 | 9.313 | 30.711 | 1.351 |
 
-**Titik berhenti A3:** K = 4 v6 MASIH memisahkan tipologi Terputus. Tipologi 4 (terburuk) berisi 1.389 baris (1,73 %), dengan 96,5 % baris Terputus (waktu minimum = T_pen). Pada K = 2, baris Terputus tersebar dalam Tipologi 2 (3,2 % dari klaster itu).
+**Titik berhenti A3:** K = 4 v6 MASIH memisahkan tipologi Terputus. Tipologi 4: Terputus dari TES berisi 1.389 baris (1,73 %), dengan 96,5 % baris Terputus (waktu minimum = T_pen). Pada K = 2, baris Terputus tersebar dalam Tipologi 2 (3,2 % dari klaster itu).
 
 ## (e) Temuan utama K = 2 dan K = 4: transisi antarlevel
 
 | Pasangan level | K = 2: transisi dominan | K = 2: SR (%) | K = 2: masuk Tergenang | K = 4: transisi dominan | K = 4: SR (%) | K = 4: masuk Tergenang |
 |---|---|---|---|---|---|---|
 | Baseline → Rendah | Tipologi 1 → Tipologi 2 (48) | 99,78 | 39 | Tipologi 1 → Tipologi 2 (61) | 99,49 | 39 |
-| Rendah → Sedang | Tipologi 2 → Tergenang (1.956) | 92,38 | 3.336 | Tipologi 3 → Tergenang (1.870) | 87,08 | 3.336 |
+| Rendah → Sedang | Tipologi 2 → Tergenang (di luar klasterisasi) (1.956) | 92,38 | 3.336 | Tipologi 3 → Tergenang (di luar klasterisasi) (1.870) | 87,08 | 3.336 |
 | Sedang → Tinggi | Tipologi 1 → Tipologi 2 (2.638) | 82,88 | 3.800 | Tipologi 2 → Tipologi 3 (1.488) | 77,51 | 3.800 |
-| Baseline → Tinggi | Tipologi 1 → Tergenang (4.121) | 77,09 | 7.175 | Tipologi 1 → Tergenang (2.845) | 71,18 | 7.175 |
+| Baseline → Tinggi | Tipologi 1 → Tergenang (di luar klasterisasi) (4.121) | 77,09 | 7.175 | Tipologi 1 → Tergenang (di luar klasterisasi) (2.845) | 71,18 | 7.175 |
 
 Transisi dominan = sel matriks transisi terbesar di luar diagonal (perpindahan state). SR = stability rate pada grid non-Tergenang di kedua level.
 
@@ -133,4 +133,4 @@ Transisi dominan = sel matriks transisi terbesar di luar diagonal (perpindahan s
 
 Dari 7 kriteria, 4 menunjuk K = 2 dan 2 menunjuk K = 4; K = 4 **bukan** pilihan mayoritas metrik.
 
-**Dasar substantif.** K = 4 dipilih karena memisahkan tipologi grid Terputus: Tipologi 4 (terburuk) berisi 1.389 baris (1,73 % data gabungan) dengan 96,5 % baris Terputus (waktu minimum = T_pen). Kelompok ini relevan bagi perencanaan evakuasi karena menandai grid yang tidak mencapai TES mana pun lewat jaringan jalan; pada K = 2 grid tersebut tercampur dalam tipologi terburuk yang berukuran 51,7 % data. Kesimpulan utama tidak bergantung pada K: perbandingan K = 4 vs K = 2 ada di `output_bab4/temuan_kunci.md` bagian (g) dan tabel S20. K = 2 dan K = 3 dilaporkan sebagai sensitivitas.
+**Dasar substantif.** K = 4 dipilih karena memisahkan tipologi grid Terputus: Tipologi 4: Terputus dari TES berisi 1.389 baris (1,73 % data gabungan) dengan 96,5 % baris Terputus (waktu minimum = T_pen). Kelompok ini relevan bagi perencanaan evakuasi karena menandai grid yang tidak mencapai TES mana pun lewat jaringan jalan; pada K = 2 grid tersebut tercampur dalam tipologi terburuk yang berukuran 51,7 % data. Kesimpulan utama tidak bergantung pada K: perbandingan K = 4 vs K = 2 ada di `output_bab4/temuan_kunci.md` bagian (g) dan tabel S20. K = 2 dan K = 3 dilaporkan sebagai sensitivitas.

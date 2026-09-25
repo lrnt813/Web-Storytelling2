@@ -400,6 +400,31 @@ baris penalti; median ≤ 10 menit "Akses Baik", 10–30 "Akses Sedang", > 30 "A
 karena tidak membedakan klaster: kedua klaster K = 2 mendapat label "Akses Baik" (CATATAN P3-9).
 Model, keanggotaan, dan penomoran tidak berubah.
 
+**Label deskriptif dan status Tergenang (koreksi penyajian setelah finalisasi).** Nomor tipologi tetap
+peringkat. Setiap tipologi diberi deskripsi yang ditulis dari profilnya: median waktu minimum, kepadatan
+jalan, waktu ke TES kesehatan/GOR, dan % Terputus. Deskripsi disimpan di `pengaturan_hasil.json` →
+`deskripsi_tipologi` dan dipakai oleh ekspor Bab IV, dashboard, dan `docs/KEPUTUSAN_K_v6.md`. Untuk K = 4:
+
+| Tipologi | Deskripsi | Dasar profil (T07) |
+|---|---|---|
+| 1 | Akses sangat dekat, jaringan jalan padat | median 3,29 mnt; kepadatan 0,97 (tertinggi); kesehatan/GOR ± 18 mnt |
+| 2 | Akses dekat ke TES terdekat, jaringan jalan lebih jarang | median 4,16 mnt; kepadatan 0,71; kesehatan/GOR ± 38 mnt |
+| 3 | Akses sedang, TES kesehatan/GOR jauh | median 9,76 mnt (P90 18,09); kesehatan 46, GOR 48 mnt |
+| 4 | Terputus dari TES | 96,5 % Terputus; opsi rute 0,06 |
+
+Sensitivitas K = 2: Tipologi 1 "Akses dekat, jaringan jalan padat" (3,58 mnt; 0,86) dan Tipologi 2 "Akses lebih
+jauh, jaringan jalan lebih jarang" (8,70 mnt; 3,2 % Terputus). Sensitivitas K = 3: "Akses sangat dekat, jaringan
+jalan padat" (3,12; 0,94), "Akses dekat, jaringan jalan lebih jarang" (5,64; 0,72), dan "Akses jauh, sebagian
+terputus" (11,70; P90 28,94; 5,8 % Terputus).
+
+**Grid Tergenang tidak diklasterkan** dan ditampilkan sebagai status di luar klasterisasi, bukan sebagai
+tipologi:
+- Peta tipologi: warna abu-abu dengan legenda terpisah.
+- Tabel distribusi: kolom "Status: Tergenang (di luar klasterisasi)".
+- Matriks dan ringkasan transisi: state "Tergenang (di luar klasterisasi)".
+
+Model, label numerik, dan semua angka tidak berubah.
+
 Profil yang wajib dibaca bersama label peringkat: median, P75, dan P90 waktu minimum; persentase
 baris penalti; proporsi baris dengan \(t^{\min} >\) batas waktu evakuasi (30 menit; juga 20 dan 40);
 proporsi baris **Terputus** (\(t^{\min} = T_{\text{pen}}\)); dan proporsi grid terisolasi.

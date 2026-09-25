@@ -528,3 +528,22 @@ Hasil terkunci `hasil-skripsi-v6` tidak diubah; model utama tidak dijalankan ula
   (`output_bab4/validasi/validasi_TAS_v6.xlsx`) dan rekapnya (`python -m scripts.rekap_validasi_TAS`). Perubahan
   lain (metode, parameter, data, keputusan K) memerlukan putaran baru dengan hasil terkunci baru dan persetujuan
   pembimbing.
+
+## Koreksi penyajian setelah penutupan (permintaan peneliti)
+
+Tidak ada perubahan model, data, maupun hasil terkunci. Semua perubahan berada di lapisan penyajian: ekspor
+Bab IV, dashboard, dan `KEPUTUSAN_K_v6.md`.
+
+- **K-1. Tergenang dipisahkan dari label klaster.** Grid Tergenang tidak diklasterkan, sehingga tidak
+  ditampilkan sebagai tipologi. Perubahannya:
+  - peta tipologi dan dashboard: abu-abu, dengan legenda "Di luar klasterisasi";
+  - T08/S08: kolom "Status: Tergenang (di luar klasterisasi)";
+  - matriks dan ringkasan transisi (T09, T10, S20): state "Tergenang (di luar klasterisasi)".
+
+  Angka tidak berubah. — *SELESAI*
+- **K-2. Kolom "Setara secara stabilitas dengan K terbaik" dihapus** dari T05 (dan dari tabel K di dashboard),
+  karena stabilitas kini hanya uji ketahanan (METODOLOGI §9 (h)). — *SELESAI*
+- **K-3. Label deskriptif tipologi** ditulis dari profil klaster, dengan nomor tipologi tetap sebagai
+  peringkat. Deskripsi disimpan di `pengaturan_hasil.json` → `deskripsi_tipologi`, dan dasar profilnya di
+  METODOLOGI §10. Deskripsi adalah tafsiran peneliti atas profil, bukan keluaran algoritma. — *SELESAI, perlu
+  dikonfirmasi pembimbing*

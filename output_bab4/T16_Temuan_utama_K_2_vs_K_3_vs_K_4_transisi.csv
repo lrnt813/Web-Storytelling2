@@ -1,5 +1,5 @@
 ﻿Transisi,Dominan K2,SR K2 (%),ARI K2,Dominan K3,SR K3 (%),ARI K3,Dominan K4,SR K4 (%),ARI K4
-Baseline → Rendah,K0 → K1 (48),99.783512,0.991358,K0 → K1 (61),99.518424,0.984845,K0 → K1 (61),99.487497,0.985982
-Rendah → Sedang,K1 → Tergenang (1.956),92.377448,0.718323,K2 → Tergenang (1.258),86.791377,0.640343,K2 → Tergenang (1.870),87.081563,0.682365
-Sedang → Tinggi,K0 → K1 (2.638),82.87521,0.431975,K1 → K2 (2.819),70.189702,0.317238,K1 → K2 (1.488),77.506775,0.479869
-Baseline → Tinggi,K0 → Tergenang (4.121),77.093819,0.293228,K1 → K2 (3.287),62.414505,0.222161,K0 → Tergenang (2.845),71.183379,0.373061
+Baseline → Rendah,Tipologi 1 → Tipologi 2 (48),99.783512,0.991358,Tipologi 1 → Tipologi 2 (61),99.518424,0.984845,Tipologi 1 → Tipologi 2 (61),99.487497,0.985982
+Rendah → Sedang,Tipologi 2 → Tergenang (di luar klasterisasi) (1.956),92.377448,0.718323,Tipologi 3 → Tergenang (di luar klasterisasi) (1.258),86.791377,0.640343,Tipologi 3 → Tergenang (di luar klasterisasi) (1.870),87.081563,0.682365
+Sedang → Tinggi,Tipologi 1 → Tipologi 2 (2.638),82.87521,0.431975,Tipologi 2 → Tipologi 3 (2.819),70.189702,0.317238,Tipologi 2 → Tipologi 3 (1.488),77.506775,0.479869
+Baseline → Tinggi,Tipologi 1 → Tergenang (di luar klasterisasi) (4.121),77.093819,0.293228,Tipologi 2 → Tipologi 3 (3.287),62.414505,0.222161,Tipologi 1 → Tergenang (di luar klasterisasi) (2.845),71.183379,0.373061

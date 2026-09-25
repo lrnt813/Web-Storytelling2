@@ -25,10 +25,10 @@ Sumber: `T07` (Profil tipologi SDWFCM K4 (data gabungan keempat level)) dan `T07
 
 | Tipologi | Baris (%) | Median / P75 / P90 waktu min. (menit) | > 30 menit | Terputus | Terisolasi | Kepadatan jalan | Kelas bahaya |
 |---|---:|---|---:|---:|---:|---:|---:|
-| Tipologi 1 (terbaik) | 20.432 (25,5 %) | 3,29 / 4,82 / 6,45 | 0,00 % | 0,00 % | 0,000 | 0,972 | 0,431 |
-| Tipologi 2 | 27.019 (33,7 %) | 4,16 / 5,60 / 6,83 | 0,00 % | 0,00 % | 0,000 | 0,707 | 0,197 |
-| Tipologi 3 | 31.263 (39,0 %) | 9,76 / 13,05 / 18,09 | 2,60 % | 0,06 % | 0,001 | 0,691 | 0,328 |
-| Tipologi 4 (terburuk) | 1.389 (1,7 %) | 403,29 / 403,29 / 403,29 | 98,92 % | 96,54 % | 0,965 | 0,620 | 0,353 |
+| Tipologi 1: Akses sangat dekat, jaringan jalan padat | 20.432 (25,5 %) | 3,29 / 4,82 / 6,45 | 0,00 % | 0,00 % | 0,000 | 0,972 | 0,431 |
+| Tipologi 2: Akses dekat ke TES terdekat, jaringan jalan lebih jarang | 27.019 (33,7 %) | 4,16 / 5,60 / 6,83 | 0,00 % | 0,00 % | 0,000 | 0,707 | 0,197 |
+| Tipologi 3: Akses sedang, TES kesehatan/GOR jauh | 31.263 (39,0 %) | 9,76 / 13,05 / 18,09 | 2,60 % | 0,06 % | 0,001 | 0,691 | 0,328 |
+| Tipologi 4: Terputus dari TES | 1.389 (1,7 %) | 403,29 / 403,29 / 403,29 | 98,92 % | 96,54 % | 0,965 | 0,620 | 0,353 |
 
 **Pembeda Tipologi 1 vs Tipologi 2** (sumber: `T07` (Profil tipologi SDWFCM K4 (data gabungan keempat level))): waktu tempuh minimum hampir sama (median 3,29 vs 4,16 menit). Pembedanya kepadatan jalan (rerata 0,972 vs 0,707) dan kelas bahaya deskriptif (rerata 0,431 vs 0,197; bukan fitur klasterisasi). Pada kategori TES tertentu (sumber: `T07b` (Waktu tempuh per kategori TES per klaster K4 (menit))) median waktu ke TES kesehatan 18,07 vs 37,44 menit, dan ke GOR 18,29 vs 39,15 menit.
 
@@ -74,9 +74,9 @@ Sumber: `S20` (Ketahanan kesimpulan terhadap K: K = 4 (utama) vs K = 2 (sensitiv
 | Pasangan level | K = 4: transisi dominan | K = 4: SR | K = 2: transisi dominan | K = 2: SR | Masuk Tergenang (K = 4 / K = 2) |
 |---|---|---:|---|---:|---:|
 | Baseline → Rendah | Tipologi 1 → Tipologi 2 (61) | 99,49 % | Tipologi 1 → Tipologi 2 (48) | 99,78 % | 39 / 39 |
-| Rendah → Sedang | Tipologi 3 → Tergenang (1.870) | 87,08 % | Tipologi 2 → Tergenang (1.956) | 92,38 % | 3.336 / 3.336 |
+| Rendah → Sedang | Tipologi 3 → Tergenang (di luar klasterisasi) (1.870) | 87,08 % | Tipologi 2 → Tergenang (di luar klasterisasi) (1.956) | 92,38 % | 3.336 / 3.336 |
 | Sedang → Tinggi | Tipologi 2 → Tipologi 3 (1.488) | 77,51 % | Tipologi 1 → Tipologi 2 (2.638) | 82,88 % | 3.800 / 3.800 |
-| Baseline → Tinggi | Tipologi 1 → Tergenang (2.845) | 71,18 % | Tipologi 1 → Tergenang (4.121) | 77,09 % | 7.175 / 7.175 |
+| Baseline → Tinggi | Tipologi 1 → Tergenang (di luar klasterisasi) (2.845) | 71,18 % | Tipologi 1 → Tergenang (di luar klasterisasi) (4.121) | 77,09 % | 7.175 / 7.175 |
 
 | Level | % grid di tipologi terburuk (K = 4 / K = 2) | TAS di tipologi terburuk (K = 4 / K = 2) | TAS di tipologi lain (K = 4 / K = 2) |
 |---|---:|---:|---:|
