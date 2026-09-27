@@ -41,5 +41,6 @@ def test_kelas_kuantil_dan_peta(tmp_path):
     g = P.gabung_penduduk(_desa(), pd.DataFrame({"Kalurahan/Village": ["Wates", "Temon Kulon"], "Penduduk": [5, 9]}))
     f = tmp_path / "desa.gpkg"
     g.to_file(f, layer="KulonProgo_Desa", driver="GPKG")
-    out = P.peta_sebaran_penduduk(f, tmp_path / "peta.png", kec=tmp_path / "tidak_ada.gpkg")
-    assert out.exists() and out.stat().st_size > 0
+    out = P.peta_sebaran_penduduk(f, tmp_path, kec=tmp_path / "tidak_ada.gpkg")
+    assert [o.name for o in out] == ["penduduk_desa_jumlah.png", "penduduk_desa_kepadatan.png"]
+    assert all(o.exists() and o.stat().st_size > 0 for o in out)
