@@ -32,6 +32,46 @@ dipakai (checksum SHA-256 diverifikasi) dan disimpan di `tools/` (tidak di-commi
 - Tunnel cepat (*quick tunnel*) ini ditujukan untuk pengujian/demonstrasi; untuk layanan
   permanen dengan alamat tetap diperlukan akun Cloudflare dan domain sendiri.
 
+## Hosting permanen gratis: Hugging Face Spaces (+ Netlify opsional)
+
+Netlify hanya bisa menyajikan berkas statis (folder `frontend/`). Server Python (FastAPI + GeoPandas/SciPy,
+RAM ± 1,5 GB) tidak bisa berjalan di Netlify, sehingga bila hanya Netlify yang dipakai, halaman tampil tetapi
+semua data (`/api/...`) gagal dimuat. Solusinya: seluruh dashboard dijalankan di **Hugging Face Spaces**
+(gratis, tanpa kartu kredit, ± 16 GB RAM), dan Netlify hanya opsional sebagai alamat kedua.
+
+### A. Membuat Space (sekali)
+
+1. Daftar/masuk di https://huggingface.co.
+2. Buat token: *Settings → Access Tokens → Create new token* → jenis **Write** → salin token (`hf_…`).
+3. Di GitHub (repo ini): *Settings → Secrets and variables → Actions*:
+   - tab **Secrets** → *New repository secret*: nama `HF_TOKEN`, isi token tadi;
+   - tab **Variables** → *New repository variable*: nama `HF_SPACE`, isi `NAMA_PENGGUNA_HF/dashboard-tes-kulonprogo`.
+4. Di GitHub tab **Actions** → *Sinkronkan ke Hugging Face Space* → **Run workflow**. Space dibuat otomatis
+   dan berkas diunggah (± 164 MB; hanya berkas yang dibutuhkan server, lihat `scripts/deploy_hf_space.py`).
+5. Buka `https://huggingface.co/spaces/NAMA_PENGGUNA_HF/dashboard-tes-kulonprogo` dan tunggu build selesai
+   (± 10–15 menit pertama kali; status **Running**). Alamat dashboard:
+   `https://nama_pengguna_hf-dashboard-tes-kulonprogo.hf.space` (huruf kecil; garis bawah menjadi tanda hubung).
+
+Setelah itu setiap push ke `main` yang mengubah backend, frontend, data, atau `Dockerfile` otomatis memperbarui
+Space. Tanpa GitHub Actions, unggahan juga bisa dari laptop:
+
+```
+set HF_TOKEN=hf_xxx
+python -m scripts.deploy_hf_space --space NAMA_PENGGUNA_HF/dashboard-tes-kulonprogo
+```
+
+Catatan: Space gratis "tidur" bila ± 48 jam tidak dibuka; pembukaan berikutnya memerlukan ± 1–2 menit untuk
+bangun dan memuat data. Space bersifat publik (hanya-baca; hasil penelitian tidak dapat diubah dari browser).
+
+### B. Netlify (opsional)
+
+1. Di `netlify.toml`, ganti `NAMA-PENGGUNA-HF-dashboard-tes-kulonprogo.hf.space` dengan alamat Space dari
+   langkah A.5, lalu commit dan push.
+2. Di Netlify: *Add new site → Import from GitHub* → pilih repo ini. Pengaturan build dibaca dari
+   `netlify.toml` (*Publish directory* = `frontend`, tanpa build command).
+3. Netlify menyajikan halaman dan meneruskan semua permintaan `/api/*` ke Space. Space harus berstatus
+   **Running**; bila Space sedang tidur, permintaan pertama dapat gagal sampai Space bangun.
+
 ## Alternatif hosting permanen
 
 `Dockerfile` dan `requirements.txt` sudah tersedia, sehingga dashboard dapat dipasang di
