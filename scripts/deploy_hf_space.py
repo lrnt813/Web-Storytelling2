@@ -67,6 +67,22 @@ def siapkan_folder(tujuan: Path, root: Path = ROOT) -> list:
     return berkas + ["README.md"]
 
 
+def normalisasi_space(nilai: str) -> str:
+    """'https://huggingface.co/spaces/user/nama', 'spaces/user/nama', ' user/nama ' → 'user/nama'.
+    Error berbahasa Indonesia bila formatnya tidak bisa dipakai."""
+    import re
+    v = (nilai or "").strip().strip("/")
+    v = re.sub(r"^(https?://)?(www\.)?huggingface\.co/", "", v)
+    v = re.sub(r"^spaces/", "", v)
+    if v.endswith(".hf.space") or "hf.space" in v:
+        raise SystemExit(f"HF_SPACE berisi alamat dashboard ({nilai!r}). Isi dengan NAMA_PENGGUNA_HF/nama-space, "
+                         "misalnya budi123/dashboard-tes-kulonprogo.")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*", v):
+        raise SystemExit(f"Format HF_SPACE tidak valid: {nilai!r}. Isi dengan NAMA_PENGGUNA_HF/nama-space "
+                         "(satu tanda '/', tanpa spasi dan tanpa https://).")
+    return v
+
+
 def _cek_lfs(root: Path, berkas: list):
     """Berkas Git LFS yang belum diunduh hanya berisi pointer teks kecil; hentikan agar Space tidak rusak."""
     for rel in berkas:
@@ -89,17 +105,37 @@ def main(argv=None):
         return 0
     if not args.space:
         raise SystemExit("Isi --space NAMA_PENGGUNA/nama-space (atau variabel HF_SPACE).")
-    token = os.environ.get("HF_TOKEN")
+    args.space = normalisasi_space(args.space)
+    token = (os.environ.get("HF_TOKEN") or "").strip()
     if not token:
         raise SystemExit("Variabel lingkungan HF_TOKEN (token Hugging Face dengan izin write) belum diisi.")
     _cek_lfs(ROOT, berkas)
     from huggingface_hub import HfApi
+    from huggingface_hub.utils import HfHubHTTPError
     api = HfApi(token=token)
-    api.create_repo(args.space, repo_type="space", space_sdk="docker", exist_ok=True)
-    with tempfile.TemporaryDirectory() as tmp:
-        siapkan_folder(Path(tmp))
-        api.upload_folder(folder_path=tmp, repo_id=args.space, repo_type="space", delete_patterns="*",
-                          commit_message="Sinkronisasi dashboard dari GitHub")
+    try:
+        info = api.whoami()
+    except HfHubHTTPError as e:
+        raise SystemExit(f"Token HF_TOKEN ditolak Hugging Face ({e}). Buat token baru jenis 'Write' lalu perbarui "
+                         "secret HF_TOKEN di GitHub.")
+    pemilik = info.get("name")
+    organisasi = [o.get("name") for o in info.get("orgs", [])]
+    namespace = args.space.split("/", 1)[0]
+    print(f"Token milik: {pemilik}; Space tujuan: {args.space}")
+    if namespace not in [pemilik] + organisasi:
+        raise SystemExit(f"Nama pengguna di HF_SPACE ({namespace!r}) bukan pemilik token ({pemilik!r}). Ubah variable "
+                         f"HF_SPACE menjadi {pemilik}/{args.space.split('/', 1)[1]}.")
+    try:
+        api.create_repo(args.space, repo_type="space", space_sdk="docker", exist_ok=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            siapkan_folder(Path(tmp))
+            api.upload_folder(folder_path=tmp, repo_id=args.space, repo_type="space", delete_patterns="*",
+                              commit_message="Sinkronisasi dashboard dari GitHub")
+    except HfHubHTTPError as e:
+        kode = getattr(getattr(e, "response", None), "status_code", None)
+        saran = (" Token kemungkinan hanya berizin baca: buat token jenis 'Write' (atau token fine-grained dengan izin "
+                 "menulis repo/Space) lalu perbarui secret HF_TOKEN." if kode in (401, 403) else "")
+        raise SystemExit(f"Hugging Face menolak unggahan (HTTP {kode}): {e}.{saran}")
     user, nama = args.space.split("/", 1)
     print(f"Selesai. Space: https://huggingface.co/spaces/{args.space}")
     print(f"Alamat dashboard (setelah build ± 10–15 menit): https://{user.lower()}-{nama.lower().replace('_', '-')}.hf.space")
