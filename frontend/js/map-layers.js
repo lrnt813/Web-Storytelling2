@@ -17,12 +17,19 @@ function initMap() {
     map.createPane('marker-pane');
     map.getPane('marker-pane').style.zIndex = 660;
 
+    // Jalan digambar pada kanvas tersendiri. Bila berada di pane yang sama dengan grid, kanvas jalan menutupi kanvas
+    // grid dan menahan semua klik (grid tidak bisa diklik di mode Info Grid). Pane ini tidak menangkap klik.
+    map.createPane('roads-pane');
+    map.getPane('roads-pane').style.zIndex = 405;
+    map.getPane('roads-pane').style.pointerEvents = 'none';
+
     routeLayers = L.layerGroup().addTo(map);
     contextRouteLayers = L.layerGroup().addTo(map);
     tesLayer = L.layerGroup().addTo(map);
     searchBoundaryLayer = L.layerGroup().addTo(map);
     adminBoundaryLayer = L.layerGroup().addTo(map);
-    roadsLayer = L.geoJSON(null, { renderer: L.canvas({ padding: 0.3 }), interactive: false, style: roadStyle(false) });
+    roadsLayer = L.geoJSON(null, { pane: 'roads-pane', renderer: L.canvas({ pane: 'roads-pane', padding: 0.3 }),
+                                   interactive: false, style: roadStyle(false) });
     initBoundaryPanes();
     addTesLayerHoverControl();
     initMapTypeControls();
@@ -754,8 +761,12 @@ let compareLayer = null;
 let compareFraction = 0.5;
 const compareLookups = {};
 
+function compareKey(level = compareLevel) {
+    return `${level}|${activeK}`;
+}
+
 async function fetchLevelLookup(level) {
-    const key = `${level}|${activeK}`;
+    const key = compareKey(level);
     if (compareLookups[key]) return compareLookups[key];
     const resp = await fetch(`${API_BASE}/baseline?level=${level}${activeK ? `&k=${activeK}` : ''}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -818,8 +829,15 @@ function updateCompareClip() {
 }
 
 function applyCompareStyle() {
-    if (!compareLayer || !compareLevel || !compareLookups[compareLevel]) return;
-    compareLayer.setStyle(gridStyleFromLookup(compareLookups[compareLevel]));
+    if (!compareLayer || !compareLevel) return;
+    const lookup = compareLookups[compareKey()];
+    if (!lookup) {                                   // mis. K baru dipilih: muat dulu data level pembanding untuk K itu
+        const level = compareLevel;
+        fetchLevelLookup(level).then(() => { if (compareLevel === level) applyCompareStyle(); })
+            .catch(e => console.error(e));
+        return;
+    }
+    compareLayer.setStyle(gridStyleFromLookup(lookup));
     updateCompareClip();
 }
 
@@ -838,7 +856,7 @@ async function setCompareLevel(level) {
             compareLayer = L.geoJSON(gridGeoJSONData, {
                 pane: 'compare-pane', interactive: false,
                 renderer: L.canvas({ pane: 'compare-pane', padding: 0.5 }),
-                style: gridStyleFromLookup(compareLookups[compareLevel])
+                style: gridStyleFromLookup(compareLookups[compareKey()])
             });
         }
         if (!map.hasLayer(compareLayer)) compareLayer.addTo(map);
