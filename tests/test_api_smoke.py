@@ -69,3 +69,18 @@ def test_level_endpoints(client, sample_grid, level, k):
                                              "cut_roads": [{"lat": -7.8573, "lng": 110.1590}]})
     assert sim.status_code == 200, sim.text[:300]
     assert sim.json()["k_optimal"] == k
+
+
+def test_blokir_hanya_pada_jaringan_jalan(client):
+    from backend.main import _utm_to_wgs84, state
+    line = state.roads_raw.geometry.iloc[len(state.roads_raw) // 2]
+    mid = line.interpolate(0.5, normalized=True)
+    lng, lat = _utm_to_wgs84.transform(mid.x + 3, mid.y + 3)           # ± 4 m dari ruas
+    r = client.get("/api/snap-road", params={"lat": lat, "lng": lng, "tol_m": 20}).json()
+    assert r["found"] and r["jarak_m"] <= 20 and "edge_from" in r
+    laut = client.get("/api/snap-road", params={"lat": -8.05, "lng": 110.05, "tol_m": 75}).json()
+    assert laut["found"] is False                                        # Samudra Hindia: bukan jaringan jalan
+    sim = client.post("/api/simulate", json={"level": "baseline", "cut_roads": [{"lat": -8.05, "lng": 110.05}]})
+    assert sim.status_code == 422
+    ok = client.post("/api/simulate", json={"level": "baseline", "cut_roads": [{"lat": r["lat"], "lng": r["lng"]}]})
+    assert ok.status_code == 200 and ok.json()["simulated"]

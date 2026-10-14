@@ -217,12 +217,35 @@ def _snap(G, tn, nl, xy, max_snap: float = 300):
         return None
 
 
+_ROAD_INDEX = {}
+
+
+def _road_index():
+    """Indeks ruas jalan untuk menempelkan titik blokir (dibangun sekali per data jalan)."""
+    from .road_cut import RoadIndex
+    key = id(state.roads_raw)
+    if key not in _ROAD_INDEX:
+        _ROAD_INDEX.clear()
+        _ROAD_INDEX[key] = RoadIndex(state.roads_raw)
+    return _ROAD_INDEX[key]
+
+
 def _prepare_cut_roads(cut_roads) -> List[dict]:
+    """Titik blokir → ruas jalan. Setiap titik (lat/lng atau x/y) ditempelkan ke ruas jalan terdekat dalam
+    toleransi; titik di luar jaringan jalan ditolak (HTTP 422). Hasil: edge_from/edge_to (sisi graf ruas), x/y
+    titik pada ruas, dan id_jalan."""
+    from .road_cut import CUT_TOL_DEFAULT_M
     result = []
     for item in cut_roads:
         d = item.dict(exclude_none=True) if hasattr(item, "dict") else dict(item)
         if "lat" in d and "lng" in d and "x" not in d:
             d["x"], d["y"] = _latlon_to_projected(d["lat"], d["lng"])
+        if "x" in d and "y" in d and state.roads_raw is not None:
+            snap = _road_index().snap(d["x"], d["y"], CUT_TOL_DEFAULT_M)
+            if snap is None:
+                raise HTTPException(status_code=422, detail="Titik blokir tidak berada pada jaringan jalan "
+                                                            f"(lebih dari {CUT_TOL_DEFAULT_M:g} m dari ruas terdekat).")
+            d.update(snap)
         result.append(d)
     return result
 
@@ -376,6 +399,25 @@ async def health_check():
         },
         "config": {"skenario": T.SKENARIO, "levels": T.LEVELS, "target_crs": cfg.target_crs},
     }
+
+
+@app.get("/api/snap-road", tags=["Clustering"], summary="Tempelkan titik blokir ke ruas jalan terdekat")
+async def get_snap_road(lat: float = Query(...), lng: float = Query(...),
+                        tol_m: float = Query(30.0, gt=0, description="Toleransi jarak klik ke ruas (m), maks. 75")):
+    """Dipakai mode Blokir Jalan: titik hanya diterima bila berada pada jaringan jalan (≤ tol_m dari ruas)."""
+    _check_ready()
+    if state.roads_raw is None:
+        raise HTTPException(status_code=404, detail="Data jalan tidak tersedia")
+    x, y = _latlon_to_projected(lat, lng)
+    snap = _road_index().snap(x, y, tol_m)
+    if snap is None:
+        return {"found": False}
+    lon2, lat2 = _utm_to_wgs84.transform(snap["x"], snap["y"])
+    out = {"found": True, "lat": lat2, "lng": lon2, **snap}
+    if "name" in state.roads_raw.columns:
+        nm = state.roads_raw.at[snap["id_jalan"], "name"]
+        out["nama"] = None if pd.isna(nm) else str(nm)
+    return _sanitize(out)
 
 
 @app.get("/api/levels", tags=["System"], summary="Daftar level intensitas banjir")
@@ -660,14 +702,10 @@ async def post_roads(body: RoadRequest):
     roads_sim["is_broken"] = False
     roads_sim.loc[road_closed_mask(roads_sim, T.SKENARIO, lv["intensity"], cfg), "is_broken"] = True
 
-    if body.cut_roads:
-        pts = [Point(*_latlon_to_projected(c["lat"], c["lng"])) for c in body.cut_roads
-               if "lat" in c and "lng" in c]
-        if pts:
-            cut_gdf = gpd.GeoDataFrame(geometry=pts, crs=cfg.target_crs)
-            res = gpd.sjoin_nearest(roads_sim, cut_gdf, max_distance=50, how="inner")
-            if not res.empty:
-                roads_sim.loc[res.index.unique(), "is_broken"] = True
+    if body.cut_roads:                             # hanya ruas yang benar-benar diblokir (titik di luar jalan ditolak)
+        ids = [c["id_jalan"] for c in _prepare_cut_roads(body.cut_roads) if "id_jalan" in c]
+        if ids:
+            roads_sim.loc[ids, "is_broken"] = True
 
     if not body.full:
         return JSONResponse(content={"status": "ok", "level": lv["key"],

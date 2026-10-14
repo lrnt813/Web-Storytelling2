@@ -485,11 +485,42 @@ function onMapClick(e) {
     }
 }
 
-function addRoadCut(latlng, skipSave = false) {
-    const cut = { lat: latlng.lat, lng: latlng.lng };
+// Toleransi klik ke ruas jalan ≈ 12 piksel layar pada zoom saat ini (10–75 m; dibatasi juga oleh server).
+function cutToleranceM(latlng) {
+    const mPerPx = 40075016.686 * Math.cos(latlng.lat * Math.PI / 180) / Math.pow(2, map.getZoom() + 8);
+    return Math.min(75, Math.max(10, 12 * mPerPx));
+}
+
+// Titik blokir hanya boleh pada jaringan jalan: klik ditempelkan ke ruas terdekat oleh server (/api/snap-road).
+async function snapToRoad(latlng, tolM) {
+    const resp = await fetch(`${API_BASE}/snap-road?lat=${latlng.lat}&lng=${latlng.lng}&tol_m=${tolM}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json();
+}
+
+async function addRoadCut(latlng, skipSave = false, tolM = null) {
+    let snap;
+    try {
+        snap = await snapToRoad(latlng, tolM ?? cutToleranceM(latlng));
+    } catch (e) {
+        console.error(e);
+        if (typeof showToast === 'function') showToast('Gagal memeriksa jaringan jalan. Coba lagi.', 'warn');
+        return false;
+    }
+    if (!snap.found) {
+        if (!skipSave && typeof showToast === 'function')
+            showToast('Titik itu bukan jaringan jalan. Klik tepat pada ruas jalan untuk memblokir.', 'warn');
+        return false;
+    }
+    if (roadCuts.some(c => c.id_jalan === snap.id_jalan)) {
+        if (!skipSave && typeof showToast === 'function') showToast('Ruas jalan ini sudah diblokir.', 'info');
+        return false;
+    }
+    const cut = { lat: snap.lat, lng: snap.lng, id_jalan: snap.id_jalan };
     roadCuts.push(cut);
-    const marker = L.circleMarker(latlng, { radius: 8, color: '#ef4444', weight: 3, fillOpacity: 0.8, fillColor: '#000', pane: 'marker-pane' })
-        .bindTooltip('Blokir jalan — klik untuk menghapus', { direction: 'top' })
+    const label = snap.nama ? `Blokir: ${snap.nama}` : 'Blokir ruas jalan';
+    const marker = L.circleMarker([snap.lat, snap.lng], { radius: 8, color: '#ef4444', weight: 3, fillOpacity: 0.8, fillColor: '#000', pane: 'marker-pane' })
+        .bindTooltip(`${label} — klik untuk menghapus`, { direction: 'top' })
         .addTo(map);
     marker.on('click', e => {
         L.DomEvent.stopPropagation(e);
@@ -501,19 +532,23 @@ function addRoadCut(latlng, skipSave = false) {
     cutMarkers.push(marker);
     if (!skipSave) saveSession();
     updateCutUI();
+    return true;
 }
 
 function saveSession() {
     localStorage.setItem('evac_road_cuts', JSON.stringify(roadCuts));
 }
 
-function loadSession() {
+async function loadSession() {
     const saved = localStorage.getItem('evac_road_cuts');
-    if (saved) {
-        const cuts = JSON.parse(saved);
-        cuts.forEach(c => addRoadCut(c, true));
-        if (cuts.length > 0) fetchAndRenderData();
-    }
+    if (!saved) return;
+    const cuts = JSON.parse(saved);
+    let ok = 0;
+    for (const c of cuts) if (await addRoadCut(L.latLng(c.lat, c.lng), true, 30)) ok++;   // titik lama diperiksa ulang
+    saveSession();
+    if (ok < cuts.length && typeof showToast === 'function')
+        showToast(`${cuts.length - ok} titik blokir tersimpan dihapus karena tidak berada pada jaringan jalan.`, 'warn');
+    if (ok > 0) fetchAndRenderData();
 }
 
 async function resetSimulation() {

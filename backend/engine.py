@@ -418,14 +418,21 @@ def apply_road_cuts_to_graph(G: nx.Graph, nl, tn, cut_roads: List[dict], cfg: Cf
     Terapkan penutupan jalan dari input user ke NetworkX graph (in-place pada salinan).
     Setiap item di cut_roads dapat berupa:
       - {"edge_id": int}   → row index di edge_df asli
-      - {"lat": float, "lng": float}  → koordinat titik yang di-snap ke edge terdekat
+      - {"edge_from": [x, y], "edge_to": [x, y]}  → ruas spesifik (diprioritaskan; dari backend/road_cut.py)
+      - {"x": float, "y": float}  → node terdekat (≤ 100 m); semua sisi pada node itu dihapus
 
     Untuk endpoint /api/simulate — ini memodifikasi SALINAN graph, bukan global.
     """
     G_sim = G.copy()
     for item in cut_roads:
-        # Prioritaskan x/y (UTM) yang sudah dikonversi di main.py
-        if "x" in item and "y" in item:
+        # Prioritaskan ruas spesifik (titik blokir yang sudah ditempel ke ruas jalan; backend/road_cut.py)
+        if "edge_from" in item and "edge_to" in item:
+            u = (round(item["edge_from"][0], 2), round(item["edge_from"][1], 2))
+            v = (round(item["edge_to"][0],   2), round(item["edge_to"][1],   2))
+            if G_sim.has_edge(u, v):
+                G_sim.remove_edge(u, v)
+                logger.info(f"[apply_road_cuts] edge spesifik ({u}→{v}) dihapus")
+        elif "x" in item and "y" in item:
             xy = [item["x"], item["y"]]
             # Snapping ke node terdekat dengan radius lebih luas (100m)
             node = _snap(G_sim, tn, nl, xy, max_snap=100)
@@ -434,12 +441,6 @@ def apply_road_cuts_to_graph(G: nx.Graph, nl, tn, cut_roads: List[dict], cfg: Cf
                 edges_to_remove = list(G_sim.edges(node))
                 G_sim.remove_edges_from(edges_to_remove)
                 logger.info(f"[apply_road_cuts] {len(edges_to_remove)} edge dihapus di node {node} (titik klik)")
-        elif "edge_from" in item and "edge_to" in item:
-            u = (round(item["edge_from"][0], 2), round(item["edge_from"][1], 2))
-            v = (round(item["edge_to"][0],   2), round(item["edge_to"][1],   2))
-            if G_sim.has_edge(u, v):
-                G_sim.remove_edge(u, v)
-                logger.info(f"[apply_road_cuts] edge spesifik ({u}→{v}) dihapus")
     return G_sim
 
 
