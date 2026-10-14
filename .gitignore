@@ -7,3 +7,8 @@ tools/
 
 # Cache, log, dan berkas kerja sementara (graf jalan, alamat publik) — dibuat ulang otomatis
 scratch/
+
+# Lingkungan lokal
+.venv/
+.pytest_cache/
+.claude/

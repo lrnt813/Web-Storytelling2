@@ -561,3 +561,24 @@ Bab IV, dashboard, dan `KEPUTUSAN_K_v6.md`.
     semula Tipologi 3 → Tergenang, kini Tipologi 1 → Tipologi 2 (1.128 grid).
 
   — *SELESAI*
+
+## L. Persiapan repositori artifak (tanpa hosting)
+
+Tidak ada perubahan pada model maupun hasil terkunci.
+
+- **L-1. Hosting dibatalkan.** Workflow dan skrip Hugging Face (`sync-huggingface.yml`, `scripts/deploy_hf_space.py`,
+  `tests/test_deploy_hf.py`) serta `netlify.toml` dihapus; bagian terkait di `docs/DEPLOY.md` dihapus. Dashboard
+  dijalankan lokal (atau Cloudflare Tunnel sementara).
+- **L-2. `matplotlib` belum tercantum di `requirements.txt`**, padahal dipakai `export_bab4`, `penduduk_desa`,
+  `lembar_validasi_TAS`, `dampak_koreksi_snapping`, dan `validasi_desc_n_sintetis`. Instalasi baru dari
+  `requirements.txt` akan gagal membangun peta Bab IV. Ditambahkan `matplotlib==3.11.2` (versi yang terpasang
+  saat keluaran dibuat).
+- **L-3. Label usang di panel Prioritas Wilayah:** pilihan urutan "% grid klaster akses terburuk (Klaster 5)"
+  diganti "% grid tipologi akses terburuk". Perhitungannya sudah memakai tipologi ke-K (tidak berubah).
+- **L-4. Dokumentasi artifak:** README (identitas dan struktur berkas), `docs/DOKUMENTASI_SISTEM.md`
+  (menggantikan `docs/STRUCTURE.md`), `docs/PANDUAN_PENGGUNAAN.md`, dan `docs/DATASET.md`.
+- **L-5. `data/hasil_clustering/` (316 MB, LFS)** berisi keluaran tahap penelitian lama (termasuk REDCAP/SKATER,
+  banjir bandang, dan longsor) dan tidak dibaca oleh kode mana pun. Tidak disertakan pada repositori artifak baru;
+  tetap ada di repositori ini.
+
+  — *SELESAI*

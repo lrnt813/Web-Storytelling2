@@ -13,7 +13,7 @@ const REGION_SORTS = {
     tas:          { label: 'Jumlah Titik Aman Semu', desc: true },
     terdampak_pct:{ label: '% grid tergenang', desc: true },
     waktu:        { label: 'Rata-rata waktu minimum', desc: true },
-    critical_pct: { label: '% grid klaster akses terburuk (Klaster 5)', desc: true },
+    critical_pct: { label: '% grid tipologi akses terburuk', desc: true },
     name:         { label: 'Nama wilayah (A–Z)', desc: false }
 };
 

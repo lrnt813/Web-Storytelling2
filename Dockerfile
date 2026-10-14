@@ -1,4 +1,4 @@
-# Dashboard Aksesibilitas TES Banjir Kulon Progo — image untuk Hugging Face Spaces (Docker)
+# Dashboard Aksesibilitas TES Banjir Kulon Progo — image container (opsional)
 FROM python:3.14-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=7860
 
-# Hugging Face Spaces menjalankan container sebagai user UID 1000
+# container dijalankan sebagai user biasa (UID 1000), bukan root
 RUN useradd -m -u 1000 user
 WORKDIR /app
 
