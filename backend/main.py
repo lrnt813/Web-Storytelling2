@@ -32,6 +32,7 @@ from scipy.spatial import cKDTree
 from shapely.geometry import Point
 
 from . import thesis as T
+from .road_cut import CUT_TOL_DEFAULT_M
 from .config import (BASE_DIR, DATA_DIR, cfg, deskripsi_tipologi, k_utama_default, label_tipologi, utm_to_wgs84 as _utm_to_wgs84,
                      wgs84_to_utm as _wgs84_to_utm)
 from .engine import (apply_road_cuts_to_graph, build_road_graph, filter_tes, load_data, load_road_network,
@@ -403,7 +404,7 @@ async def health_check():
 
 @app.get("/api/snap-road", tags=["Clustering"], summary="Tempelkan titik blokir ke ruas jalan terdekat")
 async def get_snap_road(lat: float = Query(...), lng: float = Query(...),
-                        tol_m: float = Query(30.0, gt=0, description="Toleransi jarak klik ke ruas (m), maks. 75")):
+                        tol_m: float = Query(CUT_TOL_DEFAULT_M, gt=0, description="Toleransi jarak klik ke ruas (m), maks. 75")):
     """Dipakai mode Blokir Jalan: titik hanya diterima bila berada pada jaringan jalan (≤ tol_m dari ruas)."""
     _check_ready()
     if state.roads_raw is None:

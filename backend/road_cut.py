@@ -10,7 +10,7 @@ from typing import Optional
 import numpy as np
 import shapely
 
-CUT_TOL_DEFAULT_M = 30.0     # toleransi bawaan jarak klik ke ruas jalan
+CUT_TOL_DEFAULT_M = 25.0     # toleransi bawaan jarak klik ke ruas jalan
 CUT_TOL_MAX_M = 75.0         # batas atas toleransi yang boleh diminta klien
 
 

@@ -544,7 +544,7 @@ async function loadSession() {
     if (!saved) return;
     const cuts = JSON.parse(saved);
     let ok = 0;
-    for (const c of cuts) if (await addRoadCut(L.latLng(c.lat, c.lng), true, 30)) ok++;   // titik lama diperiksa ulang
+    for (const c of cuts) if (await addRoadCut(L.latLng(c.lat, c.lng), true, 25)) ok++;   // titik lama diperiksa ulang
     saveSession();
     if (ok < cuts.length && typeof showToast === 'function')
         showToast(`${cuts.length - ok} titik blokir tersimpan dihapus karena tidak berada pada jaringan jalan.`, 'warn');
