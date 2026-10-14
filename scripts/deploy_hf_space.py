@@ -142,5 +142,21 @@ def main(argv=None):
     return 0
 
 
+def _jalankan():
+    """main() dengan pesan kesalahan yang juga ditulis sebagai anotasi GitHub Actions (terlihat di ringkasan run)."""
+    try:
+        return main()
+    except SystemExit as e:
+        if isinstance(e.code, str) and os.environ.get("GITHUB_ACTIONS"):
+            print("::error title=Unggah ke Hugging Face gagal::" + e.code.replace("
+", " "), flush=True)
+        raise
+    except Exception as e:                                        # kesalahan tak terduga
+        if os.environ.get("GITHUB_ACTIONS"):
+            print(f"::error title=Unggah ke Hugging Face gagal::{type(e).__name__}: {e}".replace("
+", " "), flush=True)
+        raise
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(_jalankan())
