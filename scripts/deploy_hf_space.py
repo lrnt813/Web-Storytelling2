@@ -148,13 +148,11 @@ def _jalankan():
         return main()
     except SystemExit as e:
         if isinstance(e.code, str) and os.environ.get("GITHUB_ACTIONS"):
-            print("::error title=Unggah ke Hugging Face gagal::" + e.code.replace("
-", " "), flush=True)
+            print("::error title=Unggah ke Hugging Face gagal::" + " ".join(e.code.split()), flush=True)
         raise
     except Exception as e:                                        # kesalahan tak terduga
         if os.environ.get("GITHUB_ACTIONS"):
-            print(f"::error title=Unggah ke Hugging Face gagal::{type(e).__name__}: {e}".replace("
-", " "), flush=True)
+            print("::error title=Unggah ke Hugging Face gagal::" + " ".join(f"{type(e).__name__}: {e}".split()), flush=True)
         raise
 
 
