@@ -577,8 +577,29 @@ Tidak ada perubahan pada model maupun hasil terkunci.
   diganti "% grid tipologi akses terburuk". Perhitungannya sudah memakai tipologi ke-K (tidak berubah).
 - **L-4. Dokumentasi artifak:** README (identitas dan struktur berkas), `docs/DOKUMENTASI_SISTEM.md`
   (menggantikan `docs/STRUCTURE.md`), `docs/PANDUAN_PENGGUNAAN.md`, dan `docs/DATASET.md`.
-- **L-5. `data/hasil_clustering/` (316 MB, LFS)** berisi keluaran tahap penelitian lama (termasuk REDCAP/SKATER,
-  banjir bandang, dan longsor) dan tidak dibaca oleh kode mana pun. Tidak disertakan pada repositori artifak baru;
-  tetap ada di repositori ini.
+- **L-5. `data/hasil_clustering/` (316 MB, LFS) dihapus.** Berisi keluaran tahap penelitian lama (termasuk
+  REDCAP/SKATER, banjir bandang, dan longsor) dan tidak dibaca oleh kode mana pun. Masih dapat dipulihkan dari
+  riwayat git (commit sebelum penghapusan).
+- **L-6. Kode yang tidak terpakai dihapus** (hasil analisis vulture, pencarian rujukan, dan pemindaian CSS). Hasil
+  terkunci tidak berubah; uji dan uji API lulus, dan dashboard diuji di browser.
+  - Backend: endpoint `/api/boundary` dan `/api/admin-layers` (tidak dipanggil frontend) beserta `_load_admin_gdf`;
+    method `Cfg.sk_key`/`Cfg.int_label`; `wcss` dan `_graph_to_csr` di `thesis.py`; wrapper `sdwfcm_guo_kuadrat`
+    (varian dipanggil lewat `sdwfcm_guo(kuadrat=True)`); atribut `W_` yang tidak dibaca; import tak terpakai.
+  - `scripts/export_roads.py`: menulis `frontend/static_roads_kulonprogo.geojson` yang tidak dibaca frontend
+    (jalan dimuat lewat `/api/roads`).
+  - Frontend: `isGridIsolated`, `levelTabs`, `runAfterMapMove`, `TERDAMPAK_COLOR`; lapisan batas admin versi lama
+    (`showAdminBoundaries`, `ensureAdminBoundariesLoaded`, `adminBoundaryLayer`; digantikan `boundaries.js`);
+    overlay tutupan lahan (tidak ada pilihan peta yang mengaktifkannya); status catatan basemap
+    (`mapRuntimeState`; elemen `layer-runtime-note` tidak ada di halaman). Fallback basemap ke OpenStreetMap tetap ada.
+  - CSS: `.layer-runtime-note`, `.admin-tooltip`, `.origin-context-tooltip`.
+  - Dipertahankan: `fcm_literal`, `grid_class_rule_mask`, `road_class_rule_mask` (pembanding/oracle dalam uji);
+    arsip hasil `data/locked/arsip_*` dan `output_bab4/arsip_*` (jejak revisi; `arsip_v5` dibaca `export_bab4`);
+    kolom lama di `Kulonprogo_Ready4.gpkg` (mengubah berkas masukan akan mengubah data penelitian).
+  - Verifikasi setelah penghapusan: `pytest` + uji API (108 lulus, 1 xfailed); `cek_reproduksi` → ketiga hash identik
+    dengan hasil terkunci; `export_bab4` → 62 tabel dan peta tidak berubah, isi `Tabel_Bab4.docx` identik; uji browser
+    (level, K, enam tampilan, empat basemap, batas wilayah, pembanding level, info grid, rute, blokir jalan, simulasi,
+    reset, pencarian, prioritas wilayah, tujuh tab hasil) tanpa error JavaScript maupun API gagal.
+- **L-7. Estimasi waktu `cek_reproduksi` di README (± 9 menit) keliru:** skrip menjalankan ulang pemilihan K penuh
+  (K = 2–10), sehingga memakan ± 2 jam (run 15 Oktober 2026: 1 jam 56 menit). Estimasi di README dan panduan diperbaiki.
 
   — *SELESAI*

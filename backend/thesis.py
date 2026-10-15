@@ -20,14 +20,11 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 import geopandas as gpd
-import networkx as nx
 from scipy.sparse import csr_matrix
-from scipy.optimize import linear_sum_assignment
 from scipy.sparse.csgraph import connected_components, dijkstra
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
 from sklearn.decomposition import PCA
-from sklearn.feature_selection import VarianceThreshold
 from sklearn.metrics import (
     adjusted_rand_score,
     calinski_harabasz_score,
@@ -48,13 +45,10 @@ from .engine import (
     build_road_graph,
     calc_t_max,
     road_closed_mask,
-    impact_weights,
-    sdwfcm_objective_value,
     compute_distances,
     filter_tes,
     fuzzy_membership_update,
     neighbor_mean_operator,
-    graph_csr,
     run_skater,
     simulate_hazard,
     snapped_network,
@@ -487,12 +481,6 @@ def rook_adjacency(w) -> csr_matrix:
 
 def _centroids(X, labels, ks):
     return np.vstack([X[labels == c].mean(axis=0) for c in ks])
-
-
-def wcss(X, labels) -> float:
-    ks = sorted(set(labels.tolist()))
-    C = _centroids(X, labels, ks)
-    return float(sum(((X[labels == c] - C[i]) ** 2).sum() for i, c in enumerate(ks)))
 
 
 def ketegasan_partisi(U: np.ndarray, X: Optional[np.ndarray] = None,
@@ -1079,8 +1067,6 @@ def transition_analysis(states_from: np.ndarray, states_to: np.ndarray, k: int) 
 # ══════════════════════════════════════════════════════════════════════════════
 # 10. DETEKSI TITIK AMAN SEMU — DETOUR INDEX (Subbab 3.2.11)
 # ══════════════════════════════════════════════════════════════════════════════
-def _graph_to_csr(G: nx.Graph, nl: np.ndarray) -> csr_matrix:
-    return graph_csr(G, nl)
 
 
 def detect_tas_detour(

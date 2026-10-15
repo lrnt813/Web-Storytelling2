@@ -1,11 +1,10 @@
 """Klasterisasi data gabungan (Langkah 6–10 putaran 2)."""
 import numpy as np
 import pandas as pd
-import pytest
 from scipy.sparse import csr_matrix
 
 from backend import thesis as T
-from backend.engine import Cfg, SpatialFuzzyCMeans, fuzzy_membership_update
+from backend.engine import Cfg, fuzzy_membership_update
 
 
 def _pool(n_side=6):

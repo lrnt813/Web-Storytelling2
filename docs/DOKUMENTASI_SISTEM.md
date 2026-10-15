@@ -84,7 +84,7 @@ scripts/
   rekap_validasi_TAS.py      Merekap hasil validasi manual TAS
   dampak_koreksi_snapping.py Dampak koreksi snapping ruas (v5 → v6)
   penduduk_desa.py           Menambahkan kolom penduduk ke batas desa dan membuat peta sebaran penduduk
-  export_geometry.py, export_roads.py  Ekspor geometri grid dan jaringan jalan untuk frontend
+  export_geometry.py         Ekspor geometri grid untuk frontend
 tests/              Uji unit dan uji API (pytest)
 data/               Dataset dan hasil pemodelan (lihat docs/DATASET.md)
 output_bab4/        Keluaran Bab IV (tabel, peta, dokumen)
@@ -128,7 +128,7 @@ Dokumentasi interaktif tersedia di `http://127.0.0.1:8000/docs` saat server berj
 | POST | `/api/route-all-tes` | Rute evakuasi dari grid/titik ke TES terdekat setiap kategori |
 | POST | `/api/roads` | Jaringan jalan dengan status ruas terputus per level |
 | GET | `/api/tes-layers?level=` | Titik TES per kategori dan status aktifnya |
-| GET | `/api/admin-layers`, `/api/admin-boundaries`, `/api/boundary` | Batas administrasi |
+| GET | `/api/admin-boundaries` | Batas kabupaten, kapanewon, dan kalurahan |
 | GET | `/api/grid-admin` | Kalurahan dan kapanewon setiap grid |
 | GET | `/api/search-list` | Daftar wilayah untuk pencarian |
 | GET | `/api/geocode?q=` | Pencarian alamat (OpenStreetMap Photon dan Nominatim; perlu internet) |

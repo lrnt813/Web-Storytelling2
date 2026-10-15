@@ -15,7 +15,6 @@ const TERGENANG_LABEL = 'Tergenang (di luar klasterisasi)';
 const AKSES_COLORS = { 0: '#22c55e', 1: '#f97316', 2: '#0f172a', 3: TERGENANG_COLOR };
 const AKSES_LABELS = { 0: 'Terjangkau (≤ 30 menit)', 1: 'Jauh (> 30 menit)', 2: 'Terputus', 3: 'Tergenang' };   // grid tergenang (terdampak simulasi) — dikeluarkan dari klasterisasi & TAS
 const TAS_COLOR = "#a855f7";
-const TERDAMPAK_COLOR = "#ff7f0e";
 const NEUTRAL_FILL = "#475569";
 
 // Level banjir = kelas bahaya InaRisk yang ditutup (intensity hanya detail implementasi API)
@@ -54,10 +53,10 @@ function waktuColor(v) {
 }
 const routeColors = { 'pendidikan': '#3b82f6', 'kesehatan': '#ef4444', 'pemerintahan': '#f59e0b', 'ibadah': '#8b5cf6', 'gor': '#10b981' };
 const mapTypeOptions = {
-    'analitik': { label: 'Analitik', icon: 'fa-moon', requiresAdmin: false, requiresLandCover: false },
-    'jalan':    { label: 'Jalan', icon: 'fa-road', requiresAdmin: false, requiresLandCover: false },
-    'terrain':  { label: 'Terrain', icon: 'fa-mountain', requiresAdmin: false, requiresLandCover: false },
-    'satelit':  { label: 'Satelit', icon: 'fa-satellite', requiresAdmin: false, requiresLandCover: false }
+    'analitik': { label: 'Analitik', icon: 'fa-moon' },
+    'jalan':    { label: 'Jalan', icon: 'fa-road' },
+    'terrain':  { label: 'Terrain', icon: 'fa-mountain' },
+    'satelit':  { label: 'Satelit', icon: 'fa-satellite' }
 };
 const tesCategories = {
     'pendidikan':   { label: 'Pendidikan', icon: 'fa-graduation-cap' },
@@ -77,12 +76,8 @@ const categoryIcons = {
 
 let map, gridLayer, roadsLayer, roadsGeoJSON = null, legendControl = null, mode = 'visualize';
 let tesLayer, tesGeoJSON = null, activeTesCategories = new Set();
-let baseMapLayer = null, adminBoundaryLayer = null, landCoverLayer = null, adminGeoJSON = null;
+let baseMapLayer = null;
 let activeMapType = localStorage.getItem('evac_map_type') || 'analitik';
-let activeAdminLayers = new Set(['kecamatan', 'desa']);
-let landCoverOpacity = Number(localStorage.getItem('evac_land_cover_opacity') || '0.72');
-let mapRuntimeState = { basemap: 'ready', overlay: 'idle', message: '' };
-let landCoverRuntimeState = { tileErrors: 0, hasSuccessfulTile: false };
 let roadCuts = [], cutMarkers = [], routeLayers, contextRouteLayers, originMarker = null, gridPopup = null;
 let routingAbortController = null, isCalculating = false, markerPopupOpen = false;
 let searchMarker = null, activeCluster = null, clustersHidden = false, searchBoundaryLayer = null;
@@ -229,10 +224,6 @@ function updateRouteResultsLayout() {
     panel.style.height = 'auto';
     const naturalHeight = panel.scrollHeight;
     panel.style.height = `${Math.min(Math.round(availableHeight), naturalHeight)}px`;
-}
-
-function isGridIsolated(gridAttr) {
-    return gridAttr?.is_isolated === true || gridAttr?.is_isolated === 1;
 }
 
 function setClusterNames(names, skKey = null) {

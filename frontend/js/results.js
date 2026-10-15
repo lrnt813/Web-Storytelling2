@@ -104,12 +104,6 @@ function swatch(k) {
     return `<i class="legend-swatch" style="background:${clusterColors[k]}"></i>`;
 }
 
-function levelTabs(current, handler) {
-    return `<div class="sub-tabs">${LEVELS.map(l =>
-        `<button class="sub-tab ${l.key === current ? 'active' : ''}" onclick="${handler}('${l.key}')">${l.label}</button>`
-    ).join('')}</div>`;
-}
-
 let vizTip = null;
 function showVizTip(html, evt) {
     if (!vizTip) {

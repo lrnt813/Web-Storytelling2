@@ -4,6 +4,5 @@
 *.pyc
 scratch
 docs
-data/hasil_clustering
 *.bundle
 start_dashboard.py

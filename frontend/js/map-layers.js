@@ -1,10 +1,5 @@
 function initMap() {
     map = L.map('map', { zoomControl: false }).setView([-7.83, 110.15], 11);
-    map.createPane('base-overlay-pane');
-    map.getPane('base-overlay-pane').style.zIndex = 240;
-    map.createPane('admin-pane');
-    map.getPane('admin-pane').style.zIndex = 420;
-    map.getPane('admin-pane').style.pointerEvents = 'none';
     map.createPane('label-pane');
     map.getPane('label-pane').style.zIndex = 450;
     map.getPane('label-pane').style.pointerEvents = 'none';
@@ -27,7 +22,6 @@ function initMap() {
     contextRouteLayers = L.layerGroup().addTo(map);
     tesLayer = L.layerGroup().addTo(map);
     searchBoundaryLayer = L.layerGroup().addTo(map);
-    adminBoundaryLayer = L.layerGroup().addTo(map);
     roadsLayer = L.geoJSON(null, { pane: 'roads-pane', renderer: L.canvas({ pane: 'roads-pane', padding: 0.3 }),
                                    interactive: false, style: roadStyle(false) });
     initBoundaryPanes();
@@ -180,41 +174,6 @@ function refreshMapTypeControls() {
     });
 }
 
-function setMapRuntimeState(nextState = {}) {
-    mapRuntimeState = {
-        basemap: nextState.basemap ?? mapRuntimeState.basemap,
-        overlay: nextState.overlay ?? mapRuntimeState.overlay,
-        message: nextState.message ?? mapRuntimeState.message
-    };
-}
-
-function resetMapRuntimeState(type) {
-    setMapRuntimeState({
-        basemap: 'ready',
-        overlay: mapTypeOptions[type]?.requiresLandCover ? 'ready' : 'idle',
-        message: ''
-    });
-}
-
-function renderLayerRuntimeNote() {
-    const note = document.getElementById('layer-runtime-note');
-    if (!note) return;
-    if (!mapRuntimeState.message) {
-        note.style.display = 'none';
-        note.textContent = '';
-        note.className = 'layer-runtime-note';
-        return;
-    }
-    const tone = mapRuntimeState.basemap === 'fallback' || mapRuntimeState.overlay === 'error' ? 'warn' : 'info';
-    note.style.display = 'block';
-    note.className = `layer-runtime-note ${tone}`;
-    note.textContent = mapRuntimeState.message;
-}
-
-function updateLayerSourceInfo(type) {
-    renderLayerRuntimeNote();
-}
-
 // Seluruh basemap memakai layanan tanpa API key (Esri ArcGIS Online & OSM).
 // CARTO/Stadia kini mewajibkan API key sehingga tile-nya bertuliskan "API KEY REQUIRED".
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
@@ -245,10 +204,7 @@ function getFallbackBaseLayerConfig() {
 }
 
 function attachBaseLayerGuards(layer, type) {
-    layer.once('loading', () => {
-        setMapRuntimeState({ basemap: 'ready', message: '' });
-        updateLayerSourceInfo(activeMapType);
-    });
+    // basemap gagal dimuat berulang kali → ganti ke OpenStreetMap agar peta tetap tampil
     let errors = 0;
     layer.on('tileerror', () => {
         errors += 1;
@@ -257,11 +213,6 @@ function attachBaseLayerGuards(layer, type) {
         const fallback = getFallbackBaseLayerConfig();
         clearBaseLayers();
         baseMapLayer = L.tileLayer(fallback.url, fallback.options).addTo(map);
-        setMapRuntimeState({
-            basemap: 'fallback',
-            message: `Basemap ${mapTypeOptions[type].label} sedang bermasalah. Sistem memakai OpenStreetMap agar peta tetap tampil.`
-        });
-        updateLayerSourceInfo(activeMapType);
     });
 }
 
@@ -282,108 +233,10 @@ function setBaseMap(type) {
     attachBaseLayerGuards(baseMapLayer, type);
 }
 
-async function ensureAdminBoundariesLoaded() {
-    if (adminGeoJSON) return adminGeoJSON;
-    const candidates = [...new Set([`${RESOLVED_API_BASE}/admin-layers`, `${API_BASE}/admin-layers`])];
-    let lastError = null;
-    for (const url of candidates) {
-        try {
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            adminGeoJSON = await resp.json();
-            return adminGeoJSON;
-        } catch (err) {
-            lastError = err;
-        }
-    }
-    throw new Error(`Gagal memuat layer administrasi${lastError ? `: ${lastError.message}` : ''}`);
-}
-
-async function showAdminBoundaries(show) {
-    adminBoundaryLayer.clearLayers();
-    if (!show) return;
-    const data = await ensureAdminBoundariesLoaded();
-    if (activeAdminLayers.has('desa')) {
-        L.geoJSON(data.desa, {
-            pane: 'admin-pane',
-            style: { color: '#94a3b8', weight: 1, opacity: 0.7, fillOpacity: 0 }
-        }).addTo(adminBoundaryLayer);
-    }
-
-    if (activeAdminLayers.has('kecamatan')) {
-        L.geoJSON(data.kecamatan, {
-            pane: 'admin-pane',
-            style: { color: '#f8fafc', weight: 2.2, opacity: 0.92, fillOpacity: 0, dashArray: '6 4' },
-            onEachFeature: (feature, layer) => {
-                if (feature.properties?.name) {
-                    layer.bindTooltip(feature.properties.name, {
-                        direction: 'center',
-                        sticky: true,
-                        className: 'admin-tooltip'
-                    });
-                }
-            }
-        }).addTo(adminBoundaryLayer);
-    }
-    adminBoundaryLayer.eachLayer(layer => {
-        if (layer.bringToFront) layer.bringToFront();
-    });
-}
-
-function showLandCover(show) {
-    if (!show) {
-        if (landCoverLayer && map.hasLayer(landCoverLayer)) map.removeLayer(landCoverLayer);
-        landCoverRuntimeState = { tileErrors: 0, hasSuccessfulTile: false };
-        if (activeMapType !== 'tutupan_lahan') {
-            setMapRuntimeState({ overlay: 'idle', message: mapRuntimeState.basemap === 'fallback' ? mapRuntimeState.message : '' });
-            updateLayerSourceInfo(activeMapType);
-        }
-        return;
-    }
-    if (!landCoverLayer) {
-        landCoverLayer = L.tileLayer(
-            'https://services.arcgisonline.com/ArcGIS/rest/services/ESRI_LandCover_World_2020/MapServer/tile/{z}/{y}/{x}',
-            {
-                attribution: 'Land cover &copy; Esri',
-                opacity: landCoverOpacity,
-                pane: 'base-overlay-pane',
-                maxZoom: 18
-            }
-        );
-        landCoverLayer.on('load', () => {
-            if (activeMapType !== 'tutupan_lahan') return;
-            landCoverRuntimeState.hasSuccessfulTile = true;
-            landCoverRuntimeState.tileErrors = 0;
-            setMapRuntimeState({ overlay: 'ready', message: mapRuntimeState.basemap === 'fallback' ? mapRuntimeState.message : '' });
-            updateLayerSourceInfo(activeMapType);
-            addLegend();
-        });
-        landCoverLayer.on('tileerror', () => {
-            if (activeMapType !== 'tutupan_lahan') return;
-            landCoverRuntimeState.tileErrors += 1;
-            if (landCoverRuntimeState.hasSuccessfulTile || landCoverRuntimeState.tileErrors < 8) return;
-            if (map.hasLayer(landCoverLayer)) map.removeLayer(landCoverLayer);
-            setMapRuntimeState({
-                overlay: 'error',
-                message: 'Overlay tutupan lahan tidak berhasil dimuat. Basemap tetap aktif, tetapi layer penutup lahan sementara dinonaktifkan.'
-            });
-            updateLayerSourceInfo(activeMapType);
-            addLegend();
-        });
-    }
-    landCoverLayer.setOpacity(landCoverOpacity);
-    landCoverLayer.addTo(map);
-}
-
 async function applyMapType(type) {
     activeMapType = mapTypeOptions[type] ? type : 'analitik';
-    landCoverRuntimeState = { tileErrors: 0, hasSuccessfulTile: false };
-    resetMapRuntimeState(activeMapType);
     refreshMapTypeControls();
     setBaseMap(activeMapType);
-    updateLayerSourceInfo(activeMapType);
-    adminBoundaryLayer.clearLayers();
-    showLandCover(false);
     addLegend();
 }
 

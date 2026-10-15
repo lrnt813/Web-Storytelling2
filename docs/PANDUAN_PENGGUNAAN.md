@@ -96,7 +96,7 @@ dan Waktu Tempuh. Setiap tabel dapat diunduh (Excel), setiap grafik dapat diundu
 
 ```bash
 python -m pytest -q                         # uji unit (± 1 menit)
-python -m scripts.cek_reproduksi            # jalankan ulang pipeline ke folder sementara dan bandingkan hash (± 9 menit)
+python -m scripts.cek_reproduksi            # jalankan ulang pipeline ke folder sementara dan bandingkan hash (± 2 jam; termasuk pemilihan K)
 python -m scripts.export_bab4               # bangun ulang output_bab4/ dari hasil terkunci (beberapa detik)
 ```
 

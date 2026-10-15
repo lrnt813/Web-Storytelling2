@@ -730,45 +730,6 @@ def _admin_name_col(gdf: gpd.GeoDataFrame, kind: str) -> Optional[str]:
         (c for c in ["NAMOBJ", "WADMKE", "DESA", "NAMA"] if c in gdf.columns), None)
 
 
-def _load_admin_gdf(file_name: str, kind: str) -> gpd.GeoDataFrame:
-    path = Path(DATA_DIR) / file_name
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"File GPKG tidak ditemukan: {path}")
-    gdf = gpd.read_file(path).to_crs("EPSG:4326")
-    col = _admin_name_col(gdf, kind)
-    if not col:
-        raise HTTPException(status_code=500, detail=f"Kolom nama tidak ditemukan di {file_name}")
-    out = gdf[[col, "geometry"]].rename(columns={col: "name"})
-    out["geometry"] = out.geometry.simplify(0.0002, preserve_topology=True)
-    return out
-
-
-@app.get("/api/admin-layers", tags=["System"], summary="Layer administrasi Kulon Progo")
-async def get_admin_layers():
-    kec = _load_admin_gdf("KulonProgo_Kec.gpkg", "kapanewon")
-    desa = _load_admin_gdf("KulonProgo_Desa.gpkg", "kalurahan")
-    return JSONResponse(content={"status": "ok", "kecamatan": json.loads(kec.to_json()),
-                                 "desa": json.loads(desa.to_json())})
-
-
-@app.get("/api/boundary", tags=["Search"])
-async def get_boundary(name: str, type: str):
-    path = Path(DATA_DIR) / ("KulonProgo_Kec.gpkg" if type == "kapanewon" else "KulonProgo_Desa.gpkg")
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"File GPKG tidak ditemukan: {path}")
-    gdf = gpd.read_file(path)
-    col = _admin_name_col(gdf, type)
-    if not col:
-        raise HTTPException(status_code=500, detail=f"Kolom nama tidak ditemukan di {path.name}")
-    search = name.replace("Kelurahan ", "").replace("Desa ", "").replace("Kecamatan ", "").strip()
-    match = gdf[gdf[col].str.lower() == search.lower()]
-    if match.empty:
-        match = gdf[gdf[col].str.contains(search, case=False, na=False)]
-    if match.empty:
-        raise HTTPException(status_code=404, detail=f"Wilayah '{search}' ({type}) tidak ditemukan")
-    return JSONResponse(content=json.loads(match.iloc[[0]].to_crs("EPSG:4326").to_json()))
-
-
 @app.get("/api/search-list", tags=["Search"])
 async def get_search_list():
     results = []

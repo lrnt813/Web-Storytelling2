@@ -1,6 +1,5 @@
 """Simulasi blokir jalan dashboard: titik blokir hanya boleh pada jaringan jalan."""
 import geopandas as gpd
-import networkx as nx
 import numpy as np
 from shapely.geometry import LineString
 

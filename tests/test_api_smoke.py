@@ -41,7 +41,7 @@ def test_system(client):
     res = r.json()
     assert set(res["model"]) == {"2", "3", "4"}
     assert "ari_subsampel_mean" in res["k_selection"]["candidates"][0]
-    for p in ["/api/admin-layers", "/api/admin-boundaries", "/api/grid-admin", "/api/search-list"]:
+    for p in ["/api/admin-boundaries", "/api/grid-admin", "/api/search-list"]:
         assert client.get(p).status_code == 200, p
     assert client.get("/api/baseline", params={"level": "baseline", "k": 7}).status_code == 422
 

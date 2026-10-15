@@ -11,7 +11,7 @@ Bentuk harfiah (fungsi `sdwfcm_guo`, `kuadrat=False`):
   faktor spasial    f_ij = Σ_{k∈NB(j)} d_ik / min_l Σ_{k∈NB(j)} d_lk      (NB(j) = 8 tetangga terdekat, tanpa bobot)
   jarak gabungan    D_ij = (1 − λ)·d_ij·f_ij + λ·d_ij
   keanggotaan (10)  u_ij = 1 / Σ_k (D_ij / D_kj)^(1/(m−1))   (pangkat harfiah artikel)
-Varian `kuadrat=True` (sdwfcm_guo_kuadrat): d_ij diganti ‖x_j − v_i‖² di f dan D (menjawab ambiguitas pangkat;
+Varian `kuadrat=True`: d_ij diganti ‖x_j − v_i‖² di f dan D (menjawab ambiguitas pangkat;
 dengan d² bentuk keanggotaan setara FCM baku).
 
 Artikel tidak merumuskan fungsi objektif, sehingga dari beberapa inisialisasi dipilih run dengan
@@ -106,11 +106,6 @@ def sdwfcm_guo(X: np.ndarray, W: csr_matrix, k: int, m: float = 1.7, lam: float 
             "konvergensi": [{kk: r[kk] for kk in ("seed", "n_iter", "konvergen", "perubahan_U_akhir",
                                                     "perubahan_pusat_akhir", "J_FCM")} for r in runs],
             "pemilihan_run": "J_FCM = Σ u^m ‖x − v‖² terkecil (artikel tidak merumuskan fungsi objektif)"}
-
-
-def sdwfcm_guo_kuadrat(X, W, k, **kw):
-    """Varian sensitivitas: D dihitung dari d² (lihat docstring modul)."""
-    return sdwfcm_guo(X, W, k, kuadrat=True, **kw)
 
 
 def fcm_literal(X: np.ndarray, k: int, m: float = 1.7, seed: int = 42, max_iter: int = 150, tol: float = 1e-4,

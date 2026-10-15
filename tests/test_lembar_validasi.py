@@ -1,5 +1,4 @@
 """Putaran 6: isian awal otomatis lembar validasi TAS v6 (aturan kata kunci, prioritas (a)–(e), hotspot)."""
-import numpy as np
 import pandas as pd
 
 from scripts.lembar_validasi_TAS import add_hotspots, kode_dari_teks, pilihan, prefill

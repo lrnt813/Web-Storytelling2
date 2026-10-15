@@ -95,7 +95,7 @@ Langkah lengkap, cara memakai setiap fitur, dan pemecahan masalah: **[docs/PANDU
 │   ├── keputusan_k_v6.py, reproduksi_label_v6.py, metrik_finalisasi_v6.py, validasi_desc_n_sintetis.py
 │   ├── lembar_validasi_TAS.py, rekap_validasi_TAS.py, dampak_koreksi_snapping.py
 │   ├── penduduk_desa.py         Kolom penduduk dan peta sebaran penduduk per desa
-│   └── export_geometry.py, export_roads.py
+│   └── export_geometry.py       Geometri grid untuk frontend
 │
 ├── data/                        DATASET (lihat docs/DATASET.md)
 │   ├── Kulonprogo_Ready4.gpkg   Grid analisis 100 × 100 m
@@ -116,7 +116,7 @@ Langkah lengkap, cara memakai setiap fitur, dan pemecahan masalah: **[docs/PANDU
 
 ```bash
 python -m pytest -q                  # uji unit
-python -m scripts.cek_reproduksi     # jalankan ulang ke folder sementara dan bandingkan hash (± 9 menit)
+python -m scripts.cek_reproduksi     # jalankan ulang ke folder sementara dan bandingkan hash (± 2 jam; termasuk pemilihan K)
 python -m scripts.export_bab4        # bangun ulang output_bab4/ dari data/locked/
 ```
 

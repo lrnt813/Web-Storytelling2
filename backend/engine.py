@@ -139,12 +139,6 @@ class Cfg:
             "gor":          f"{b}/Kulonprogo_GOR.gpkg",
         }
 
-    def sk_key(self, s: str, i: float) -> str:
-        return f"{s}_{int(i * 100)}pct"
-
-    def int_label(self, i: float) -> str:
-        return "Baseline (0%)" if i == 0.0 else f"Intensitas {int(i * 100)}%"
-
     def norm_haz(self, v: int) -> float:
         return self.hazard_normalize_map.get(int(v), 1.0)
 
@@ -939,7 +933,6 @@ class SpatialDistanceWeightedFCM:
             W = self._build_W(gdf_or_coords)
         else:
             self._sigma = self.sigma
-        self.W_ = W
         dw = impact_weights(n, mask_dampak, self.impact_weight)
         U = np.random.dirichlet(np.ones(k), size=n)
         self.objective_history_ = []

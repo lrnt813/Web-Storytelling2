@@ -51,18 +51,6 @@ async function calculateRoutes(latlng, isGridClick = false) {
     }
 }
 
-function runAfterMapMove(action, fallbackMs = 450) {
-    let done = false;
-    const finish = () => {
-        if (done) return;
-        done = true;
-        map.off('moveend', finish);
-        action();
-    };
-    map.once('moveend', finish);
-    window.setTimeout(finish, fallbackMs);
-}
-
 function restoreIsolatedOriginView() {
     if (!isolatedOrigin) return;
     const origin = isolatedOrigin;
