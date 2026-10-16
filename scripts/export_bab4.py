@@ -838,9 +838,10 @@ def write_maps(R, grid, out_dir):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
+    from scripts.peta_util import CRS_PETA, handle_batas, lengkapi_peta
     if not GEOM.exists():
         return
-    g = gpd.read_file(GEOM)[["id_grid", "geometry"]].merge(grid, on="id_grid", how="left")
+    g = gpd.read_file(GEOM).to_crs(CRS_PETA)[["id_grid", "geometry"]].merge(grid, on="id_grid", how="left")
     d = out_dir / "peta"
     d.mkdir(exist_ok=True)
     for k in [int(x) for x in R["k_keluaran"]]:
@@ -849,9 +850,10 @@ def write_maps(R, grid, out_dir):
             ada = st < k                                  # grid Tergenang tidak diklasterkan → tidak digambar
             fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
             g[ada].plot(ax=ax, color=np.array(CLUSTER_COLORS)[st[ada]], linewidth=0)
+            lengkapi_peta(ax)
             ax.set_axis_off()
             ax.set_title(f"Tipologi SDWFCM K = {k} — {R['levels'][key]['label_lengkap']}", fontsize=9)
-            ax.legend(handles=[Patch(color=CLUSTER_COLORS[c], label=tip(c, k)) for c in range(k)],
+            ax.legend(handles=[Patch(color=CLUSTER_COLORS[c], label=tip(c, k)) for c in range(k)] + [handle_batas()],
                       title="Tipologi", loc="lower left", fontsize=7, title_fontsize=7)
             fig.tight_layout()
             fig.savefig(d / f"tipologi_K{k}_{key}.png")
@@ -861,9 +863,10 @@ def write_maps(R, grid, out_dir):
         st = g[f"akses_{key}"].values
         fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
         g.plot(ax=ax, color=[akses_pal[int(v)] for v in st], linewidth=0)
+        lengkapi_peta(ax)
         ax.set_axis_off()
         ax.set_title(f"Kategori akses (batas 30 menit) — {R['levels'][key]['label_lengkap']}", fontsize=9)
-        ax.legend(handles=[Patch(color=akses_pal[c], label=f"{AKSES[c]} ({id_num(int((st == c).sum()), 0)})") for c in range(4)],
+        ax.legend(handles=[Patch(color=akses_pal[c], label=f"{AKSES[c]} ({id_num(int((st == c).sum()), 0)})") for c in range(4)] + [handle_batas()],
                   loc="lower left", fontsize=7)
         fig.tight_layout()
         fig.savefig(d / f"akses_{key}.png")
@@ -878,9 +881,10 @@ def write_maps(R, grid, out_dir):
                 4: "TAS hilang: lainnya", 5: "TAS tetap", 0: "lainnya"}
         fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
         g.plot(ax=ax, color=[pal2[int(v)] for v in cls], linewidth=0)
+        lengkapi_peta(ax)
         ax.set_axis_off()
         ax.set_title(f"Perubahan TAS terhadap Baseline — {R['levels'][key]['label_lengkap']}", fontsize=9)
-        ax.legend(handles=[Patch(color=pal2[c], label=f"{lab2[c]} ({id_num(int((cls == c).sum()), 0)})") for c in (1, 5, 2, 3, 4)],
+        ax.legend(handles=[Patch(color=pal2[c], label=f"{lab2[c]} ({id_num(int((cls == c).sum()), 0)})") for c in (1, 5, 2, 3, 4)] + [handle_batas()],
                   loc="lower left", fontsize=7)
         fig.tight_layout()
         fig.savefig(d / f"tas_perubahan_{key}.png")
@@ -897,10 +901,11 @@ def write_maps(R, grid, out_dir):
         colors = [pal3.get(a, TERGENANG_COLOR if w else "#e5e7eb") for a, w in zip(atr, wet)]
         fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
         g.plot(ax=ax, color=colors, linewidth=0)
+        lengkapi_peta(ax)
         ax.set_axis_off()
         ax.set_title(f"Atribusi banjir pada TAS — {R['levels'][key]['label_lengkap']}", fontsize=9)
         ax.legend(handles=[Patch(color=pal3[a], label=f"{a} ({id_num(int((atr == a).sum()), 0)})") for a in ATRIBUSI]
-                  + [Patch(color=TERGENANG_COLOR, label="Tergenang"), Patch(color="#e5e7eb", label="bukan TAS")],
+                  + [Patch(color=TERGENANG_COLOR, label="Tergenang"), Patch(color="#e5e7eb", label="bukan TAS"), handle_batas()],
                   loc="lower left", fontsize=7)
         fig.tight_layout()
         fig.savefig(d / f"atribusi_banjir_{key}.png")
@@ -914,10 +919,11 @@ def write_maps(R, grid, out_dir):
         st = g[f"tas_status_{key}"].values
         fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
         g.plot(ax=ax, color=[pal[int(s)] for s in st], linewidth=0)
+        lengkapi_peta(ax)
         ax.set_axis_off()
         ax.set_title(f"Titik Aman Semu (DI ≥ 2, T_ideal ≤ 5, T_aktual ≥ 30 menit) — {R['levels'][key]['label_lengkap']}",
                      fontsize=9)
-        ax.legend(handles=[Patch(color=pal[s], label=f"{lab[s]} ({id_num(int((st == s).sum()), 0)})") for s in pal],
+        ax.legend(handles=[Patch(color=pal[s], label=f"{lab[s]} ({id_num(int((st == s).sum()), 0)})") for s in pal] + [handle_batas()],
                   loc="lower left", fontsize=7)
         fig.tight_layout()
         fig.savefig(d / f"tas_{key}.png")
@@ -926,7 +932,8 @@ def write_maps(R, grid, out_dir):
 
 def write_membership_maps(R, g, d, plt, k=4, klaster=(2, 3)):
     """Peta derajat keanggotaan fuzzy terkunci (u_c, K = 4) terhadap Tipologi 3 dan Tipologi 4, per level. Hanya
-    visualisasi dari thesis_pooled_results.csv.gz; grid Tergenang abu-abu."""
+    visualisasi dari thesis_pooled_results.csv.gz; grid Tergenang tidak digambar."""
+    from scripts.peta_util import handle_batas, lengkapi_peta
     pool_f = LOCKED / "thesis_pooled_results.csv.gz"
     if str(k) not in R["model"] or not pool_f.exists():
         return
@@ -940,6 +947,8 @@ def write_membership_maps(R, g, d, plt, k=4, klaster=(2, 3)):
             wet = val.isna()                              # Tergenang: tidak diklasterkan → tidak digambar
             g[~wet].assign(u=val[~wet]).plot(ax=ax, column="u", cmap="viridis", vmin=0, vmax=1, linewidth=0,
                                             legend=True, legend_kwds={"shrink": 0.6, "label": "derajat keanggotaan"})
+            lengkapi_peta(ax)
+            ax.legend(handles=[handle_batas()], loc="lower left", fontsize=7)
             ax.set_axis_off()
             ax.set_title(f"Keanggotaan terhadap Tipologi {c + 1} (K = {k})", fontsize=9)
         fig.suptitle(f"{R['levels'][key]['label_lengkap']} (grid Tergenang tidak ditampilkan)", fontsize=9)

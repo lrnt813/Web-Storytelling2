@@ -84,6 +84,7 @@ scripts/
   rekap_validasi_TAS.py      Merekap hasil validasi manual TAS
   dampak_koreksi_snapping.py Dampak koreksi snapping ruas (v5 → v6)
   penduduk_desa.py           Menambahkan kolom penduduk ke batas desa dan membuat peta sebaran penduduk
+  peta_util.py               Kelengkapan peta: batas Kabupaten Kulon Progo, arah utara, skala batang (EPSG:32749)
   export_geometry.py         Ekspor geometri grid untuk frontend
 tests/              Uji unit dan uji API (pytest)
 data/               Dataset dan hasil pemodelan (lihat docs/DATASET.md)

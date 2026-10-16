@@ -13,7 +13,7 @@ Proses dihentikan bila ada kalurahan yang tidak cocok, supaya tidak ada nilai ko
 
 Peta (output_bab4/peta/): dua berkas terpisah, penduduk_desa_jumlah.png (jumlah penduduk) dan
 penduduk_desa_kepadatan.png (kepadatan penduduk). Masing-masing choropleth 5 kelas kuantil (jumlah desa per kelas
-± sama), dengan batas kapanewon, nomor peringkat 5 kalurahan tertinggi di peta, dan daftar namanya. Data ini hanya informasi
+± sama), dengan batas kapanewon dan kabupaten, arah utara, skala, nomor peringkat 5 kalurahan tertinggi di peta, dan daftar namanya. Data ini hanya informasi
 pendukung: tidak dipakai dalam analisis SDWFCM, TAS, maupun hasil terkunci. Data permukiman (bangunan/lahan
 terbangun) tidak tersedia di repositori; peta permukiman memerlukan data tambahan.
 """
@@ -102,7 +102,9 @@ def peta_sebaran_penduduk(gpkg: Path = GPKG, out_dir: Path = PETA_DIR, kec: Path
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
     from matplotlib.patches import Patch
+    from scripts.peta_util import handle_batas, lengkapi_peta
     desa = gpd.read_file(gpkg).to_crs(CRS_UTM)
     if not set(KOLOM_BARU) <= set(desa.columns):
         raise ValueError("Kolom penduduk belum ada; jalankan tambah_ke_gpkg terlebih dahulu.")
@@ -129,15 +131,18 @@ def peta_sebaran_penduduk(gpkg: Path = GPKG, out_dir: Path = PETA_DIR, kec: Path
         ax.text(0.01, 0.99, "\n".join([f"{N_LABEL} kalurahan tertinggi"] + daftar), transform=ax.transAxes,
                 ha="left", va="top", fontsize=7, color="#18181b", linespacing=1.4,
                 bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="#a1a1aa", lw=0.5, alpha=0.95))
+        lengkapi_peta(ax, utara=(0.06, 0.68), lebar_batas=1.4)
         n_kelas = np.bincount(k, minlength=N_KELAS)
         ax.legend(handles=[Patch(facecolor=ramp[i], edgecolor="#a1a1aa", linewidth=0.4,
                                  label=f"{_fmt(b[i])} – {_fmt(b[i + 1])}  ({n_kelas[i]} desa)")
-                           for i in range(N_KELAS)],
+                           for i in range(N_KELAS)]
+                  + ([Line2D([], [], color="#3f3f46", linewidth=0.7, label="Batas kapanewon")] if batas_kec is not None else [])
+                  + [handle_batas(1.4)],
                   title=judul, loc="lower left", fontsize=7, title_fontsize=7.5, frameon=True, framealpha=0.9)
         ax.set_title(f"{judul} per kalurahan, Kabupaten Kulon Progo\n(total {_fmt(tot)} jiwa, {len(desa)} kalurahan)",
                      fontsize=10, color="#18181b")
         ax.set_axis_off()
-        fig.text(0.5, 0.012, "Kelas kuantil (jumlah desa per kelas ± sama). Garis gelap = batas kapanewon; nomor = peringkat "
+        fig.text(0.5, 0.012, "Kelas kuantil (jumlah desa per kelas ± sama). Nomor = peringkat "
                  f"{N_LABEL} kalurahan tertinggi."
                  + ("\nKepadatan = penduduk / luas poligon (EPSG:32749)." if nama == "kepadatan" else ""),
                  ha="center", va="bottom", fontsize=6.5, color="#52525b")

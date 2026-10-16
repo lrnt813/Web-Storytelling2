@@ -106,7 +106,8 @@ python -m scripts.export_bab4               # bangun ulang output_bab4/ dari has
 - K utama tabel Bab IV dan dashboard diatur di `pengaturan_hasil.json`.
 - Peta sebaran penduduk per desa: `python -m scripts.penduduk_desa --hanya-peta`.
 - Validasi manual TAS: `python -m scripts.lembar_validasi_TAS` (membuat lembar Excel), isi lembar, lalu
-  `python -m scripts.rekap_validasi_TAS`.
+  `python -m scripts.rekap_validasi_TAS`. Untuk membuat ulang peta validasi saja tanpa menimpa lembar yang sudah
+  diisi: `python -m scripts.lembar_validasi_TAS --hanya-peta`.
 
 ## 6. Masalah umum
 

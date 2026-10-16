@@ -1,6 +1,7 @@
 """Lembar validasi manual Titik Aman Semu v6 (TAS, aturan utama) untuk keempat level.
 
     python -m scripts.lembar_validasi_TAS
+    python -m scripts.lembar_validasi_TAS --hanya-peta   # buat ulang peta saja; lembar Excel yang sudah diisi tidak disentuh
 
 Keluaran (output_bab4/validasi/):
   validasi_TAS_v6.xlsx   lembar "Validasi TAS" (satu baris per grid TAS per level), "Hotspot" (DBSCAN 350 m pada
@@ -196,15 +197,18 @@ def _map(png, grid_geom, tes_pt, route, gxy, roads_lv, closed_lv, route_base=Non
     ax.set_aspect("equal")
     ax.set_xticks([])
     ax.set_yticks([])
+    from scripts.peta_util import lengkapi_peta
+    lengkapi_peta(ax, batas=False, luar=True)
     ax.set_title("ungu = grid TAS; bintang = TES terdekat; ··· garis lurus; biru = rute jaringan\n"
                  "oranye putus = ruas snapping; merah putus = ruas ditutup"
                  + ("; hijau tebal = rute Baseline" if route_base else ""), fontsize=6.3)
     fig.tight_layout()
-    fig.savefig(png)
+    fig.savefig(png, bbox_inches="tight", pad_inches=0.08)
     plt.close(fig)
 
 
-def build(out_dir: Path = VALIDASI_DIR, lembar_v5: Path = LEMBAR_V5):
+def build(out_dir: Path = VALIDASI_DIR, lembar_v5: Path = LEMBAR_V5, hanya_peta: bool = False):
+    """Peta per TAS dan lembar validasi. hanya_peta=True: hanya peta dibuat ulang (lembar Excel tidak ditulis)."""
     from pyproj import Transformer
     from backend import thesis as T
     from backend.engine import Cfg, load_data, load_road_network, road_closed_mask
@@ -272,6 +276,8 @@ def build(out_dir: Path = VALIDASI_DIR, lembar_v5: Path = LEMBAR_V5):
                 "_x": gxy[0], "_y": gxy[1],
             })
     df = pd.DataFrame(rows)
+    if hanya_peta:
+        return df, None
     v5 = pd.read_excel(lembar_v5, sheet_name=SHEET)
     df[list(KOLOM_ISI)] = prefill(df, v5)
     df["Valid"] = None
@@ -420,6 +426,10 @@ PETUNJUK = [
 
 
 if __name__ == "__main__":
+    if "--hanya-peta" in sys.argv[1:]:
+        d, _ = build(hanya_peta=True)
+        print(f"{len(d)} peta dibuat ulang di {VALIDASI_DIR / 'peta'}; lembar Excel tidak diubah")
+        sys.exit(0)
     d, h = build()
     print(d.groupby("level").size().reindex(["Baseline", "Rendah", "Sedang", "Tinggi"]).fillna(0).astype(int))
     print("status isian:", d["Status isian"].value_counts().to_dict())

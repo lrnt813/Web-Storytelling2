@@ -95,6 +95,7 @@ Langkah lengkap, cara memakai setiap fitur, dan pemecahan masalah: **[docs/PANDU
 │   ├── keputusan_k_v6.py, reproduksi_label_v6.py, metrik_finalisasi_v6.py, validasi_desc_n_sintetis.py
 │   ├── lembar_validasi_TAS.py, rekap_validasi_TAS.py, dampak_koreksi_snapping.py
 │   ├── penduduk_desa.py         Kolom penduduk dan peta sebaran penduduk per desa
+│   ├── peta_util.py             Batas kabupaten, arah utara, dan skala pada peta
 │   └── export_geometry.py       Geometri grid untuk frontend
 │
 ├── data/                        DATASET (lihat docs/DATASET.md)

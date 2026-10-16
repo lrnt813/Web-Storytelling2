@@ -603,3 +603,21 @@ Tidak ada perubahan pada model maupun hasil terkunci.
   (K = 2–10), sehingga memakan ± 2 jam (run 15 Oktober 2026: 1 jam 56 menit). Estimasi di README dan panduan diperbaiki.
 
   — *SELESAI*
+
+## M. Kelengkapan kartografis peta Bab IV
+
+Tidak ada perubahan pada model, hasil terkunci, maupun tabel (62 tabel dan isi `Tabel_Bab4.docx` identik).
+
+- **M-1. Peta tingkat kabupaten** (`output_bab4/peta/`: tipologi K2–K4, akses, TAS, perubahan TAS, atribusi banjir,
+  keanggotaan, penduduk) kini memuat **batas Kabupaten Kulon Progo** (gabungan batas kapanewon BIG), **arah utara**,
+  dan **skala batang**. Peta grid digambar pada EPSG:32749 (sebelumnya koordinat geografis EPSG:4326) agar skala benar;
+  bentuk wilayah sedikit berbeda dari versi lama karena proyeksi, bukan karena data. Modul bersama: `scripts/peta_util.py`.
+- **M-2. Peta lokal** (`output_bab4/validasi/peta/`, `output_bab4/dampak_koreksi_snapping/`) memuat arah utara dan skala di
+  bawah bingkai peta agar tidak menutupi grid, rute, atau TES. Batas kabupaten tidak digambar karena pada skala
+  sedekat itu jarang terlihat. Peta validasi dibuat ulang dengan `lembar_validasi_TAS --hanya-peta`; lembar
+  `validasi_TAS_v6.xlsx` yang sudah diisi tidak disentuh (checksum sama).
+- **M-3. Tidak dibuat ulang:** `output_bab4/diagnostik/ruas_tertutup_*.png` (diagnostik tahap v3; skrip pembuatnya tidak
+  pernah masuk repositori dan isinya menggambarkan atribut kelas lama, sehingga membuat ulang akan mengubah maknanya)
+  dan `output_bab4/finalisasi_v6/peta_data_sintetis.png` (data buatan, bukan peta geografis).
+
+  — *SELESAI*

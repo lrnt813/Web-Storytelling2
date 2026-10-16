@@ -73,6 +73,7 @@ def maps(rows, gdf, roads, pack, tes_xy_by_id):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from backend import thesis as T
+    from scripts.peta_util import lengkapi_peta
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("peta_*.png"):
         old.unlink()
@@ -105,12 +106,13 @@ def maps(rows, gdf, roads, pack, tes_xy_by_id):
             ax.set_aspect("equal")
             ax.set_xticks([])
             ax.set_yticks([])
+            lengkapi_peta(ax, batas=False, luar=True)
             ax.set_title(f"{lab}\nT_aktual {fmt(t_akt)} menit", fontsize=8)
         fig.suptitle(f"Grid {gi} (Baseline) — biru = rute jaringan; oranye putus = ruas snapping; ··· garis lurus",
                      fontsize=8)
         fig.tight_layout()
         png = OUT / f"peta_{gi}.png"
-        fig.savefig(png)
+        fig.savefig(png, bbox_inches="tight", pad_inches=0.08)
         plt.close(fig)
         files.append(png)
     return files
