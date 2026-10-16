@@ -832,63 +832,60 @@ def tables_k_compare(R, grid):
 
 
 # ── peta ────────────────────────────────────────────────────────────────────
+def _simpan_peta(path, judul, gambar, handles, judul_legenda=None):
+    """Satu peta kabupaten dengan tata letak baku (scripts.peta_util): peta berbingkai + panel mata angin, legenda,
+    dan skala. `gambar(ax)` menggambar isi peta."""
+    import matplotlib.pyplot as plt
+    from scripts import peta_util as PU
+    fig, (ax,), panel = PU.tata_letak()
+    gambar(ax)
+    PU.beri_ruang(ax)
+    PU.selesaikan(fig, [ax], panel, handles, judul_legenda)
+    PU.judul(fig, [ax], panel, judul)
+    fig.savefig(path, bbox_inches="tight", pad_inches=0.12)
+    plt.close(fig)
+
+
 def write_maps(R, grid, out_dir):
     import geopandas as gpd
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.patches import Patch
-    from scripts.peta_util import CRS_PETA, handle_batas, lengkapi_peta
+    from scripts.peta_util import CRS_PETA
     if not GEOM.exists():
         return
     g = gpd.read_file(GEOM).to_crs(CRS_PETA)[["id_grid", "geometry"]].merge(grid, on="id_grid", how="left")
     d = out_dir / "peta"
     d.mkdir(exist_ok=True)
+    lv = lambda key: R["levels"][key]["label_lengkap"]
+    n_ = lambda m: id_num(int(m.sum()), 0)
     for k in [int(x) for x in R["k_keluaran"]]:
         for key in LEVEL_ORDER:
             st = g[f"state_{key}_k{k}"].values
             ada = st < k                                  # grid Tergenang tidak diklasterkan → tidak digambar
-            fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
-            g[ada].plot(ax=ax, color=np.array(CLUSTER_COLORS)[st[ada]], linewidth=0)
-            lengkapi_peta(ax)
-            ax.set_axis_off()
-            ax.set_title(f"Tipologi SDWFCM K = {k} — {R['levels'][key]['label_lengkap']}", fontsize=9)
-            ax.legend(handles=[Patch(color=CLUSTER_COLORS[c], label=tip(c, k)) for c in range(k)] + [handle_batas()],
-                      title="Tipologi", loc="lower left", fontsize=7, title_fontsize=7)
-            fig.tight_layout()
-            fig.savefig(d / f"tipologi_K{k}_{key}.png")
-            plt.close(fig)
+            _simpan_peta(d / f"tipologi_K{k}_{key}.png", f"Tipologi SDWFCM K = {k} — {lv(key)}",
+                         lambda ax: g[ada].plot(ax=ax, color=np.array(CLUSTER_COLORS)[st[ada]], linewidth=0),
+                         [Patch(color=CLUSTER_COLORS[c], label=tip(c, k)) for c in range(k)], "Tipologi")
     akses_pal = {0: "#22c55e", 1: "#f97316", 2: "#0f172a", 3: TERGENANG_COLOR}
     for key in ("baseline", "sedang", "tinggi"):
         st = g[f"akses_{key}"].values
-        fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
-        g.plot(ax=ax, color=[akses_pal[int(v)] for v in st], linewidth=0)
-        lengkapi_peta(ax)
-        ax.set_axis_off()
-        ax.set_title(f"Kategori akses (batas 30 menit) — {R['levels'][key]['label_lengkap']}", fontsize=9)
-        ax.legend(handles=[Patch(color=akses_pal[c], label=f"{AKSES[c]} ({id_num(int((st == c).sum()), 0)})") for c in range(4)] + [handle_batas()],
-                  loc="lower left", fontsize=7)
-        fig.tight_layout()
-        fig.savefig(d / f"akses_{key}.png")
-        plt.close(fig)
+        _simpan_peta(d / f"akses_{key}.png", f"Kategori akses (batas 30 menit) — {lv(key)}",
+                     lambda ax: g.plot(ax=ax, color=[akses_pal[int(v)] for v in st], linewidth=0),
+                     [Patch(color=akses_pal[c], label=f"{AKSES[c]} ({n_(st == c)})") for c in range(4)],
+                     "Kategori akses (jumlah grid)")
     b0 = g["tas_status_baseline"].values
+    pal2 = {0: "#e5e7eb", 1: "#dc2626", 2: TERGENANG_COLOR, 3: "#0f172a", 4: "#f59e0b", 5: "#a855f7"}
+    lab2 = {1: "TAS baru akibat banjir", 2: "TAS hilang: jadi Tergenang", 3: f"TAS hilang: jadi {TES_TT}",
+            4: "TAS hilang: lainnya", 5: "TAS tetap", 0: "lainnya"}
     for key in ("sedang", "tinggi"):
         st = g[f"tas_status_{key}"].values
         cls = np.select([(b0 != 1) & (st == 1), (b0 == 1) & (st == 3), (b0 == 1) & (st == 2), (b0 == 1) & (st == 0),
                          (b0 == 1) & (st == 1)], [1, 2, 3, 4, 5], default=0)
-        pal2 = {0: "#e5e7eb", 1: "#dc2626", 2: TERGENANG_COLOR, 3: "#0f172a", 4: "#f59e0b", 5: "#a855f7"}
-        lab2 = {1: "TAS baru akibat banjir", 2: "TAS hilang: jadi Tergenang", 3: f"TAS hilang: jadi {TES_TT}",
-                4: "TAS hilang: lainnya", 5: "TAS tetap", 0: "lainnya"}
-        fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
-        g.plot(ax=ax, color=[pal2[int(v)] for v in cls], linewidth=0)
-        lengkapi_peta(ax)
-        ax.set_axis_off()
-        ax.set_title(f"Perubahan TAS terhadap Baseline — {R['levels'][key]['label_lengkap']}", fontsize=9)
-        ax.legend(handles=[Patch(color=pal2[c], label=f"{lab2[c]} ({id_num(int((cls == c).sum()), 0)})") for c in (1, 5, 2, 3, 4)] + [handle_batas()],
-                  loc="lower left", fontsize=7)
-        fig.tight_layout()
-        fig.savefig(d / f"tas_perubahan_{key}.png")
-        plt.close(fig)
+        _simpan_peta(d / f"tas_perubahan_{key}.png", f"Perubahan TAS terhadap Baseline — {lv(key)}",
+                     lambda ax: g.plot(ax=ax, color=[pal2[int(v)] for v in cls], linewidth=0),
+                     [Patch(color=pal2[c], label=f"{lab2[c]} ({n_(cls == c)})") for c in (1, 5, 2, 3, 4)]
+                     + [Patch(color=pal2[0], label="Grid lainnya")], "Perubahan TAS (jumlah grid)")
 
     pal3 = {"dipicu banjir": "#dc2626", "diperparah banjir": "#f59e0b", "tidak berubah": "#a855f7",
             "lainnya": "#0f172a"}
@@ -899,17 +896,11 @@ def write_maps(R, grid, out_dir):
         atr = g[col].astype(object).where(g[col].notna(), None)
         wet = g[f"tergenang_{key}"].values == 1
         colors = [pal3.get(a, TERGENANG_COLOR if w else "#e5e7eb") for a, w in zip(atr, wet)]
-        fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
-        g.plot(ax=ax, color=colors, linewidth=0)
-        lengkapi_peta(ax)
-        ax.set_axis_off()
-        ax.set_title(f"Atribusi banjir pada TAS — {R['levels'][key]['label_lengkap']}", fontsize=9)
-        ax.legend(handles=[Patch(color=pal3[a], label=f"{a} ({id_num(int((atr == a).sum()), 0)})") for a in ATRIBUSI]
-                  + [Patch(color=TERGENANG_COLOR, label="Tergenang"), Patch(color="#e5e7eb", label="bukan TAS"), handle_batas()],
-                  loc="lower left", fontsize=7)
-        fig.tight_layout()
-        fig.savefig(d / f"atribusi_banjir_{key}.png")
-        plt.close(fig)
+        _simpan_peta(d / f"atribusi_banjir_{key}.png", f"Atribusi banjir pada TAS — {lv(key)}",
+                     lambda ax: g.plot(ax=ax, color=colors, linewidth=0),
+                     [Patch(color=pal3[a], label=f"{a} ({n_(atr == a)})") for a in ATRIBUSI]
+                     + [Patch(color=TERGENANG_COLOR, label="Tergenang"), Patch(color="#e5e7eb", label="Bukan TAS")],
+                     "Atribusi banjir (jumlah TAS)")
 
     write_membership_maps(R, g, d, plt)
 
@@ -917,23 +908,19 @@ def write_maps(R, grid, out_dir):
     lab = {0: "Non-TAS", 1: "TAS", 2: TES_TT, 3: "Tergenang"}
     for key in LEVEL_ORDER:
         st = g[f"tas_status_{key}"].values
-        fig, ax = plt.subplots(figsize=(7, 8.5), dpi=120)
-        g.plot(ax=ax, color=[pal[int(s)] for s in st], linewidth=0)
-        lengkapi_peta(ax)
-        ax.set_axis_off()
-        ax.set_title(f"Titik Aman Semu (DI ≥ 2, T_ideal ≤ 5, T_aktual ≥ 30 menit) — {R['levels'][key]['label_lengkap']}",
-                     fontsize=9)
-        ax.legend(handles=[Patch(color=pal[s], label=f"{lab[s]} ({id_num(int((st == s).sum()), 0)})") for s in pal] + [handle_batas()],
-                  loc="lower left", fontsize=7)
-        fig.tight_layout()
-        fig.savefig(d / f"tas_{key}.png")
-        plt.close(fig)
+        _simpan_peta(d / f"tas_{key}.png", f"Titik Aman Semu — {lv(key)}",
+                     lambda ax: g.plot(ax=ax, color=[pal[int(s)] for s in st], linewidth=0),
+                     [Patch(color=pal[s], label=f"{lab[s]} ({n_(st == s)})") for s in pal],
+                     "Status TAS (jumlah grid)\nDI ≥ 2, T_ideal ≤ 5 menit,\nT_aktual ≥ 30 menit")
 
 
 def write_membership_maps(R, g, d, plt, k=4, klaster=(2, 3)):
     """Peta derajat keanggotaan fuzzy terkunci (u_c, K = 4) terhadap Tipologi 3 dan Tipologi 4, per level. Hanya
-    visualisasi dari thesis_pooled_results.csv.gz; grid Tergenang tidak digambar."""
-    from scripts.peta_util import handle_batas, lengkapi_peta
+    visualisasi dari thesis_pooled_results.csv.gz; grid Tergenang tidak digambar. Dua peta berdampingan dengan satu
+    panel (mata angin, skala warna bersama, legenda, skala batang)."""
+    from matplotlib.cm import ScalarMappable
+    from matplotlib.colors import Normalize
+    from scripts.peta_util import beri_ruang, selesaikan, tata_letak
     pool_f = LOCKED / "thesis_pooled_results.csv.gz"
     if str(k) not in R["model"] or not pool_f.exists():
         return
@@ -941,19 +928,22 @@ def write_membership_maps(R, g, d, plt, k=4, klaster=(2, 3)):
     pool = pd.read_csv(pool_f, usecols=["id_grid", "level"] + cols)
     for key in LEVEL_ORDER:
         sub = pool[pool["level"] == key].set_index("id_grid")
-        fig, axes = plt.subplots(1, len(klaster), figsize=(6.5 * len(klaster), 8), dpi=110)
+        fig, axes, panel = tata_letak(len(klaster), ukuran=(14, 7.6), lebar_panel=0.95)
         for ax, c, col in zip(axes, klaster, cols):
             val = g["id_grid"].map(sub[col])
             wet = val.isna()                              # Tergenang: tidak diklasterkan → tidak digambar
-            g[~wet].assign(u=val[~wet]).plot(ax=ax, column="u", cmap="viridis", vmin=0, vmax=1, linewidth=0,
-                                            legend=True, legend_kwds={"shrink": 0.6, "label": "derajat keanggotaan"})
-            lengkapi_peta(ax)
-            ax.legend(handles=[handle_batas()], loc="lower left", fontsize=7)
-            ax.set_axis_off()
-            ax.set_title(f"Keanggotaan terhadap Tipologi {c + 1} (K = {k})", fontsize=9)
-        fig.suptitle(f"{R['levels'][key]['label_lengkap']} (grid Tergenang tidak ditampilkan)", fontsize=9)
-        fig.tight_layout()
-        fig.savefig(d / f"keanggotaan_K{k}_{key}.png")
+            g[~wet].assign(u=val[~wet]).plot(ax=ax, column="u", cmap="viridis", vmin=0, vmax=1, linewidth=0)
+            beri_ruang(ax)
+            ax.set_title(f"Keanggotaan terhadap Tipologi {c + 1} (K = {k})", fontsize=9.5)
+        selesaikan(fig, axes, panel, [], None, legenda_y=0.7)
+        cax = panel["legenda"].inset_axes([0.1, 0.83, 0.8, 0.055])
+        cb = fig.colorbar(ScalarMappable(Normalize(0, 1), "viridis"), cax=cax, orientation="horizontal")
+        cb.ax.tick_params(labelsize=7)
+        cb.set_label("Derajat keanggotaan", fontsize=7.5, fontweight="bold")
+        cb.ax.xaxis.set_label_position("top")
+        fig.suptitle(f"Derajat keanggotaan SDWFCM K = {k} — {R['levels'][key]['label_lengkap']}\n"
+                     "(grid Tergenang tidak ditampilkan)", fontsize=10.5, fontweight="bold", y=0.975)
+        fig.savefig(d / f"keanggotaan_K{k}_{key}.png", bbox_inches="tight", pad_inches=0.12)
         plt.close(fig)
 
 

@@ -73,7 +73,7 @@ def maps(rows, gdf, roads, pack, tes_xy_by_id):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from backend import thesis as T
-    from scripts.peta_util import lengkapi_peta
+    from scripts import peta_util as PU
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("peta_*.png"):
         old.unlink()
@@ -87,7 +87,10 @@ def maps(rows, gdf, roads, pack, tes_xy_by_id):
         pts = [gxy, txy] + (old["xy"] if old else []) + (new["xy"] if new else [])
         x0, x1 = min(p[0] for p in pts) - 150, max(p[0] for p in pts) + 150
         y0, y1 = min(p[1] for p in pts) - 150, max(p[1] for p in pts) + 150
-        fig, axes = plt.subplots(1, 2, figsize=(9, 4.6), dpi=110)
+        x0, x1, y0, y1 = PU.sesuaikan_rasio(x0, x1, y0, y1, rmin=0.8)
+        tinggi = PU.tinggi_pas(12.5, (y1 - y0) / (x1 - x0), 2, lebar_peta=2.2, atas=0.86)
+        fig, axes, panel = PU.tata_letak(2, ukuran=(12.5, tinggi), dpi=120, lebar_peta=2.2, lebar_panel=1.0,
+                                         tinggi_panel=(1.3, 2.4, 0.95), atas=0.86)
         for ax, rt, lab, t_akt in ((axes[0], old, "v5 (snapping ke verteks)", r["T_aktual v5"]),
                                    (axes[1], new, "v6 (snapping ke ruas)", r["T_aktual v6"])):
             roads.cx[x0:x1, y0:y1].plot(ax=ax, color="#9ca3af", linewidth=0.6)
@@ -103,16 +106,12 @@ def maps(rows, gdf, roads, pack, tes_xy_by_id):
             ax.plot(*txy, marker="*", markersize=12, color="#16a34a")
             ax.set_xlim(x0, x1)
             ax.set_ylim(y0, y1)
-            ax.set_aspect("equal")
-            ax.set_xticks([])
-            ax.set_yticks([])
-            lengkapi_peta(ax, batas=False, luar=True)
-            ax.set_title(f"{lab}\nT_aktual {fmt(t_akt)} menit", fontsize=8)
-        fig.suptitle(f"Grid {gi} (Baseline) — biru = rute jaringan; oranye putus = ruas snapping; ··· garis lurus",
-                     fontsize=8)
-        fig.tight_layout()
+            ax.set_title(f"{lab}\nT_aktual {fmt(t_akt)} menit", fontsize=8.5)
+        PU.selesaikan(fig, axes, panel, PU.handles_rute(), "Keterangan", batas=False, fontsize_legenda=7)
+        PU.judul(fig, axes, panel, f"Rute grid {gi} ke TES terdekat (Baseline): sebelum dan sesudah koreksi snapping",
+                 fontsize=10, y=0.975)
         png = OUT / f"peta_{gi}.png"
-        fig.savefig(png, bbox_inches="tight", pad_inches=0.08)
+        fig.savefig(png, bbox_inches="tight", pad_inches=0.1)
         plt.close(fig)
         files.append(png)
     return files

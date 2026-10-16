@@ -104,7 +104,7 @@ def peta_sebaran_penduduk(gpkg: Path = GPKG, out_dir: Path = PETA_DIR, kec: Path
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch
-    from scripts.peta_util import handle_batas, lengkapi_peta
+    from scripts import peta_util as PU
     desa = gpd.read_file(gpkg).to_crs(CRS_UTM)
     if not set(KOLOM_BARU) <= set(desa.columns):
         raise ValueError("Kolom penduduk belum ada; jalankan tambah_ke_gpkg terlebih dahulu.")
@@ -117,7 +117,7 @@ def peta_sebaran_penduduk(gpkg: Path = GPKG, out_dir: Path = PETA_DIR, kec: Path
         v = desa[kol].values
         b = kelas_kuantil(v)
         k = np.clip(np.searchsorted(b, v, side="right") - 1, 0, N_KELAS - 1)
-        fig, ax = plt.subplots(figsize=(7.2, 8.4), dpi=150)
+        fig, (ax,), panel = PU.tata_letak(ukuran=(10.4, 8.2), dpi=150, tinggi_panel=(1.0, 1.75, 0.75), info=1.35)
         desa.plot(ax=ax, color=np.array(ramp)[k], edgecolor="white", linewidth=0.5)
         if batas_kec is not None:
             batas_kec.boundary.plot(ax=ax, color="#3f3f46", linewidth=0.7)
@@ -128,27 +128,26 @@ def peta_sebaran_penduduk(gpkg: Path = GPKG, out_dir: Path = PETA_DIR, kec: Path
             ax.annotate(str(rank), (p.x, p.y), fontsize=6.5, fontweight="bold", color="#18181b", ha="center",
                         va="center", bbox=dict(boxstyle="circle,pad=0.25", fc="white", ec="#18181b", lw=0.6))
             daftar.append(f"{rank}. {r[KOLOM_NAMA]}: {_fmt(r[kol])}")
-        ax.text(0.01, 0.99, "\n".join([f"{N_LABEL} kalurahan tertinggi"] + daftar), transform=ax.transAxes,
-                ha="left", va="top", fontsize=7, color="#18181b", linespacing=1.4,
-                bbox=dict(boxstyle="round,pad=0.4", fc="white", ec="#a1a1aa", lw=0.5, alpha=0.95))
-        lengkapi_peta(ax, utara=(0.06, 0.68), lebar_batas=1.4)
+        PU.beri_ruang(ax)
         n_kelas = np.bincount(k, minlength=N_KELAS)
-        ax.legend(handles=[Patch(facecolor=ramp[i], edgecolor="#a1a1aa", linewidth=0.4,
-                                 label=f"{_fmt(b[i])} – {_fmt(b[i + 1])}  ({n_kelas[i]} desa)")
-                           for i in range(N_KELAS)]
-                  + ([Line2D([], [], color="#3f3f46", linewidth=0.7, label="Batas kapanewon")] if batas_kec is not None else [])
-                  + [handle_batas(1.4)],
-                  title=judul, loc="lower left", fontsize=7, title_fontsize=7.5, frameon=True, framealpha=0.9)
-        ax.set_title(f"{judul} per kalurahan, Kabupaten Kulon Progo\n(total {_fmt(tot)} jiwa, {len(desa)} kalurahan)",
-                     fontsize=10, color="#18181b")
-        ax.set_axis_off()
-        fig.text(0.5, 0.012, "Kelas kuantil (jumlah desa per kelas ± sama). Nomor = peringkat "
-                 f"{N_LABEL} kalurahan tertinggi."
-                 + ("\nKepadatan = penduduk / luas poligon (EPSG:32749)." if nama == "kepadatan" else ""),
-                 ha="center", va="bottom", fontsize=6.5, color="#52525b")
-        fig.tight_layout(rect=(0, 0.03, 1, 1))
+        handles = [Patch(facecolor=ramp[i], edgecolor="#a1a1aa", linewidth=0.4,
+                         label=f"{_fmt(b[i])} – {_fmt(b[i + 1])} ({n_kelas[i]} desa)") for i in range(N_KELAS)]
+        if batas_kec is not None:
+            handles.append(Line2D([], [], color="#3f3f46", linewidth=0.7, label="Batas kapanewon"))
+        PU.selesaikan(fig, [ax], panel, handles, judul)
+        info = panel["info"]
+        info.text(0.07, 0.95, f"{N_LABEL} kalurahan tertinggi", ha="left", va="top", fontsize=8, fontweight="bold",
+                  transform=info.transAxes)
+        info.text(0.07, 0.78, "\n".join(daftar), ha="left", va="top", fontsize=7.5, linespacing=1.5,
+                  transform=info.transAxes)
+        PU.judul(fig, [ax], panel, f"{judul} per kalurahan, Kabupaten Kulon Progo\n"
+                 f"(total {_fmt(tot)} jiwa, {len(desa)} kalurahan)", y=0.975)
+        fig.text((ax.get_position().x0 + panel["skala"].get_position().x1) / 2, 0.012,
+                 "Kelas kuantil (jumlah desa per kelas ± sama). Nomor pada peta = peringkat kalurahan tertinggi."
+                 + (" Kepadatan = penduduk / luas poligon." if nama == "kepadatan" else ""),
+                 ha="center", va="bottom", fontsize=6.8, color="#52525b")
         f = out_dir / f"penduduk_desa_{nama}.png"
-        fig.savefig(f)
+        fig.savefig(f, bbox_inches="tight", pad_inches=0.12)
         plt.close(fig)
         files.append(f)
     return files

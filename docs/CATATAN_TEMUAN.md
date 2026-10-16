@@ -608,14 +608,21 @@ Tidak ada perubahan pada model maupun hasil terkunci.
 
 Tidak ada perubahan pada model, hasil terkunci, maupun tabel (62 tabel dan isi `Tabel_Bab4.docx` identik).
 
-- **M-1. Peta tingkat kabupaten** (`output_bab4/peta/`: tipologi K2–K4, akses, TAS, perubahan TAS, atribusi banjir,
-  keanggotaan, penduduk) kini memuat **batas Kabupaten Kulon Progo** (gabungan batas kapanewon BIG), **arah utara**,
-  dan **skala batang**. Peta grid digambar pada EPSG:32749 (sebelumnya koordinat geografis EPSG:4326) agar skala benar;
-  bentuk wilayah sedikit berbeda dari versi lama karena proyeksi, bukan karena data. Modul bersama: `scripts/peta_util.py`.
-- **M-2. Peta lokal** (`output_bab4/validasi/peta/`, `output_bab4/dampak_koreksi_snapping/`) memuat arah utara dan skala di
-  bawah bingkai peta agar tidak menutupi grid, rute, atau TES. Batas kabupaten tidak digambar karena pada skala
-  sedekat itu jarang terlihat. Peta validasi dibuat ulang dengan `lembar_validasi_TAS --hanya-peta`; lembar
-  `validasi_TAS_v6.xlsx` yang sudah diisi tidak disentuh (checksum sama).
+- **M-1. Tata letak baku** (`scripts/peta_util.py`): peta di dalam bingkai (neatline) dan satu **panel samping**
+  berbingkai berisi, dari atas ke bawah, **mata angin delapan arah** (U, T, S, B + arah antara), **legenda**, dan
+  **skala batang** dengan keterangan proyeksi (UTM zona 49S, WGS 84). Elemen pendukung tidak digambar di atas peta
+  sehingga tidak menutupi isi dan tidak berdempetan; label legenda dibungkus otomatis sesuai lebar panel; skala
+  dihitung dari ukuran peta setelah tata letak final (skala grafis tetap benar bila gambar diperbesar/diperkecil).
+- **M-2. Peta tingkat kabupaten** (`output_bab4/peta/`: tipologi K2–K4, akses, TAS, perubahan TAS, atribusi banjir,
+  keanggotaan, penduduk) memuat **batas Kabupaten Kulon Progo** (gabungan batas kapanewon BIG) dan entri legendanya.
+  Peta grid digambar pada EPSG:32749 (sebelumnya EPSG:4326) agar skala benar; bentuk wilayah sedikit berbeda karena
+  proyeksi, bukan karena data. Peta keanggotaan memakai satu skala warna bersama di panel; peta penduduk menaruh
+  daftar 5 kalurahan tertinggi di panel.
+- **M-2b. Peta lokal** (`output_bab4/validasi/peta/`, `output_bab4/dampak_koreksi_snapping/`) memakai tata letak yang
+  sama; keterangan simbol yang sebelumnya ditulis sebagai judul panjang kini menjadi legenda. Batas peta diperluas
+  secukupnya (pusat tetap) agar rasio tinggi/lebar wajar dan bingkai peta setinggi panel. Batas kabupaten tidak
+  digambar karena pada skala sedekat itu jarang terlihat. Peta validasi dibuat ulang dengan
+  `lembar_validasi_TAS --hanya-peta`; lembar `validasi_TAS_v6.xlsx` yang sudah diisi tidak disentuh (checksum sama).
 - **M-3. Tidak dibuat ulang:** `output_bab4/diagnostik/ruas_tertutup_*.png` (diagnostik tahap v3; skrip pembuatnya tidak
   pernah masuk repositori dan isinya menggambarkan atribut kelas lama, sehingga membuat ulang akan mengubah maknanya)
   dan `output_bab4/finalisasi_v6/peta_data_sintetis.png` (data buatan, bukan peta geografis).

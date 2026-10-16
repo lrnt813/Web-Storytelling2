@@ -173,7 +173,11 @@ def _map(png, grid_geom, tes_pt, route, gxy, roads_lv, closed_lv, route_base=Non
     xs, ys = [p[0] for p in pts], [p[1] for p in pts]
     pad = 150.0
     x0, x1, y0, y1 = min(xs) - pad, max(xs) + pad, min(ys) - pad, max(ys) + pad
-    fig, ax = plt.subplots(figsize=(4.2, 4.2), dpi=110)
+    from scripts import peta_util as PU
+    x0, x1, y0, y1 = PU.sesuaikan_rasio(x0, x1, y0, y1)
+    tinggi = PU.tinggi_pas(8.2, (y1 - y0) / (x1 - x0), lebar_peta=2.25, atas=0.88)
+    fig, (ax,), panel = PU.tata_letak(ukuran=(8.2, tinggi), dpi=120, lebar_peta=2.25, lebar_panel=1.0,
+                                      tinggi_panel=(1.3, 2.6, 0.95), atas=0.88)
     sub = roads_lv.cx[x0:x1, y0:y1]
     sc = closed_lv[sub.index.values]
     if (~sc).any():
@@ -194,16 +198,15 @@ def _map(png, grid_geom, tes_pt, route, gxy, roads_lv, closed_lv, route_base=Non
     ax.plot(*tes_pt, marker="*", markersize=12, color="#16a34a")
     ax.set_xlim(x0, x1)
     ax.set_ylim(y0, y1)
-    ax.set_aspect("equal")
-    ax.set_xticks([])
-    ax.set_yticks([])
-    from scripts.peta_util import lengkapi_peta
-    lengkapi_peta(ax, batas=False, luar=True)
-    ax.set_title("ungu = grid TAS; bintang = TES terdekat; ··· garis lurus; biru = rute jaringan\n"
-                 "oranye putus = ruas snapping; merah putus = ruas ditutup"
-                 + ("; hijau tebal = rute Baseline" if route_base else ""), fontsize=6.3)
-    fig.tight_layout()
-    fig.savefig(png, bbox_inches="tight", pad_inches=0.08)
+    handles = PU.handles_rute(baseline=True)
+    if not route_base:
+        handles = handles[:-1]
+    if not sc.any():
+        handles = [h for h in handles if h.get_label() != "Ruas ditutup banjir"]
+    PU.selesaikan(fig, [ax], panel, handles, "Keterangan", batas=False, fontsize_legenda=7)
+    level, _, gid = Path(png).stem.partition("_")
+    PU.judul(fig, [ax], panel, f"Titik Aman Semu: grid {gid}, level {level.capitalize()}", fontsize=9.5, y=0.955)
+    fig.savefig(png, bbox_inches="tight", pad_inches=0.1)
     plt.close(fig)
 
 
