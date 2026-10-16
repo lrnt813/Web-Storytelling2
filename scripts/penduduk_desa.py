@@ -39,9 +39,6 @@ CRS_UTM = "EPSG:32749"
 KOLOM_NAMA = "NAMOBJ"
 KOLOM_BARU = ["penduduk", "luas_km2", "kepadatan_jiwa_km2"]
 N_KELAS = 5
-# Ramp sekuensial satu hue, terang → gelap (panel 1 biru; panel 2 oranye = slot kategorikal berikutnya).
-BIRU = ["#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"]
-ORANYE = ["#fde3d6", "#f8b89a", "#f28d63", "#eb6834", "#b8481d"]
 
 
 def normalisasi_nama(s: str) -> str:
@@ -91,64 +88,66 @@ def _fmt(x: float) -> str:
     return f"{x:,.0f}".replace(",", ".")
 
 
-PANEL = {"jumlah": ("penduduk", "Jumlah penduduk (jiwa)", BIRU),
-         "kepadatan": ("kepadatan_jiwa_km2", "Kepadatan penduduk (jiwa/km²)", ORANYE)}
+# Warna kelas: scripts/peta_util.PENDUDUK (gradasi satu warna terang → gelap; biru tidak dipakai karena khusus genangan)
+PANEL = {"jumlah": ("penduduk", "Jumlah penduduk", "jiwa"),
+         "kepadatan": ("kepadatan_jiwa_km2", "Kepadatan penduduk", "jiwa/km²")}
 
 
 def peta_sebaran_penduduk(gpkg: Path = GPKG, out_dir: Path = PETA_DIR, kec: Path = KEC) -> list:
-    """Dua peta choropleth terpisah per kalurahan (5 kelas kuantil, label 5 kalurahan tertinggi):
-    penduduk_desa_jumlah.png dan penduduk_desa_kepadatan.png. Returns daftar berkas."""
+    """Dua peta choropleth terpisah per kalurahan (5 kelas kuantil, nomor 5 kalurahan tertinggi):
+    penduduk_desa_jumlah.png dan penduduk_desa_kepadatan.png, dengan tata letak scripts/peta_util.py (sama dengan
+    peta kabupaten Bab IV). Returns daftar berkas."""
     import geopandas as gpd
     import matplotlib
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from matplotlib.lines import Line2D
-    from matplotlib.patches import Patch
     from scripts import peta_util as PU
     desa = gpd.read_file(gpkg).to_crs(CRS_UTM)
     if not set(KOLOM_BARU) <= set(desa.columns):
         raise ValueError("Kolom penduduk belum ada; jalankan tambah_ke_gpkg terlebih dahulu.")
-    batas_kec = gpd.read_file(kec).to_crs(CRS_UTM) if Path(kec).exists() else None
     tot = int(desa["penduduk"].sum())
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    x0, y0, x1, y1 = desa.total_bounds
+    pad = 900.0
+    rasio = (y1 - y0 + 2 * pad) / (x1 - x0 + 2 * pad)
+    batas = PU.sesuaikan_rasio(x0 - pad, x1 + pad, y0 - pad, y1 + pad, rasio, rasio)
     files = []
-    for nama, (kol, judul, ramp) in PANEL.items():
+    for nama, (kol, judul, satuan) in PANEL.items():
+        ramp = PU.PENDUDUK[nama]
         v = desa[kol].values
         b = kelas_kuantil(v)
         k = np.clip(np.searchsorted(b, v, side="right") - 1, 0, N_KELAS - 1)
-        fig, (ax,), panel = PU.tata_letak(ukuran=(10.4, 8.2), dpi=150, tinggi_panel=(1.0, 1.75, 0.75), info=1.35)
-        desa.plot(ax=ax, color=np.array(ramp)[k], edgecolor="white", linewidth=0.5)
-        if batas_kec is not None:
-            batas_kec.boundary.plot(ax=ax, color="#3f3f46", linewidth=0.7)
+        fig, (ax,), panel = PU.kanvas(1, rasio)
+        desa.plot(ax=ax, color=np.array(ramp)[k], edgecolor="white", linewidth=0.3, zorder=1)
+        if Path(kec).exists():
+            gpd.read_file(kec).to_crs(CRS_UTM).boundary.plot(ax=ax, color=PU.WARNA["batas_kec"],
+                                                             linewidth=PU.LEBAR_BATAS_KEC, zorder=5)
+        b_kab = desa.dissolve().boundary
+        b_kab.plot(ax=ax, color=PU.WARNA["batas_kab"], linewidth=PU.LEBAR_BATAS_KAB, zorder=6)
         top = desa.nlargest(N_LABEL, kol)
-        daftar = []
-        for rank, (_, r) in enumerate(top.iterrows(), start=1):   # penanda nomor (tidak bertumpuk) + daftar
+        peringkat = []
+        for rank, (_, r) in enumerate(top.iterrows(), start=1):   # nomor peringkat di peta + daftar di legenda
             p = r.geometry.representative_point()
-            ax.annotate(str(rank), (p.x, p.y), fontsize=6.5, fontweight="bold", color="#18181b", ha="center",
-                        va="center", bbox=dict(boxstyle="circle,pad=0.25", fc="white", ec="#18181b", lw=0.6))
-            daftar.append(f"{rank}. {r[KOLOM_NAMA]}: {_fmt(r[kol])}")
-        PU.beri_ruang(ax)
+            ax.annotate(str(rank), (p.x, p.y), fontsize=PU.FS_TEKNIS, fontweight="bold", color=PU.WARNA_TEKS,
+                        ha="center", va="center", zorder=8,
+                        bbox=dict(boxstyle="circle,pad=0.22", fc="white", ec=PU.WARNA_TEKS, lw=0.5))
+            peringkat.append(PU.titik(PU.WARNA_TEKS, f"{r[KOLOM_NAMA]} — {_fmt(r[kol])}", penanda=f"${rank}$",
+                                      ukuran=6))
+        PU.atur_batas(ax, *batas)
         n_kelas = np.bincount(k, minlength=N_KELAS)
-        handles = [Patch(facecolor=ramp[i], edgecolor="#a1a1aa", linewidth=0.4,
-                         label=f"{_fmt(b[i])} – {_fmt(b[i + 1])} ({n_kelas[i]} desa)") for i in range(N_KELAS)]
-        if batas_kec is not None:
-            handles.append(Line2D([], [], color="#3f3f46", linewidth=0.7, label="Batas kapanewon"))
-        PU.selesaikan(fig, [ax], panel, handles, judul)
-        info = panel["info"]
-        info.text(0.07, 0.95, f"{N_LABEL} kalurahan tertinggi", ha="left", va="top", fontsize=8, fontweight="bold",
-                  transform=info.transAxes)
-        info.text(0.07, 0.78, "\n".join(daftar), ha="left", va="top", fontsize=7.5, linespacing=1.5,
-                  transform=info.transAxes)
-        PU.judul(fig, [ax], panel, f"{judul} per kalurahan, Kabupaten Kulon Progo\n"
-                 f"(total {_fmt(tot)} jiwa, {len(desa)} kalurahan)", y=0.975)
-        fig.text((ax.get_position().x0 + panel["skala"].get_position().x1) / 2, 0.012,
-                 "Kelas kuantil (jumlah desa per kelas ± sama). Nomor pada peta = peringkat kalurahan tertinggi."
-                 + (" Kepadatan = penduduk / luas poligon." if nama == "kepadatan" else ""),
-                 ha="center", va="bottom", fontsize=6.8, color="#52525b")
+        kelas = [PU.kotak(ramp[i], f"{_fmt(b[i])} – {_fmt(b[i + 1])} ({n_kelas[i]} kalurahan)") for i in range(N_KELAS)]
+        PU.judul(fig, f"{judul} per kalurahan",
+                 f"Kabupaten Kulon Progo · total {_fmt(tot)} jiwa, {len(desa)} kalurahan · 5 kelas kuantil "
+                 "(jumlah kalurahan per kelas ± sama)"
+                 + (" · kepadatan = penduduk / luas poligon kalurahan" if nama == "kepadatan" else ""))
+        y_blok = PU.blok_bawah(panel, ax, "Sumber: data penduduk per kalurahan; batas administrasi BIG, skala "
+                                          "1:10.000")
+        y = PU.legenda(panel, [(f"{judul} ({satuan})", kelas),
+                               (f"{N_LABEL} kalurahan tertinggi", peringkat),
+                               ("Referensi", [PU.handle_batas_kec(), PU.handle_batas_kab()])])
+        PU.periksa_ruang(y, y_blok, f"penduduk_desa_{nama}")
         f = out_dir / f"penduduk_desa_{nama}.png"
-        fig.savefig(f, bbox_inches="tight", pad_inches=0.12)
-        plt.close(fig)
+        PU.simpan(fig, f)
         files.append(f)
     return files
 

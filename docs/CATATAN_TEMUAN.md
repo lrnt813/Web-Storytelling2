@@ -628,3 +628,36 @@ Tidak ada perubahan pada model, hasil terkunci, maupun tabel (62 tabel dan isi `
   dan `output_bab4/finalisasi_v6/peta_data_sintetis.png` (data buatan, bukan peta geografis).
 
   — *SELESAI*
+
+## N. Sistem desain kartografi (perombakan visual seluruh peta)
+
+Tidak ada perubahan pada data, geometri, kelas, ambang, CRS, maupun hasil terkunci; 62 tabel dan isi
+`Tabel_Bab4.docx` identik; lembar validasi tidak disentuh. Hanya simbolisasi, tata letak, tipografi, dan legenda.
+
+- **N-1. Sistem desain bersama** (`scripts/peta_util.py`): lebar figure tetap 7 inci, 300 dpi, tanpa pemangkasan
+  otomatis (peta sejenis berukuran identik); satu keluarga huruf dengan hierarki judul/subjudul/judul kelompok/label/
+  keterangan teknis; peta kabupaten memakai batas tampilan yang sama; panel kanan berisi legenda berkelompok, arah
+  utara sederhana, skala batang, proyeksi, dan sumber. Arah utara delapan arah pada putaran sebelumnya diganti panah
+  utara sederhana sesuai permintaan terbaru (elemen pendukung tidak boleh lebih dominan daripada peta).
+- **N-2. Warna semantik** (diuji jarak OKLab untuk penglihatan normal, deuteranopia, protanopia): biru hanya untuk
+  genangan dan ruas ditutup banjir; tipologi, kategori akses, dan kelas penduduk memakai gradasi terang → gelap
+  (ColorBrewer); TAS magenta di semua peta; "tidak terjangkau" cokelat tua (bukan hitam, karena batas wilayah gelap);
+  "lainnya" abu-abu tua netral. Peta penduduk jumlah tidak lagi biru (diganti ungu) agar tidak tertukar dengan genangan.
+  Satu pasangan masih di bawah ambang ketat: "Menjadi Non-TAS" vs "Menjadi TES terdekat tidak terjangkau" pada peta
+  perubahan TAS (ΔE deuteranopia ≈ 10; masing-masing 3 dan 7 grid); dibedakan juga oleh label legenda.
+- **N-3. Area kosong diberi makna.** Grid analisis hanya mencakup ± 39% luas kabupaten; area kabupaten di luar grid
+  kini diisi abu-abu sangat muda ("Di luar grid analisis"). Pada peta tipologi dan keanggotaan, grid Tergenang tetap
+  tidak digambar (keputusan K-4) dan menyatu dengan kelas netral "Tidak diklasterkan: di luar grid analisis atau grid
+  Tergenang" (jumlah grid Tergenang dicantumkan), sehingga tidak ada lagi area putih yang ambigu.
+- **N-4. Legenda** memuat jumlah grid dan persentase (dari 22.673 grid) yang dihitung dari data, dikelompokkan
+  menjadi kategori utama, status/kondisi tambahan, dan referensi. Dua label diperjelas tanpa mengubah data:
+  "TAS baru akibat banjir" → "TAS baru (bukan TAS di Baseline)" (kelas ini tidak menguji penyebab; penyebab ada pada
+  peta atribusi), dan "TAS hilang: lainnya" → "Menjadi Non-TAS" (definisi kelasnya memang TAS Baseline yang berstatus
+  Non-TAS). Subjudul peta atribusi tidak lagi menyebut "TES terdekat sama dengan Baseline" karena kategori "lainnya"
+  justru mencakup TES yang berubah.
+- **N-5. Peta TAS** menebalkan tepi grid TAS (warna yang sama) agar kategori yang jarang tetap terlihat saat
+  diperkecil ke halaman A4; geometri tidak berubah.
+- **N-6. Untuk diperiksa (data, bukan visual):** 38 grid berpusat sedikit di luar batas kabupaten BIG (perbedaan
+  sumber batas/grid di tepi wilayah). Tidak diubah; perlu dicek bila dianggap penting.
+
+  — *SELESAI*

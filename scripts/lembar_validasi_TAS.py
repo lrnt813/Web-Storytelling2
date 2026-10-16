@@ -165,49 +165,58 @@ def gmaps_satelit(lat, lon) -> str:
     return f"https://www.google.com/maps/@{lat:.6f},{lon:.6f},18z/data=!3m1!1e3"
 
 
-def _map(png, grid_geom, tes_pt, route, gxy, roads_lv, closed_lv, route_base=None):
+RASIO_PETA_LOKAL = 0.72          # rasio tinggi/lebar bingkai peta lokal (semua peta validasi berukuran sama)
+
+
+def _map(png, grid_geom, tes_pt, route, gxy, roads_lv, closed_lv, route_base=None, judul_utama=None, subjudul=""):
+    """Peta lokal satu grid TAS: jalan, ruas ditutup, grid, TES terdekat, garis lurus, rute jaringan (+ ruas
+    snapping), dan rute Baseline bila ada. Tata letak scripts/peta_util.py; batas tampilan diperluas (pusat tetap)
+    ke rasio bingkai yang sama untuk semua peta."""
     import matplotlib
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    from scripts import peta_util as PU
+    W = PU.WARNA
     pts = [gxy, tes_pt] + (route["xy"] if route else []) + (route_base["xy"] if route_base else [])
     xs, ys = [p[0] for p in pts], [p[1] for p in pts]
     pad = 150.0
-    x0, x1, y0, y1 = min(xs) - pad, max(xs) + pad, min(ys) - pad, max(ys) + pad
-    from scripts import peta_util as PU
-    x0, x1, y0, y1 = PU.sesuaikan_rasio(x0, x1, y0, y1)
-    tinggi = PU.tinggi_pas(8.2, (y1 - y0) / (x1 - x0), lebar_peta=2.25, atas=0.88)
-    fig, (ax,), panel = PU.tata_letak(ukuran=(8.2, tinggi), dpi=120, lebar_peta=2.25, lebar_panel=1.0,
-                                      tinggi_panel=(1.3, 2.6, 0.95), atas=0.88)
+    x0, x1, y0, y1 = PU.sesuaikan_rasio(min(xs) - pad, max(xs) + pad, min(ys) - pad, max(ys) + pad,
+                                        RASIO_PETA_LOKAL, RASIO_PETA_LOKAL)
+    fig, (ax,), panel = PU.kanvas(1, RASIO_PETA_LOKAL)
     sub = roads_lv.cx[x0:x1, y0:y1]
     sc = closed_lv[sub.index.values]
     if (~sc).any():
-        sub[~sc].plot(ax=ax, color="#9ca3af", linewidth=0.6)
+        sub[~sc].plot(ax=ax, color=W["jalan"], linewidth=0.5, zorder=1)
     if sc.any():
-        sub[sc].plot(ax=ax, color="#dc2626", linewidth=0.8, linestyle="--")
-    for poly in getattr(grid_geom, "geoms", [grid_geom]):
-        ax.fill(*poly.exterior.xy, facecolor="#a855f7", alpha=0.35, edgecolor="#6b21a8", linewidth=1)
-    ax.plot([gxy[0], tes_pt[0]], [gxy[1], tes_pt[1]], color="#111827", linestyle=":", linewidth=1.2)
+        sub[sc].plot(ax=ax, color=W["jalan_tutup"], linewidth=0.8, linestyle=(0, (3, 2)), zorder=2)
     if route_base:
         net = route_base["xy"][1:-1]
-        ax.plot([p[0] for p in net], [p[1] for p in net], color="#0d9488", linewidth=2.6, alpha=0.55)
+        ax.plot([p[0] for p in net], [p[1] for p in net], color=W["rute_baseline"], linewidth=3.2, alpha=0.45,
+                solid_capstyle="round", zorder=3)
+    for poly in getattr(grid_geom, "geoms", [grid_geom]):
+        ax.fill(*poly.exterior.xy, facecolor=W["tas"], alpha=0.35, edgecolor=W["tas"], linewidth=1.0, zorder=4)
+    ax.plot([gxy[0], tes_pt[0]], [gxy[1], tes_pt[1]], color=PU.WARNA_TEKS, linestyle=(0, (1, 1.5)), linewidth=1.0,
+            zorder=5)
     if route:
         p = route["xy"]
-        ax.plot([q[0] for q in p[1:-1]], [q[1] for q in p[1:-1]], color="#2563eb", linewidth=1.6)
+        ax.plot([q[0] for q in p[1:-1]], [q[1] for q in p[1:-1]], color=W["rute"], linewidth=1.6, zorder=6)
         for a_, b_ in ((p[0], p[1]), (p[-2], p[-1])):                     # ruas snapping
-            ax.plot([a_[0], b_[0]], [a_[1], b_[1]], color="#f97316", linewidth=1.4, linestyle="--")
-    ax.plot(*tes_pt, marker="*", markersize=12, color="#16a34a")
-    ax.set_xlim(x0, x1)
-    ax.set_ylim(y0, y1)
-    handles = PU.handles_rute(baseline=True)
-    if not route_base:
-        handles = handles[:-1]
-    if not sc.any():
-        handles = [h for h in handles if h.get_label() != "Ruas ditutup banjir"]
-    PU.selesaikan(fig, [ax], panel, handles, "Keterangan", batas=False, fontsize_legenda=7)
+            ax.plot([a_[0], b_[0]], [a_[1], b_[1]], color=W["rute"], linewidth=1.1, linestyle=(0, (3, 1.5)), zorder=6)
+    ax.plot(*tes_pt, marker="*", markersize=12, color=W["tes"], markeredgecolor=PU.WARNA_TEKS,
+            markeredgewidth=0.5, zorder=7)
+    PU.atur_batas(ax, x0, x1, y0, y1)
+    objek = [PU.kotak(W["tas"], "Grid TAS", alpha=0.6), PU.titik(W["tes"], "TES terdekat (garis lurus)", ukuran=9),
+             PU.garis(PU.WARNA_TEKS, "Garis lurus grid ke TES", 1.0, (0, (1, 1.5))),
+             PU.garis(W["rute"], "Rute jaringan jalan", 1.6), PU.garis(W["rute"], "Ruas snapping", 1.1, (0, (3, 1.5)))]
+    if route_base:
+        objek.append(PU.garis(W["rute_baseline"], "Rute Baseline ke TES yang sama", 3.2, alpha=0.45))
+    jalan = [PU.garis(W["jalan"], "Jalan", 0.8)]
+    if sc.any():
+        jalan.append(PU.garis(W["jalan_tutup"], "Ruas ditutup banjir", 0.9, (0, (3, 2))))
     level, _, gid = Path(png).stem.partition("_")
-    PU.judul(fig, [ax], panel, f"Titik Aman Semu: grid {gid}, level {level.capitalize()}", fontsize=9.5, y=0.955)
-    fig.savefig(png, bbox_inches="tight", pad_inches=0.1)
-    plt.close(fig)
+    PU.judul(fig, judul_utama or f"Rute grid TAS {gid} ke TES terdekat", subjudul or f"Level {level.capitalize()}")
+    y_blok = PU.blok_bawah(panel, ax, "Sumber: hasil analisis (data/locked); jaringan jalan OpenStreetMap")
+    PU.periksa_ruang(PU.legenda(panel, [("Rute dan objek", objek), ("Jaringan jalan", jalan)]), y_blok, Path(png).name)
+    PU.simpan(fig, png)
 
 
 def build(out_dir: Path = VALIDASI_DIR, lembar_v5: Path = LEMBAR_V5, hanya_peta: bool = False):
@@ -215,6 +224,7 @@ def build(out_dir: Path = VALIDASI_DIR, lembar_v5: Path = LEMBAR_V5, hanya_peta:
     from pyproj import Transformer
     from backend import thesis as T
     from backend.engine import Cfg, load_data, load_road_network, road_closed_mask
+    from scripts import peta_util as PU
     logging.basicConfig(level=logging.WARNING)
     R = json.loads((LOCKED / "thesis_results.json").read_text(encoding="utf-8"))
     grid = pd.read_csv(LOCKED / "thesis_grid_results.csv.gz")
@@ -260,8 +270,13 @@ def build(out_dir: Path = VALIDASI_DIR, lembar_v5: Path = LEMBAR_V5, hanya_peta:
             lon_g, lat_g = to_wgs.transform(*gxy)
             lon_t, lat_t = to_wgs.transform(*txy[j])
             png = peta_dir / f"{key}_{int(grid.at[gi, 'id_grid'])}.png"
-            _map(png, gdf.geometry.iloc[gi], tuple(txy[j]), r, tuple(gxy), roads, closed, routes_b[j])
             trow = tes_v.loc[ids[j]]
+            sub_judul = (f"{lv['label_lengkap']} · T_ideal {PU.angka(grid.at[gi, f't_ideal_{key}'], 2)} menit · "
+                         f"T_aktual {PU.angka(grid.at[gi, f't_aktual_{key}'], 2)} menit · "
+                         f"DI {PU.angka(grid.at[gi, f'di_{key}'], 2)} · TES: {tes_name(trow)} "
+                         f"({KAT_LABEL.get(trow['kategori'], trow['kategori'])})")
+            _map(png, gdf.geometry.iloc[gi], tuple(txy[j]), r, tuple(gxy), roads, closed, routes_b[j],
+                 f"Rute grid TAS {int(grid.at[gi, 'id_grid'])} ke TES terdekat", sub_judul)
             num = lambda c: (float(grid.at[gi, c]) if c in grid.columns and pd.notna(grid.at[gi, c]) else None)
             rows.append({
                 "id_grid": int(grid.at[gi, "id_grid"]), "id_grid_asli": str(grid.at[gi, "id_grid_asli"]),

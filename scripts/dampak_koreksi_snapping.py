@@ -69,11 +69,14 @@ def route_vertex(graph_pack, gxy, txy, max_snap=300.0):
 
 
 def maps(rows, gdf, roads, pack, tes_xy_by_id):
+    """Peta sebelum/sesudah koreksi snapping (kiri v5, kanan v6) dengan tata letak scripts/peta_util.py; kedua
+    peta memakai batas tampilan yang sama."""
     import matplotlib
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
     from backend import thesis as T
     from scripts import peta_util as PU
+    W = PU.WARNA
+    rasio = 1.0
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("peta_*.png"):
         old.unlink()
@@ -85,34 +88,39 @@ def maps(rows, gdf, roads, pack, tes_xy_by_id):
         old = route_vertex(pack, gxy, txy)
         new = T.tas_routes(pack, gxy[None], txy[None])[0]
         pts = [gxy, txy] + (old["xy"] if old else []) + (new["xy"] if new else [])
-        x0, x1 = min(p[0] for p in pts) - 150, max(p[0] for p in pts) + 150
-        y0, y1 = min(p[1] for p in pts) - 150, max(p[1] for p in pts) + 150
-        x0, x1, y0, y1 = PU.sesuaikan_rasio(x0, x1, y0, y1, rmin=0.8)
-        tinggi = PU.tinggi_pas(12.5, (y1 - y0) / (x1 - x0), 2, lebar_peta=2.2, atas=0.86)
-        fig, axes, panel = PU.tata_letak(2, ukuran=(12.5, tinggi), dpi=120, lebar_peta=2.2, lebar_panel=1.0,
-                                         tinggi_panel=(1.3, 2.4, 0.95), atas=0.86)
-        for ax, rt, lab, t_akt in ((axes[0], old, "v5 (snapping ke verteks)", r["T_aktual v5"]),
-                                   (axes[1], new, "v6 (snapping ke ruas)", r["T_aktual v6"])):
-            roads.cx[x0:x1, y0:y1].plot(ax=ax, color="#9ca3af", linewidth=0.6)
+        x0, x1, y0, y1 = PU.sesuaikan_rasio(min(p[0] for p in pts) - 150, max(p[0] for p in pts) + 150,
+                                            min(p[1] for p in pts) - 150, max(p[1] for p in pts) + 150, rasio, rasio)
+        fig, axes, panel = PU.kanvas(2, rasio, judul_peta=True)
+        jalan = roads.cx[x0:x1, y0:y1]
+        for ax, rt, lab, t_akt in ((axes[0], old, "v5: snapping ke verteks terdekat", r["T_aktual v5"]),
+                                   (axes[1], new, "v6: snapping ke ruas terdekat", r["T_aktual v6"])):
+            jalan.plot(ax=ax, color=W["jalan"], linewidth=0.5, zorder=1)
             geom = gdf.geometry.iloc[gi]
             for poly in getattr(geom, "geoms", [geom]):
-                ax.fill(*poly.exterior.xy, facecolor="#a855f7", alpha=0.35, edgecolor="#6b21a8", linewidth=1)
-            ax.plot([gxy[0], txy[0]], [gxy[1], txy[1]], color="#111827", linestyle=":", linewidth=1.2)
+                ax.fill(*poly.exterior.xy, facecolor=W["tas"], alpha=0.35, edgecolor=W["tas"], linewidth=1.0, zorder=4)
+            ax.plot([gxy[0], txy[0]], [gxy[1], txy[1]], color=PU.WARNA_TEKS, linestyle=(0, (1, 1.5)), linewidth=1.0,
+                    zorder=5)
             if rt:
                 p = rt["xy"]
-                ax.plot([q[0] for q in p[1:-1]], [q[1] for q in p[1:-1]], color="#2563eb", linewidth=1.6)
+                ax.plot([q[0] for q in p[1:-1]], [q[1] for q in p[1:-1]], color=W["rute"], linewidth=1.5, zorder=6)
                 for a_, b_ in ((p[0], p[1]), (p[-2], p[-1])):
-                    ax.plot([a_[0], b_[0]], [a_[1], b_[1]], color="#f97316", linewidth=1.4, linestyle="--")
-            ax.plot(*txy, marker="*", markersize=12, color="#16a34a")
-            ax.set_xlim(x0, x1)
-            ax.set_ylim(y0, y1)
-            ax.set_title(f"{lab}\nT_aktual {fmt(t_akt)} menit", fontsize=8.5)
-        PU.selesaikan(fig, axes, panel, PU.handles_rute(), "Keterangan", batas=False, fontsize_legenda=7)
-        PU.judul(fig, axes, panel, f"Rute grid {gi} ke TES terdekat (Baseline): sebelum dan sesudah koreksi snapping",
-                 fontsize=10, y=0.975)
+                    ax.plot([a_[0], b_[0]], [a_[1], b_[1]], color=W["rute"], linewidth=1.0, linestyle=(0, (3, 1.5)),
+                            zorder=6)
+            ax.plot(*txy, marker="*", markersize=11, color=W["tes"], markeredgecolor=PU.WARNA_TEKS,
+                    markeredgewidth=0.5, zorder=7)
+            PU.atur_batas(ax, x0, x1, y0, y1)
+            PU.judul_peta(ax, f"{lab} · T_aktual {fmt(t_akt)} menit")
+        PU.judul(fig, f"Dampak koreksi snapping pada rute grid {gi}",
+                 "Baseline · rute dari grid ke TES terdekat (garis lurus) sebelum (v5) dan sesudah (v6) koreksi")
+        y_blok = PU.blok_bawah(panel, axes[0], "Sumber: hasil analisis v5 dan v6; jaringan jalan OpenStreetMap")
+        objek = [PU.kotak(W["tas"], "Grid", alpha=0.6), PU.titik(W["tes"], "TES terdekat (garis lurus)", ukuran=9),
+                 PU.garis(PU.WARNA_TEKS, "Garis lurus grid ke TES", 1.0, (0, (1, 1.5))),
+                 PU.garis(W["rute"], "Rute jaringan jalan", 1.5),
+                 PU.garis(W["rute"], "Ruas snapping", 1.0, (0, (3, 1.5)))]
+        PU.periksa_ruang(PU.legenda(panel, [("Rute dan objek", objek), ("Jaringan jalan", [PU.garis(W["jalan"], "Jalan", 0.8)])]),
+                         y_blok, f"peta_{gi}")
         png = OUT / f"peta_{gi}.png"
-        fig.savefig(png, bbox_inches="tight", pad_inches=0.1)
-        plt.close(fig)
+        PU.simpan(fig, png)
         files.append(png)
     return files
 

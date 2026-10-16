@@ -832,18 +832,36 @@ def tables_k_compare(R, grid):
 
 
 # ── peta ────────────────────────────────────────────────────────────────────
-def _simpan_peta(path, judul, gambar, handles, judul_legenda=None):
-    """Satu peta kabupaten dengan tata letak baku (scripts.peta_util): peta berbingkai + panel mata angin, legenda,
-    dan skala. `gambar(ax)` menggambar isi peta."""
-    import matplotlib.pyplot as plt
+# Kartografi mengikuti scripts/peta_util.py (warna semantik, tata letak tetap, 300 dpi). Bagian ini hanya memilih
+# kolom hasil terkunci, menghitung jumlah per kategori, dan menyusun judul/legenda; tidak ada nilai yang diubah.
+SUMBER_PETA = "Sumber: hasil analisis (data/locked); batas administrasi BIG, skala 1:10.000"
+
+
+def _peta_kabupaten(path, utama, sub, gambar, kelompok, catatan=""):
+    """Satu peta kabupaten: batas tampilan, latar netral, dan posisi elemen identik untuk semua peta."""
     from scripts import peta_util as PU
-    fig, (ax,), panel = PU.tata_letak()
+    rasio = _rasio_kabupaten()
+    fig, (ax,), panel = PU.kanvas(1, rasio)
+    PU.latar_kabupaten(ax)
     gambar(ax)
-    PU.beri_ruang(ax)
-    PU.selesaikan(fig, [ax], panel, handles, judul_legenda)
-    PU.judul(fig, [ax], panel, judul)
-    fig.savefig(path, bbox_inches="tight", pad_inches=0.12)
-    plt.close(fig)
+    PU.gambar_batas(ax)
+    PU.atur_batas(ax, *PU.batas_tampilan_kabupaten(rasio))
+    PU.judul(fig, utama, sub)
+    y_blok = PU.blok_bawah(panel, ax, SUMBER_PETA)
+    PU.periksa_ruang(PU.legenda(panel, kelompok, catatan), y_blok, path.name)
+    PU.simpan(fig, path)
+
+
+def _rasio_kabupaten(pad_m=900.0):
+    from scripts import peta_util as PU
+    x0, y0, x1, y1 = PU.batas_kabupaten().total_bounds
+    return (y1 - y0 + 2 * pad_m) / (x1 - x0 + 2 * pad_m)
+
+
+def _referensi(PU, luar=True):
+    """Kelompok legenda referensi: area di luar grid analisis (netral) dan batas kabupaten."""
+    return ("Referensi", ([PU.kotak(PU.WARNA["luar_grid"], "Di luar grid analisis")] if luar else [])
+            + [PU.handle_batas_kab()])
 
 
 def write_maps(R, grid, out_dir):
@@ -851,100 +869,158 @@ def write_maps(R, grid, out_dir):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.patches import Patch
-    from scripts.peta_util import CRS_PETA
-    if not GEOM.exists():
+    from backend.engine import EVAC_TIME_MIN, Cfg
+    from backend.thesis import TAS_DI_ABSOLUTE, TAS_T_AKTUAL_MIN, TAS_T_IDEAL_MAX
+    from scripts import peta_util as PU
+    if not GEOM.exists() or PU.batas_kabupaten() is None:
         return
-    g = gpd.read_file(GEOM).to_crs(CRS_PETA)[["id_grid", "geometry"]].merge(grid, on="id_grid", how="left")
+    W = PU.WARNA
+    g = gpd.read_file(GEOM).to_crs(PU.CRS_PETA)[["id_grid", "geometry"]].merge(grid, on="id_grid", how="left")
+    N = len(g)
     d = out_dir / "peta"
     d.mkdir(exist_ok=True)
     lv = lambda key: R["levels"][key]["label_lengkap"]
-    n_ = lambda m: id_num(int(m.sum()), 0)
+    lab = lambda nama, m: PU.label_hitung(nama, int(np.sum(m)), N)
+    catatan = f"Angka: jumlah grid 100 × 100 m (persentase dari {PU.angka(N)} grid analisis)."
+    banjir = lambda key, m: ([("Status banjir", [PU.kotak(W["tergenang"], lab("Tergenang", m))])]
+                             if np.sum(m) else [])
+    ev, v = PU.angka(EVAC_TIME_MIN), PU.angka(Cfg().walking_speed_m_per_min)
+
+    # 1. Tipologi SDWFCM (ordinal: Tipologi 1 = akses terbaik). Grid Tergenang tidak diklasterkan → tidak digambar
+    #    (keputusan peneliti; tampil pada peta Grid Tergenang) dan menyatu dengan latar netral "tidak diklasterkan".
     for k in [int(x) for x in R["k_keluaran"]]:
+        pal = PU.TIPOLOGI[k]
         for key in LEVEL_ORDER:
             st = g[f"state_{key}_k{k}"].values
-            ada = st < k                                  # grid Tergenang tidak diklasterkan → tidak digambar
-            _simpan_peta(d / f"tipologi_K{k}_{key}.png", f"Tipologi SDWFCM K = {k} — {lv(key)}",
-                         lambda ax: g[ada].plot(ax=ax, color=np.array(CLUSTER_COLORS)[st[ada]], linewidth=0),
-                         [Patch(color=CLUSTER_COLORS[c], label=tip(c, k)) for c in range(k)], "Tipologi")
-    akses_pal = {0: "#22c55e", 1: "#f97316", 2: "#0f172a", 3: TERGENANG_COLOR}
+            ada = st < k
+            _peta_kabupaten(
+                d / f"tipologi_K{k}_{key}.png", f"Tipologi aksesibilitas TES banjir (SDWFCM, K = {k})",
+                f"{lv(key)} · tipologi diurutkan dari rata-rata waktu tempuh minimum ke TES terpendek (Tipologi 1) "
+                f"hingga terpanjang (Tipologi {k})",
+                lambda ax: PU.isi_grid(ax, g[ada], np.array(pal)[st[ada]]),
+                [("Tipologi (urut: akses terbaik → terburuk)", [PU.kotak(pal[c], lab(tip(c, k), st == c))
+                                                                for c in range(k)]),
+                 ("Tidak diklasterkan", [PU.kotak(W["luar_grid"], "Di luar grid analisis atau grid Tergenang"
+                                         + (f" (Tergenang: {PU.angka(int(np.sum(st == k)))} grid)" if np.sum(st == k) else ""))]),
+                 ("Referensi", [PU.handle_batas_kab()])], catatan)
+
+    # 2. Kategori akses (ordinal Terjangkau → Jauh → Terputus; Tergenang = status banjir terpisah)
     for key in ("baseline", "sedang", "tinggi"):
         st = g[f"akses_{key}"].values
-        _simpan_peta(d / f"akses_{key}.png", f"Kategori akses (batas 30 menit) — {lv(key)}",
-                     lambda ax: g.plot(ax=ax, color=[akses_pal[int(v)] for v in st], linewidth=0),
-                     [Patch(color=akses_pal[c], label=f"{AKSES[c]} ({n_(st == c)})") for c in range(4)],
-                     "Kategori akses (jumlah grid)")
+        warna = np.array([W["terjangkau"], W["jauh"], W["tak_terjangkau"], W["tergenang"]])[st]
+        _peta_kabupaten(
+            d / f"akses_{key}.png", "Kategori akses ke TES terdekat",
+            f"{lv(key)} · batas waktu evakuasi {ev} menit, berjalan kaki {v} m/menit",
+            lambda ax: PU.isi_grid(ax, g, warna),
+            [("Kategori akses", [PU.kotak(W["terjangkau"], lab(f"Terjangkau (≤ {ev} menit)", st == 0)),
+                                 PU.kotak(W["jauh"], lab(f"Jauh (> {ev} menit)", st == 1)),
+                                 PU.kotak(W["tak_terjangkau"], lab("Terputus (tidak ada TES terjangkau)", st == 2))]),
+             *banjir(key, st == 3), _referensi(PU)], catatan)
+
+    aturan = (f"DI ≥ {PU.angka(TAS_DI_ABSOLUTE)}, T_ideal ≤ {PU.angka(TAS_T_IDEAL_MAX)} menit, "
+              f"T_aktual ≥ {PU.angka(TAS_T_AKTUAL_MIN)} menit")
+
+    # 3. Status TAS per level (TAS = kategori utama; ditonjolkan karena jumlahnya kecil)
+    for key in LEVEL_ORDER:
+        st = g[f"tas_status_{key}"].values
+
+        def gambar(ax, st=st):
+            for s, w_, z in ((0, W["grid_lain"], 2), (3, W["tergenang"], 2), (2, W["tak_terjangkau"], 3)):
+                PU.isi_grid(ax, g[st == s], w_, zorder=z)
+            PU.isi_grid(ax, g[st == 1], W["tas"], tonjolkan=True, zorder=4)
+        _peta_kabupaten(
+            d / f"tas_{key}.png", "Titik Aman Semu (TAS)", f"{lv(key)} · aturan TAS: {aturan}", gambar,
+            [("Status TAS", [PU.kotak(W["tas"], lab("TAS", st == 1)),
+                             PU.kotak(W["tak_terjangkau"], lab(TES_TT, st == 2))]),
+             ("Grid lain", [PU.kotak(W["grid_lain"], lab("Non-TAS", st == 0))]),
+             *banjir(key, st == 3), _referensi(PU)], catatan)
+
+    # 4. Perubahan TAS terhadap Baseline
     b0 = g["tas_status_baseline"].values
-    pal2 = {0: "#e5e7eb", 1: "#dc2626", 2: TERGENANG_COLOR, 3: "#0f172a", 4: "#f59e0b", 5: "#a855f7"}
-    lab2 = {1: "TAS baru akibat banjir", 2: "TAS hilang: jadi Tergenang", 3: f"TAS hilang: jadi {TES_TT}",
-            4: "TAS hilang: lainnya", 5: "TAS tetap", 0: "lainnya"}
     for key in ("sedang", "tinggi"):
         st = g[f"tas_status_{key}"].values
         cls = np.select([(b0 != 1) & (st == 1), (b0 == 1) & (st == 3), (b0 == 1) & (st == 2), (b0 == 1) & (st == 0),
                          (b0 == 1) & (st == 1)], [1, 2, 3, 4, 5], default=0)
-        _simpan_peta(d / f"tas_perubahan_{key}.png", f"Perubahan TAS terhadap Baseline — {lv(key)}",
-                     lambda ax: g.plot(ax=ax, color=[pal2[int(v)] for v in cls], linewidth=0),
-                     [Patch(color=pal2[c], label=f"{lab2[c]} ({n_(cls == c)})") for c in (1, 5, 2, 3, 4)]
-                     + [Patch(color=pal2[0], label="Grid lainnya")], "Perubahan TAS (jumlah grid)")
+        warna = {1: W["dipicu"], 5: W["tas"], 2: W["tergenang"], 3: W["tak_terjangkau"], 4: W["tak_teratribusi"]}
 
-    pal3 = {"dipicu banjir": "#dc2626", "diperparah banjir": "#f59e0b", "tidak berubah": "#a855f7",
-            "lainnya": "#0f172a"}
+        def gambar(ax, cls=cls, warna=warna):
+            PU.isi_grid(ax, g[cls == 0], W["grid_lain"])
+            for c, w_ in warna.items():
+                PU.isi_grid(ax, g[cls == c], w_, tonjolkan=True, zorder=4)
+        _peta_kabupaten(
+            d / f"tas_perubahan_{key}.png", "Perubahan Titik Aman Semu terhadap Baseline",
+            f"{lv(key)} dibandingkan Baseline · aturan TAS: {aturan}", gambar,
+            [("TAS pada level ini", [PU.kotak(warna[1], lab("TAS baru (bukan TAS di Baseline)", cls == 1)),
+                                     PU.kotak(warna[5], lab("TAS tetap (juga TAS di Baseline)", cls == 5))]),
+             ("TAS Baseline yang hilang", [PU.kotak(warna[2], lab("Menjadi Tergenang", cls == 2)),
+                                           PU.kotak(warna[3], lab(f"Menjadi {TES_TT}", cls == 3)),
+                                           PU.kotak(warna[4], lab("Menjadi Non-TAS", cls == 4))]),
+             ("Grid lain", [PU.kotak(W["grid_lain"], lab("Bukan TAS di kedua level", cls == 0))]),
+             _referensi(PU)], catatan)
+
+    # 5. Atribusi pengaruh banjir pada TAS
+    warna_atr = {"dipicu banjir": W["dipicu"], "diperparah banjir": W["diperparah"], "tidak berubah": W["tas"],
+                 "lainnya": W["tak_teratribusi"]}
     for key in ("sedang", "tinggi"):
         col = f"atribusi_banjir_{key}"
         if col not in g.columns:
             continue
-        atr = g[col].astype(object).where(g[col].notna(), None)
+        atr = g[col].astype(object).where(g[col].notna(), None).values
         wet = g[f"tergenang_{key}"].values == 1
-        colors = [pal3.get(a, TERGENANG_COLOR if w else "#e5e7eb") for a, w in zip(atr, wet)]
-        _simpan_peta(d / f"atribusi_banjir_{key}.png", f"Atribusi banjir pada TAS — {lv(key)}",
-                     lambda ax: g.plot(ax=ax, color=colors, linewidth=0),
-                     [Patch(color=pal3[a], label=f"{a} ({n_(atr == a)})") for a in ATRIBUSI]
-                     + [Patch(color=TERGENANG_COLOR, label="Tergenang"), Patch(color="#e5e7eb", label="Bukan TAS")],
-                     "Atribusi banjir (jumlah TAS)")
+        bukan = np.array([a is None for a in atr]) & ~wet
+
+        def gambar(ax, atr=atr, wet=wet, bukan=bukan):
+            PU.isi_grid(ax, g[bukan], W["grid_lain"])
+            PU.isi_grid(ax, g[wet], W["tergenang"])
+            for a, w_ in warna_atr.items():
+                PU.isi_grid(ax, g[atr == a], w_, tonjolkan=True, zorder=4)
+        _peta_kabupaten(
+            d / f"atribusi_banjir_{key}.png", "Atribusi pengaruh banjir pada Titik Aman Semu",
+            f"{lv(key)} dibandingkan Baseline · atribusi hanya untuk grid TAS pada level ini",
+            gambar,
+            [("Atribusi TAS", [PU.kotak(w_, lab(a.capitalize(), atr == a)) for a, w_ in warna_atr.items()]),
+             ("Grid lain", [PU.kotak(W["grid_lain"], lab("Bukan TAS", bukan))]),
+             *banjir(key, wet), _referensi(PU)], catatan)
 
     write_membership_maps(R, g, d, plt)
-
-    pal = {0: "#e5e7eb", 1: "#a855f7", 2: "#0f172a", 3: TERGENANG_COLOR}
-    lab = {0: "Non-TAS", 1: "TAS", 2: TES_TT, 3: "Tergenang"}
-    for key in LEVEL_ORDER:
-        st = g[f"tas_status_{key}"].values
-        _simpan_peta(d / f"tas_{key}.png", f"Titik Aman Semu — {lv(key)}",
-                     lambda ax: g.plot(ax=ax, color=[pal[int(s)] for s in st], linewidth=0),
-                     [Patch(color=pal[s], label=f"{lab[s]} ({n_(st == s)})") for s in pal],
-                     "Status TAS (jumlah grid)\nDI ≥ 2, T_ideal ≤ 5 menit,\nT_aktual ≥ 30 menit")
 
 
 def write_membership_maps(R, g, d, plt, k=4, klaster=(2, 3)):
     """Peta derajat keanggotaan fuzzy terkunci (u_c, K = 4) terhadap Tipologi 3 dan Tipologi 4, per level. Hanya
-    visualisasi dari thesis_pooled_results.csv.gz; grid Tergenang tidak digambar. Dua peta berdampingan dengan satu
-    panel (mata angin, skala warna bersama, legenda, skala batang)."""
-    from matplotlib.cm import ScalarMappable
-    from matplotlib.colors import Normalize
-    from scripts.peta_util import beri_ruang, selesaikan, tata_letak
+    visualisasi dari thesis_pooled_results.csv.gz; grid Tergenang tidak diklasterkan sehingga tidak digambar (latar
+    netral "tidak diklasterkan"). Dua peta berdampingan dengan satu panel dan satu skala warna bersama."""
+    import matplotlib
+    from matplotlib.colors import LinearSegmentedColormap
+    from scripts import peta_util as PU
     pool_f = LOCKED / "thesis_pooled_results.csv.gz"
     if str(k) not in R["model"] or not pool_f.exists():
         return
+    base = matplotlib.colormaps["YlOrBr"]
+    cmap = LinearSegmentedColormap.from_list("keanggotaan", base(np.linspace(0.15, 1.0, 256)))
     cols = [f"u{c}_k{k}" for c in klaster]
     pool = pd.read_csv(pool_f, usecols=["id_grid", "level"] + cols)
+    rasio = _rasio_kabupaten()
     for key in LEVEL_ORDER:
         sub = pool[pool["level"] == key].set_index("id_grid")
-        fig, axes, panel = tata_letak(len(klaster), ukuran=(14, 7.6), lebar_panel=0.95)
+        fig, axes, panel = PU.kanvas(len(klaster), rasio, judul_peta=True)
         for ax, c, col in zip(axes, klaster, cols):
             val = g["id_grid"].map(sub[col])
-            wet = val.isna()                              # Tergenang: tidak diklasterkan → tidak digambar
-            g[~wet].assign(u=val[~wet]).plot(ax=ax, column="u", cmap="viridis", vmin=0, vmax=1, linewidth=0)
-            beri_ruang(ax)
-            ax.set_title(f"Keanggotaan terhadap Tipologi {c + 1} (K = {k})", fontsize=9.5)
-        selesaikan(fig, axes, panel, [], None, legenda_y=0.7)
-        cax = panel["legenda"].inset_axes([0.1, 0.83, 0.8, 0.055])
-        cb = fig.colorbar(ScalarMappable(Normalize(0, 1), "viridis"), cax=cax, orientation="horizontal")
-        cb.ax.tick_params(labelsize=7)
-        cb.set_label("Derajat keanggotaan", fontsize=7.5, fontweight="bold")
-        cb.ax.xaxis.set_label_position("top")
-        fig.suptitle(f"Derajat keanggotaan SDWFCM K = {k} — {R['levels'][key]['label_lengkap']}\n"
-                     "(grid Tergenang tidak ditampilkan)", fontsize=10.5, fontweight="bold", y=0.975)
-        fig.savefig(d / f"keanggotaan_K{k}_{key}.png", bbox_inches="tight", pad_inches=0.12)
-        plt.close(fig)
+            ada = val.notna().values
+            PU.latar_kabupaten(ax)
+            PU.isi_grid(ax, g[ada], cmap(val[ada].values))
+            PU.gambar_batas(ax)
+            PU.atur_batas(ax, *PU.batas_tampilan_kabupaten(rasio))
+            PU.judul_peta(ax, tip(c, k))
+        PU.judul(fig, f"Derajat keanggotaan fuzzy SDWFCM (K = {k})",
+                 f"{R['levels'][key]['label_lengkap']} · keanggotaan setiap grid terhadap dua tipologi dengan akses "
+                 "terburuk (0 = bukan anggota, 1 = anggota penuh)")
+        y = PU.kolorbar(panel, cmap, 0, 1, "Derajat keanggotaan")
+        y_blok = PU.blok_bawah(panel, axes[0], SUMBER_PETA)
+        sisa = PU.legenda(panel, [("Tidak diklasterkan", [PU.kotak(PU.WARNA["luar_grid"],
+                                                                   "Di luar grid analisis atau grid Tergenang")]),
+                                  ("Referensi", [PU.handle_batas_kab()])], y_awal=y)
+        PU.periksa_ruang(sisa, y_blok, f"keanggotaan_K{k}_{key}")
+        PU.simpan(fig, d / f"keanggotaan_K{k}_{key}.png")
 
 
 # ── keluaran ────────────────────────────────────────────────────────────────
