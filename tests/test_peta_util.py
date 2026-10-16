@@ -100,7 +100,7 @@ def test_biru_hanya_untuk_banjir():
         return s_ > 0.25 and 185 <= h * 360 <= 245
     semua = {**P.WARNA, **{f"tip{k}_{i}": c for k, r in P.TIPOLOGI.items() for i, c in enumerate(r)},
              **{f"pend_{k}_{i}": c for k, r in P.PENDUDUK.items() for i, c in enumerate(r)}}
-    assert {k for k, c in semua.items() if biru(c)} <= {"tergenang", "jalan_tutup"}
+    assert {k for k, c in semua.items() if biru(c)} <= {"tergenang", "tergenang_latar", "jalan_tutup"}
 
 
 def test_batas_kabupaten_satu_poligon_utm():

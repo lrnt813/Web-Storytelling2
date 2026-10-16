@@ -886,23 +886,28 @@ def write_maps(R, grid, out_dir):
                              if np.sum(m) else [])
     ev, v = PU.angka(EVAC_TIME_MIN), PU.angka(Cfg().walking_speed_m_per_min)
 
-    # 1. Tipologi SDWFCM (ordinal: Tipologi 1 = akses terbaik). Grid Tergenang tidak diklasterkan → tidak digambar
-    #    (keputusan peneliti; tampil pada peta Grid Tergenang) dan menyatu dengan latar netral "tidak diklasterkan".
+    # 1. Tipologi SDWFCM (ordinal: Tipologi 1 = akses terbaik). Grid Tergenang tidak diklasterkan; digambar biru
+    #    lembut (status banjir) agar tidak tertukar dengan area di luar grid analisis (netral).
     for k in [int(x) for x in R["k_keluaran"]]:
         pal = PU.TIPOLOGI[k]
         for key in LEVEL_ORDER:
             st = g[f"state_{key}_k{k}"].values
             ada = st < k
+            tg = st == k
+
+            def gambar(ax, st=st, ada=ada, tg=tg, pal=pal):
+                PU.isi_grid(ax, g[tg], W["tergenang_latar"])
+                PU.isi_grid(ax, g[ada], np.array(pal)[st[ada]])
             _peta_kabupaten(
                 d / f"tipologi_K{k}_{key}.png", f"Tipologi aksesibilitas TES banjir (SDWFCM, K = {k})",
                 f"{lv(key)} · tipologi diurutkan dari rata-rata waktu tempuh minimum ke TES terpendek (Tipologi 1) "
                 f"hingga terpanjang (Tipologi {k})",
-                lambda ax: PU.isi_grid(ax, g[ada], np.array(pal)[st[ada]]),
+                gambar,
                 [("Tipologi (urut: akses terbaik → terburuk)", [PU.kotak(pal[c], lab(tip(c, k), st == c))
                                                                 for c in range(k)]),
-                 ("Tidak diklasterkan", [PU.kotak(W["luar_grid"], "Di luar grid analisis atau grid Tergenang"
-                                         + (f" (Tergenang: {PU.angka(int(np.sum(st == k)))} grid)" if np.sum(st == k) else ""))]),
-                 ("Referensi", [PU.handle_batas_kab()])], catatan)
+                 *([("Status banjir", [PU.kotak(W["tergenang_latar"], lab("Tergenang (tidak diklasterkan)", tg))])]
+                   if np.sum(tg) else []),
+                 _referensi(PU)], catatan)
 
     # 2. Kategori akses (ordinal Terjangkau → Jauh → Terputus; Tergenang = status banjir terpisah)
     for key in ("baseline", "sedang", "tinggi"):
@@ -988,7 +993,8 @@ def write_maps(R, grid, out_dir):
 def write_membership_maps(R, g, d, plt, k=4, klaster=(2, 3)):
     """Peta derajat keanggotaan fuzzy terkunci (u_c, K = 4) terhadap Tipologi 3 dan Tipologi 4, per level. Hanya
     visualisasi dari thesis_pooled_results.csv.gz; grid Tergenang tidak diklasterkan sehingga tidak digambar (latar
-    netral "tidak diklasterkan"). Dua peta berdampingan dengan satu panel dan satu skala warna bersama."""
+    biru lembut sebagai status banjir, terpisah dari area di luar grid analisis). Dua peta berdampingan dengan satu
+    panel dan satu skala warna bersama."""
     import matplotlib
     from matplotlib.colors import LinearSegmentedColormap
     from scripts import peta_util as PU
@@ -996,7 +1002,8 @@ def write_membership_maps(R, g, d, plt, k=4, klaster=(2, 3)):
     if str(k) not in R["model"] or not pool_f.exists():
         return
     base = matplotlib.colormaps["YlOrBr"]
-    cmap = LinearSegmentedColormap.from_list("keanggotaan", base(np.linspace(0.15, 1.0, 256)))
+    # mulai 0,35: keanggotaan 0 tetap berbeda dari latar netral "di luar grid analisis"
+    cmap = LinearSegmentedColormap.from_list("keanggotaan", base(np.linspace(0.35, 1.0, 256)))
     cols = [f"u{c}_k{k}" for c in klaster]
     pool = pd.read_csv(pool_f, usecols=["id_grid", "level"] + cols)
     rasio = _rasio_kabupaten()
@@ -1006,7 +1013,9 @@ def write_membership_maps(R, g, d, plt, k=4, klaster=(2, 3)):
         for ax, c, col in zip(axes, klaster, cols):
             val = g["id_grid"].map(sub[col])
             ada = val.notna().values
+            tg = g[f"tergenang_{key}"].values == 1
             PU.latar_kabupaten(ax)
+            PU.isi_grid(ax, g[tg], PU.WARNA["tergenang_latar"])
             PU.isi_grid(ax, g[ada], cmap(val[ada].values))
             PU.gambar_batas(ax)
             PU.atur_batas(ax, *PU.batas_tampilan_kabupaten(rasio))
@@ -1016,9 +1025,10 @@ def write_membership_maps(R, g, d, plt, k=4, klaster=(2, 3)):
                  "terburuk (0 = bukan anggota, 1 = anggota penuh)")
         y = PU.kolorbar(panel, cmap, 0, 1, "Derajat keanggotaan")
         y_blok = PU.blok_bawah(panel, axes[0], SUMBER_PETA)
-        sisa = PU.legenda(panel, [("Tidak diklasterkan", [PU.kotak(PU.WARNA["luar_grid"],
-                                                                   "Di luar grid analisis atau grid Tergenang")]),
-                                  ("Referensi", [PU.handle_batas_kab()])], y_awal=y)
+        n_tg = int((g[f"tergenang_{key}"].values == 1).sum())
+        sisa = PU.legenda(panel, [*([("Status banjir", [PU.kotak(PU.WARNA["tergenang_latar"], PU.label_hitung(
+                                       "Tergenang (tidak diklasterkan)", n_tg, len(g)))])] if n_tg else []),
+                                  _referensi(PU)], y_awal=y)
         PU.periksa_ruang(sisa, y_blok, f"keanggotaan_K{k}_{key}")
         PU.simpan(fig, d / f"keanggotaan_K{k}_{key}.png")
 

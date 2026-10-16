@@ -42,6 +42,7 @@ WARNA = {
     "luar_grid": "#f4f4f2",        # di dalam kabupaten, di luar grid analisis / tidak diklasterkan
     "grid_lain": "#c8c8c8",        # grid analisis tanpa kategori yang disorot (Non-TAS, bukan TAS, lainnya)
     "tergenang": "#5b9bd5",        # genangan banjir (satu-satunya pemakaian biru)
+    "tergenang_latar": "#a9cbe8",  # Tergenang pada peta yang tidak mengklasterkannya (biru sama, lebih lembut)
     "tak_terjangkau": "#7f2f0a",   # tidak terjangkau lewat jaringan jalan (bukan hitam: batas wilayah gelap)
     "tas": "#aa4499",              # Titik Aman Semu
     "dipicu": "#d55e00",           # muncul/dipicu oleh banjir

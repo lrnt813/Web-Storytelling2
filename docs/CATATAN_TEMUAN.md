@@ -646,9 +646,11 @@ Tidak ada perubahan pada data, geometri, kelas, ambang, CRS, maupun hasil terkun
   Satu pasangan masih di bawah ambang ketat: "Menjadi Non-TAS" vs "Menjadi TES terdekat tidak terjangkau" pada peta
   perubahan TAS (ΔE deuteranopia ≈ 10; masing-masing 3 dan 7 grid); dibedakan juga oleh label legenda.
 - **N-3. Area kosong diberi makna.** Grid analisis hanya mencakup ± 39% luas kabupaten; area kabupaten di luar grid
-  kini diisi abu-abu sangat muda ("Di luar grid analisis"). Pada peta tipologi dan keanggotaan, grid Tergenang tetap
-  tidak digambar (keputusan K-4) dan menyatu dengan kelas netral "Tidak diklasterkan: di luar grid analisis atau grid
-  Tergenang" (jumlah grid Tergenang dicantumkan), sehingga tidak ada lagi area putih yang ambigu.
+  diisi abu-abu sangat muda ("Di luar grid analisis", kelompok Referensi). Pada peta tipologi dan keanggotaan, grid
+  Tergenang (tidak diklasterkan) digambar **biru lembut** (#a9cbe8, keluarga biru genangan) dengan legenda sendiri
+  "Status banjir: Tergenang (tidak diklasterkan) — n (%)", sehingga tidak lagi berbagi warna dan legenda dengan area
+  di luar grid (koreksi peneliti; menggantikan penggabungan keduanya dalam satu kelas netral). Skala warna keanggotaan
+  dimulai dari YlOrBr 0,35 agar keanggotaan 0 tidak menyerupai latar netral.
 - **N-4. Legenda** memuat jumlah grid dan persentase (dari 22.673 grid) yang dihitung dari data, dikelompokkan
   menjadi kategori utama, status/kondisi tambahan, dan referensi. Dua label diperjelas tanpa mengubah data:
   "TAS baru akibat banjir" → "TAS baru (bukan TAS di Baseline)" (kelas ini tidak menguji penyebab; penyebab ada pada
